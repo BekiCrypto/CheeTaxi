@@ -1,0 +1,1244 @@
+// CheeTaxi — Prisma Schema
+// The single source of truth for the platform data model.
+// Covers: Identity, Passengers, Drivers, Fleets, Vehicles, Trips, Dispatch,
+// Pricing, Subscriptions, Payments, Wallet, Promotions, Support, Notifications,
+// Fraud, Compliance, Audit, Localization, Feature Flags.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  PLATFORM_ADMIN
+  OPERATIONS
+  FINANCE
+  SUPPORT
+  DISPATCHER
+  COMPLIANCE
+  SAFETY
+  FRAUD
+  MARKETING
+  FLEET_MANAGER
+  REGIONAL_MANAGER
+  CITY_MANAGER
+  REGULATOR
+  DRIVER
+  PASSENGER
+  DEVELOPER
+  AUDITOR
+  READ_ONLY
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNSPECIFIED
+}
+
+enum VehicleType {
+  TAXI
+  RIDE_SHARING
+  MOTORCYCLE
+  THREE_WHEELER
+  COURIER
+  FOOD_DELIVERY
+  PARCEL
+  MEDICAL
+  TRUCK
+  RENTAL
+  INTERCITY
+  EMERGENCY
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  SUSPENDED
+  VERIFICATION_PENDING
+}
+
+enum DriverStatus {
+  ONLINE
+  OFFLINE
+  ON_TRIP
+  BUSY
+  SUSPENDED
+  REJECTED
+  PENDING_KYC
+}
+
+enum DriverVerificationStage {
+  PHONE_VERIFIED
+  KYC_SUBMITTED
+  KYC_VERIFIED
+  BACKGROUND_CHECK_PENDING
+  BACKGROUND_CHECK_PASSED
+  LICENSE_VERIFIED
+  VEHICLE_VERIFIED
+  ONBOARDING_COMPLETE
+}
+
+enum TripStatus {
+  REQUESTED
+  SEARCHING
+  DRIVER_ASSIGNED
+  DRIVER_ARRIVING
+  DRIVER_ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED_BY_PASSENGER
+  CANCELLED_BY_DRIVER
+  CANCELLED_BY_SYSTEM
+  NO_DRIVER_FOUND
+}
+
+enum TripMode {
+  TAXI
+  RIDE_SHARING
+  MOTORCYCLE
+  THREE_WHEELER
+  COURIER
+  FOOD_DELIVERY
+  PARCEL
+  MEDICAL
+  TRUCK
+  SCHEDULED
+  AIRPORT
+  CORPORATE
+  SCHOOL
+  RENTAL
+  INTERCITY
+  EMERGENCY
+}
+
+enum PaymentMethod {
+  CASH
+  WALLET
+  CARD
+  CORPORATE_ACCOUNT
+  SUBSCRIPTION
+}
+
+enum TransactionType {
+  TRIP_PAYMENT
+  SUBSCRIPTION_PAYMENT
+  WALLET_TOP_UP
+  WALLET_WITHDRAWAL
+  REFUND
+  BONUS
+  PENALTY
+  COMMISSION_REVERSAL
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum SubscriptionPlanTier {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CORPORATE_FLEET
+  ENTERPRISE
+  GOVERNMENT
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING_PAYMENT
+  GRACE_PERIOD
+}
+
+enum WalletType {
+  PASSENGER
+  DRIVER
+  CORPORATE
+  PLATFORM_REVENUE
+  ESCROW
+}
+
+enum RatingRole {
+  PASSENGER_TO_DRIVER
+  DRIVER_TO_PASSENGER
+  PASSENGER_TO_SUPPORT
+  DRIVER_TO_SUPPORT
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+  ESCALATED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  IN_APP
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum SOSStatus {
+  TRIGGERED
+  ACKNOWLEDGED
+  RESPONDING
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum FleetType {
+  CORPORATE
+  GOVERNMENT
+  PARTNER
+  MERCHANT
+}
+
+enum PromoCodeType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_RIDE
+  WALLET_CREDIT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  PERMISSION_CHANGE
+  CONFIG_CHANGE
+}
+
+enum Country {
+  ETHIOPIA
+  KENYA
+  NIGERIA
+  GHANA
+  SOUTH_AFRICA
+  EGYPT
+  MOROCCO
+  RWANDA
+  TANZANIA
+  UGANDA
+  SENEGAL
+  IVORY_COAST
+  OTHER
+}
+
+// ─── IDENTITY & USERS ───────────────────────────────────────────────────────
+
+model User {
+  id                String         @id @default(cuid())
+  publicId          String         @unique @default(cuid())
+  email             String?        @unique
+  phone             String         @unique
+  phoneVerified     Boolean        @default(false)
+  emailVerified     Boolean        @default(false)
+  passwordHash      String?
+  firstName         String
+  lastName          String
+  middleName        String?
+  avatarUrl         String?
+  gender            Gender         @default(UNSPECIFIED)
+  dateOfBirth       DateTime?
+  preferredLanguage String         @default("en")
+  country           Country        @default(ETHIOPIA)
+  city              String?
+  timezone          String         @default("Africa/Addis_Ababa")
+  role              UserRole       @default(PASSENGER)
+  status            UserStatus     @default(PENDING_VERIFICATION)
+  mfaEnabled        Boolean        @default(false)
+  mfaSecret         String?
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  deletedAt         DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  roles             UserRoleAssignment[]
+  permissions       UserPermission[]
+  passenger         Passenger?
+  driver            Driver?
+  sessions          UserSession[]
+  devices           UserDevice[]
+  notifications     Notification[]
+  supportTickets    SupportTicket[]  @relation("ReporterTickets")
+  assignedTickets   SupportTicket[]  @relation("AssigneeTickets")
+  auditLogs         AuditLog[]
+  sosAlerts         SOSAlert[]
+  ratingsGiven      Rating[]        @relation("RatingFromUser")
+  ratingsReceived   Rating[]        @relation("RatingToUser")
+  referralsMade     Referral[]      @relation("Referrer")
+  referralsUsed     Referral?       @relation("ReferredUser")
+  referralCode      String?         @unique
+  wallet            Wallet?
+  walletTransactions WalletTransaction[] @relation("WalletTxUser")
+  subscriptions     Subscription[]
+  promoRedemptions  PromoRedemption[]
+  tripsAsPassenger  Trip[]          @relation("TripPassenger")
+  tripEventsTriggered TripEvent[]   @relation("TripEventActor")
+  savedPlaces       SavedPlace[]
+  favoriteDrivers   FavoriteDriver[]
+  complaints        Complaint[]
+
+  @@index([phone])
+  @@index([email])
+  @@index([role, status])
+  @@index([country, city])
+}
+
+model UserRoleAssignment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole
+  scope     String?  // e.g. "city:addis_ababa" or "fleet:abc"
+  grantedBy String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, role, scope])
+  @@index([userId])
+}
+
+model UserPermission {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission  String   // e.g. "trips:read", "drivers:approve"
+  resource    String?
+  resourceId  String?
+  granted     Boolean  @default(true)
+  grantedBy   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, permission, resource, resourceId])
+  @@index([userId])
+}
+
+model UserSession {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  deviceInfo     Json?
+  ipAddress      String?
+  userAgent      String?
+  location       Json?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+}
+
+model UserDevice {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceToken    String?  // FCM token
+  platform       String   // ios | android | web
+  deviceModel    String?
+  osVersion      String?
+  appVersion     String?
+  trustScore     Float    @default(1.0)
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, platform, deviceToken])
+  @@index([userId])
+}
+
+// ─── PASSENGER ──────────────────────────────────────────────────────────────
+
+model Passenger {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalTrips      Int      @default(0)
+  completedTrips  Int      @default(0)
+  cancelledTrips  Int      @default(0)
+  totalSpent      Decimal  @default(0) @db.Decimal(12, 2)
+  ratingAverage   Float    @default(5.0)
+  ratingCount     Int      @default(0)
+  isGuest         Boolean  @default(false)
+  blockedFromBooking Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  savedPlaces     SavedPlace[]
+  favoriteDrivers FavoriteDriver[]
+  trips           Trip[]   @relation("TripPassenger")
+
+  @@index([userId])
+}
+
+model SavedPlace {
+  id          String   @id @default(cuid())
+  passengerId String
+  passenger   Passenger @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String   // home, work, gym, ...
+  address     String
+  latitude    Float
+  longitude   Float
+  placeType   String   @default("other")
+  createdAt   DateTime @default(now())
+
+  @@index([passengerId])
+}
+
+model FavoriteDriver {
+  id          String   @id @default(cuid())
+  passengerId String
+  passenger   Passenger @relation(fields: [passengerId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverId    String
+  nickname    String?
+  createdAt   DateTime @default(now())
+
+  @@unique([passengerId, driverId])
+}
+
+// ─── DRIVER ─────────────────────────────────────────────────────────────────
+
+model Driver {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber     String   @unique
+  licenseExpiry     DateTime
+  licenseIssuingCountry Country @default(ETHIOPIA)
+  licenseFrontUrl   String
+  licenseBackUrl    String?
+  backgroundCheckPassed Boolean @default(false)
+  backgroundCheckDate DateTime?
+  backgroundCheckExpiry DateTime?
+  kycStatus         DriverVerificationStage @default(PENDING_KYC)
+  status            DriverStatus @default(OFFLINE)
+  online            Boolean  @default(false)
+  fleetId           String?
+  fleet             Fleet?   @relation(fields: [fleetId], references: [id])
+  currentVehicleId  String?
+  currentVehicle    Vehicle? @relation("CurrentVehicle", fields: [currentVehicleId], references: [id])
+  ratingAverage     Float    @default(5.0)
+  ratingCount       Int      @default(0)
+  totalTrips        Int      @default(0)
+  completedTrips    Int      @default(0)
+  cancelledTrips    Int      @default(0)
+  acceptanceRate    Float    @default(1.0)
+  completionRate    Float    @default(1.0)
+  totalEarnings     Decimal  @default(0) @db.Decimal(14, 2)
+  lifetimeRating    Float    @default(5.0)
+  tier              String   @default("standard") // standard | premium | elite
+  availableModes    VehicleType[] @default([TAXI])
+  // Geolocation (updated live)
+  latitude          Float?
+  longitude         Float?
+  heading           Float?
+  speedKmh          Float?
+  accuracyMeters    Float?
+  locationUpdatedAt DateTime?
+  // Activation
+  approvedAt        DateTime?
+  approvedBy        String?
+  deactivatedAt     DateTime?
+  deactivationReason String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  vehicles          Vehicle[]
+  trips             Trip[]   @relation("TripDriver")
+  ratingsReceived   Rating[] @relation("RatingToUser")
+  fleetMemberships  FleetMember[]
+  subscriptionAssignments DriverSubscriptionAssignment[]
+  locationHistory   DriverLocationHistory[]
+  tripEvents        TripEvent[] @relation("TripEventDriver")
+  heatMapContributions DriverHeatMap[]
+  earningsWithdrawals WithdrawalRequest[]
+
+  @@index([userId])
+  @@index([status, online])
+  @@index([fleetId])
+  @@index([kycStatus])
+}
+
+model DriverLocationHistory {
+  id          String   @id @default(cuid())
+  driverId    String
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  latitude    Float
+  longitude   Float
+  heading     Float?
+  speedKmh    Float?
+  accuracyMeters Float?
+  recordedAt  DateTime @default(now())
+
+  @@index([driverId, recordedAt])
+}
+
+model DriverHeatMap {
+  id          String   @id @default(cuid())
+  driverId    String
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  geohash     String
+  latitude    Float
+  longitude   Float
+  hourOfDay   Int
+  weekday     Int
+  observationCount Int @default(1)
+  avgWaitMinutes Float?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([driverId, geohash, hourOfDay, weekday])
+  @@index([geohash])
+}
+
+model DriverDocument {
+  id          String   @id @default(cuid())
+  driverId    String
+  documentType String  // license | insurance | vehicle_registration | ...
+  fileUrl     String
+  status      String   @default("pending") // pending | verified | rejected
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([driverId, documentType])
+}
+
+// ─── VEHICLE ────────────────────────────────────────────────────────────────
+
+model Vehicle {
+  id              String   @id @default(cuid())
+  driverId        String
+  driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  currentDriver   Driver?  @relation("CurrentVehicle", fields: [currentDriverId], references: [id])
+  currentDriverId String?  @unique
+  fleetId         String?
+  fleet           Fleet?   @relation(fields: [fleetId], references: [id])
+  plateNumber     String   @unique
+  make            String
+  model           String
+  year            Int
+  color           String
+  vehicleType     VehicleType
+  capacity        Int      @default(4)
+  hasAC           Boolean  @default(true)
+  wheelChairAccessible Boolean @default(false)
+  insuranceNumber String
+  insuranceExpiry DateTime
+  registrationNumber String
+  registrationExpiry DateTime
+  photoUrl        String?
+  status          VehicleStatus @default(VERIFICATION_PENDING)
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  trips           Trip[]   @relation("TripVehicle")
+
+  @@index([driverId])
+  @@index([fleetId])
+  @@index([vehicleType, status])
+}
+
+// ─── FLEET ──────────────────────────────────────────────────────────────────
+
+model Fleet {
+  id          String   @id @default(cuid())
+  name        String
+  type        FleetType
+  contactName String
+  contactEmail String?
+  contactPhone String
+  country     Country
+  city        String?
+  taxId       String?
+  contractStartDate DateTime?
+  contractEndDate DateTime?
+  commissionRate Float @default(0) // not used — subscription model
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     FleetMember[]
+  vehicles    Vehicle[]
+  trips       Trip[]   @relation("TripFleet")
+  corporateWallet Wallet? @relation("FleetWallet")
+
+  @@index([type, isActive])
+}
+
+model FleetMember {
+  id          String   @id @default(cuid())
+  fleetId     String
+  fleet       Fleet    @relation(fields: [fleetId], references: [id], onDelete: Cascade)
+  driverId    String
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  role        String   @default("driver") // driver | manager | owner
+  joinedAt    DateTime @default(now())
+
+  @@unique([fleetId, driverId])
+}
+
+// ─── TRIP ───────────────────────────────────────────────────────────────────
+
+model Trip {
+  id              String   @id @default(cuid())
+  publicId        String   @unique @default(cuid())
+  passengerId     String
+  passenger       Passenger @relation("TripPassenger", fields: [passengerId], references: [id])
+  passengerUserId String
+  driverId        String?
+  driver          Driver?  @relation("TripDriver", fields: [driverId], references: [id])
+  vehicleId       String?
+  vehicle         Vehicle? @relation("TripVehicle", fields: [vehicleId], references: [id])
+  fleetId         String?
+  fleet           Fleet?   @relation("TripFleet", fields: [fleetId], references: [id])
+  mode            TripMode
+  status          TripStatus @default(REQUESTED)
+  // Route
+  pickupAddress   String
+  pickupLatitude  Float
+  pickupLongitude Float
+  pickupGeohash   String
+  dropoffAddress  String
+  dropoffLatitude Float
+  dropoffLongitude Float
+  dropoffGeohash  String
+  stops           Json?    // [{address, lat, lng, ...}]
+  routePolyline   String?
+  distanceMeters  Float?
+  durationSeconds Int?
+  // Times
+  requestedAt     DateTime @default(now())
+  acceptedAt      DateTime?
+  arrivedAt       DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  cancellationReason String?
+  scheduledFor    DateTime?
+  // Pricing
+  baseFare        Decimal  @db.Decimal(10, 2)
+  distanceFare    Decimal  @default(0) @db.Decimal(10, 2)
+  timeFare        Decimal  @default(0) @db.Decimal(10, 2)
+  surgeMultiplier  Float   @default(1.0)
+  promoDiscount   Decimal  @default(0) @db.Decimal(10, 2)
+  taxAmount       Decimal  @default(0) @db.Decimal(10, 2)
+  totalFare       Decimal  @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  paymentMethod   PaymentMethod @default(CASH)
+  // Status
+  passengerRated  Boolean  @default(false)
+  driverRated     Boolean  @default(false)
+  // Delivery-specific
+  deliveryOtp     String?
+  proofOfDeliveryUrl String?
+  signatureUrl    String?
+  // Tracking
+  shareToken      String?  @unique
+  shareExpiresAt  DateTime?
+  // Refs
+  events          TripEvent[]
+  ratings         Rating[]
+  invoice         Invoice?
+  payment         Payment?
+  sosAlerts       SOSAlert[]
+  complaint       Complaint?
+
+  @@index([passengerId, status])
+  @@index([driverId, status])
+  @@index([status, requestedAt])
+  @@index([mode, status])
+  @@index([pickupGeohash])
+}
+
+model TripEvent {
+  id          String   @id @default(cuid())
+  tripId      String
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  driverId    String?
+  driver      Driver?  @relation("TripEventDriver", fields: [driverId], references: [id])
+  actorUserId String?
+  actor       User?    @relation("TripEventActor", fields: [actorUserId], references: [id])
+  eventType   String   // requested, assigned, arrived, started, completed, cancelled, ...
+  metadata    Json?
+  latitude    Float?
+  longitude   Float?
+  occurredAt  DateTime @default(now())
+
+  @@index([tripId, occurredAt])
+}
+
+// ─── PRICING & SURGE ────────────────────────────────────────────────────────
+
+model PricingTier {
+  id            String   @id @default(cuid())
+  vehicleType   VehicleType
+  city          String
+  country       Country
+  baseFare      Decimal  @db.Decimal(10, 2)
+  perKm         Decimal  @db.Decimal(10, 2)
+  perMinute     Decimal  @db.Decimal(10, 2)
+  minFare       Decimal  @db.Decimal(10, 2)
+  cancellationFee Decimal @default(0) @db.Decimal(10, 2)
+  waitingFeePerMinute Decimal @default(0) @db.Decimal(10, 2)
+  nightSurcharge Float  @default(0) // 0.0 = none, 0.2 = +20%
+  isActive      Boolean  @default(true)
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([vehicleType, city, country, effectiveFrom])
+  @@index([city, country, isActive])
+}
+
+model SurgeZone {
+  id           String   @id @default(cuid())
+  geohash      String
+  city         String
+  multiplier   Float
+  reason       String?  // demand, weather, event, ...
+  triggeredAt  DateTime @default(now())
+  expiresAt    DateTime
+  isActive     Boolean  @default(true)
+
+  @@index([geohash, isActive])
+  @@index([city, isActive])
+}
+
+// ─── SUBSCRIPTIONS ──────────────────────────────────────────────────────────
+
+model SubscriptionPlan {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  tier            SubscriptionPlanTier
+  price           Decimal  @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  durationDays    Int
+  maxDrivers      Int      @default(1) // for fleet plans
+  description     String?
+  features        Json?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscriptions   Subscription[]
+  driverAssignments DriverSubscriptionAssignment[]
+
+  @@index([tier, isActive])
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId          String
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  status          SubscriptionStatus @default(PENDING_PAYMENT)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  autoRenew       Boolean  @default(false)
+  amountPaid      Decimal  @default(0) @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  paymentId       String?
+  cancelledAt     DateTime?
+  cancellationReason String?
+  gracePeriodEndsAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  driverAssignments DriverSubscriptionAssignment[]
+
+  @@index([userId, status])
+  @@index([endsAt])
+}
+
+model DriverSubscriptionAssignment {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  driverId        String
+  driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  planId          String
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id])
+  assignedAt      DateTime @default(now())
+
+  @@unique([subscriptionId, driverId])
+  @@index([driverId])
+}
+
+// ─── WALLETS & PAYMENTS ─────────────────────────────────────────────────────
+
+model Wallet {
+  id              String   @id @default(cuid())
+  userId          String?  @unique
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fleetId         String?  @unique
+  fleet           Fleet?   @relation("FleetWallet", fields: [fleetId], references: [id])
+  type            WalletType
+  balance         Decimal  @default(0) @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  pendingBalance  Decimal  @default(0) @db.Decimal(14, 2)
+  frozen          Boolean  @default(false)
+  frozenReason    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions    WalletTransaction[]
+
+  @@index([userId])
+  @@index([fleetId])
+}
+
+model WalletTransaction {
+  id              String   @id @default(cuid())
+  walletId        String
+  wallet          Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?    @relation("WalletTxUser", fields: [userId], references: [id])
+  type            TransactionType
+  amount          Decimal  @db.Decimal(14, 2)
+  balanceBefore   Decimal  @db.Decimal(14, 2)
+  balanceAfter    Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  reference       String   @unique
+  description     String?
+  tripId          String?
+  subscriptionId  String?
+  paymentId       String?
+  initiatedBy     String?
+  metadata        Json?
+  status          TransactionStatus @default(SUCCESS)
+  createdAt       DateTime @default(now())
+
+  @@index([walletId, createdAt])
+  @@index([userId, createdAt])
+  @@index([reference])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  publicId        String   @unique @default(cuid())
+  tripId          String?  @unique
+  trip            Trip?    @relation(fields: [tripId], references: [id])
+  userId          String
+  amount          Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  method          PaymentMethod
+  provider        String   // cash | stripe | chapa | telebirr | wallet
+  providerRef     String?
+  providerPayload Json?
+  status          TransactionStatus @default(PENDING)
+  processedAt     DateTime?
+  failedAt        DateTime?
+  refundedAt      DateTime?
+  refundAmount    Decimal? @db.Decimal(14, 2)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([provider, status])
+}
+
+model WithdrawalRequest {
+  id              String   @id @default(cuid())
+  driverId        String
+  driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  amount          Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  method          String   // bank | mobile_money | cash_pickup
+  destination     Json?
+  status          TransactionStatus @default(PENDING)
+  processedBy     String?
+  processedAt     DateTime?
+  failureReason   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([driverId, status])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  publicId        String   @unique @default(cuid())
+  tripId          String   @unique
+  trip            Trip     @relation(fields: [tripId], references: [id])
+  passengerUserId String
+  subtotal        Decimal  @db.Decimal(10, 2)
+  tax             Decimal  @db.Decimal(10, 2)
+  discount        Decimal  @db.Decimal(10, 2)
+  total           Decimal  @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  issuedAt        DateTime @default(now())
+  pdfUrl          String?
+
+  @@index([passengerUserId, issuedAt])
+}
+
+// ─── RATINGS & COMPLAINTS ───────────────────────────────────────────────────
+
+model Rating {
+  id          String   @id @default(cuid())
+  tripId      String
+  trip        Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  fromUserId  String
+  fromUser    User     @relation("RatingFromUser", fields: [fromUserId], references: [id])
+  toUserId    String
+  toUser      User     @relation("RatingToUser", fields: [toUserId], references: [id])
+  role        RatingRole
+  stars       Int      // 1..5
+  comment     String?
+  tags        String[]
+  createdAt   DateTime @default(now())
+
+  @@unique([tripId, role, fromUserId])
+  @@index([toUserId])
+}
+
+model Complaint {
+  id          String   @id @default(cuid())
+  tripId      String?  @unique
+  trip        Trip?    @relation(fields: [tripId], references: [id])
+  reporterUserId String
+  reporter    User     @relation(fields: [reporterUserId], references: [id])
+  category    String   // safety | driver_behavior | billing | lost_item | other
+  severity    SupportTicketPriority @default(MEDIUM)
+  description String
+  attachments Json?
+  status      String   @default("open")
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  resolution  String?
+  createdAt   DateTime @default(now())
+
+  @@index([reporterUserId])
+  @@index([status])
+}
+
+// ─── PROMOTIONS & REFERRALS ─────────────────────────────────────────────────
+
+model PromoCode {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  type          PromoCodeType
+  value         Decimal  @db.Decimal(10, 2)
+  currency      String   @default("ETB")
+  maxRedemptions Int?
+  perUserLimit  Int      @default(1)
+  startsAt      DateTime
+  endsAt        DateTime?
+  isActive      Boolean  @default(true)
+  minTripFare   Decimal? @db.Decimal(10, 2)
+  appliesTo     VehicleType[] @default([])
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  redemptions   PromoRedemption[]
+
+  @@index([code, isActive])
+}
+
+model PromoRedemption {
+  id          String   @id @default(cuid())
+  promoCodeId String
+  promoCode   PromoCode @relation(fields: [promoCodeId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  tripId      String?
+  discountApplied Decimal @default(0) @db.Decimal(10, 2)
+  redeemedAt  DateTime @default(now())
+
+  @@unique([promoCodeId, userId])
+  @@index([userId])
+}
+
+model Referral {
+  id              String   @id @default(cuid())
+  referrerUserId  String
+  referrer        User     @relation("Referrer", fields: [referrerUserId], references: [id])
+  referredUserId  String   @unique
+  referredUser    User     @relation("ReferredUser", fields: [referredUserId], references: [id])
+  rewardType      String   // wallet_credit | free_ride | subscription_credit
+  rewardAmount    Decimal  @default(0) @db.Decimal(10, 2)
+  rewardCurrency  String   @default("ETB")
+  status          String   @default("pending") // pending | eligible | paid | rejected
+  paidAt          DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([referrerUserId])
+}
+
+// ─── SUPPORT ────────────────────────────────────────────────────────────────
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  publicId    String   @unique @default(cuid())
+  reporterUserId String
+  reporter    User     @relation("ReporterTickets", fields: [reporterUserId], references: [id])
+  assigneeId  String?
+  assignee    User?    @relation("AssigneeTickets", fields: [assigneeId], references: [id])
+  subject     String
+  description String
+  category    String
+  priority    SupportTicketPriority @default(MEDIUM)
+  status      SupportTicketStatus @default(OPEN)
+  tags        String[]
+  attachments Json?
+  firstResponseAt DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages    SupportMessage[]
+
+  @@index([status, priority])
+  @@index([assigneeId, status])
+  @@index([reporterUserId])
+}
+
+model SupportMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderId    String?
+  senderName  String?
+  body        String
+  attachments Json?
+  isInternal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+// ─── NOTIFICATIONS ──────────────────────────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel     NotificationChannel
+  title       String
+  body        String
+  payload     Json?
+  status      NotificationStatus @default(QUEUED)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failureReason String?
+  provider    String?  // firebase | twilio | sendgrid | ...
+  providerRef String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([channel, status])
+}
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  channel     NotificationChannel
+  language    String   @default("en")
+  title       String
+  body        String
+  variables   String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([code, channel, language])
+}
+
+// ─── SOS / SAFETY ───────────────────────────────────────────────────────────
+
+model SOSAlert {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tripId      String?
+  trip        Trip?    @relation(fields: [tripId], references: [id])
+  latitude    Float
+  longitude   Float
+  accuracyMeters Float?
+  reason      String?
+  audioRecordingUrl String?
+  status      SOSStatus @default(TRIGGERED)
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+// ─── AUDIT & COMPLIANCE ─────────────────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+  action      AuditAction
+  resource    String
+  resourceId  String?
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([resource, resourceId])
+  @@index([action, createdAt])
+}
+
+// ─── LOCALIZATION & FEATURE FLAGS ───────────────────────────────────────────
+
+model Translation {
+  id          String   @id @default(cuid())
+  namespace   String   @default("common")
+  key         String
+  language    String
+  value       String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([namespace, key, language])
+}
+
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  description String?
+  enabled     Boolean  @default(false)
+  rolloutPercentage Float @default(0)
+  audience    Json?    // {countries:[], roles:[]}
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── DISPATCH / SYSTEM STATE ────────────────────────────────────────────────
+
+model DispatchQueue {
+  id          String   @id @default(cuid())
+  tripId      String   @unique
+  geohash     String
+  vehicleType VehicleType
+  priority    Int      @default(0)
+  attempts    Int      @default(0)
+  status      String   @default("queued") // queued | assigned | expired
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([geohash, vehicleType, status, createdAt])
+}
+
+model DriverOffer {
+  id          String   @id @default(cuid())
+  tripId      String
+  driverId    String
+  offeredAt   DateTime @default(now())
+  expiresAt   DateTime
+  accepted    Boolean  @default(false)
+  rejected    Boolean  @default(false)
+  respondedAt DateTime?
+
+  @@index([tripId, accepted])
+  @@index([driverId, expiresAt])
+}
+
+// ─── GEO / PLACES ───────────────────────────────────────────────────────────
+
+model Geofence {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // airport | school | restricted | surge | service_area
+  geometry    Json     // GeoJSON polygon
+  country     Country
+  city        String?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type, isActive])
+}
+
+model Place {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  latitude    Float
+  longitude   Float
+  geohash     String
+  category    String   // airport | hospital | mall | university | ...
+  country     Country
+  city        String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([geohash])
+  @@index([category, city])
+}

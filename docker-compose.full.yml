@@ -1,0 +1,81 @@
+# CheeTaxi — Docker Compose for full local stack
+# Brings up: PostgreSQL, Redis, OpenSearch, API, web-landing, web-admin, web-dispatcher
+# Usage: docker compose -f docker-compose.full.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cheetaxi
+      POSTGRES_PASSWORD: cheetaxi
+      POSTGRES_DB: cheetaxi
+    ports: ["5432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cheetaxi"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: [redis_data:/data]
+
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m"
+    ports: ["9200:9200"]
+    volumes: [opensearch_data:/usr/share/opensearch/data]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports: ["4000:4000"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://cheetaxi:cheetaxi@postgres:5432/cheetaxi
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-only-secret-change-me
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      API_PORT: "4000"
+      WEB_BASE_URL: http://localhost:3000
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  web-landing:
+    build:
+      context: .
+      dockerfile: apps/web-landing/Dockerfile
+    ports: ["3000:3000"]
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on: [api]
+
+  web-admin:
+    build:
+      context: .
+      dockerfile: apps/web-admin/Dockerfile
+    ports: ["3001:3001"]
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on: [api]
+
+  web-dispatcher:
+    build:
+      context: .
+      dockerfile: apps/web-dispatcher/Dockerfile
+    ports: ["3002:3002"]
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on: [api]
+
+volumes:
+  postgres_data:
+  redis_data:
+  opensearch_data:

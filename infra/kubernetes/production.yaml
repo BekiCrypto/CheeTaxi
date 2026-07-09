@@ -1,0 +1,280 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cheetaxi
+  labels:
+    name: cheetaxi
+---
+# ─── ConfigMap ──────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cheetaxi-config
+  namespace: cheetaxi
+data:
+  NODE_ENV: "production"
+  API_PORT: "4000"
+  REDIS_URL: "redis://cheetaxi-redis:6379"
+  WEB_BASE_URL: "https://cheetaxi.africa"
+---
+# ─── API Deployment ─────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-api
+  namespace: cheetaxi
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cheetaxi-api
+  template:
+    metadata:
+      labels:
+        app: cheetaxi-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/bekicrypto/cheetaxi-api:latest
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - configMapRef:
+                name: cheetaxi-config
+            - secretRef:
+                name: cheetaxi-secrets
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 4000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-api
+  namespace: cheetaxi
+spec:
+  selector:
+    app: cheetaxi-api
+  ports:
+    - port: 80
+      targetPort: 4000
+---
+# ─── Web Landing Deployment ─────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-web-landing
+  namespace: cheetaxi
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cheetaxi-web-landing
+  template:
+    metadata:
+      labels:
+        app: cheetaxi-web-landing
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/bekicrypto/cheetaxi-web-landing:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-web-landing
+  namespace: cheetaxi
+spec:
+  selector:
+    app: cheetaxi-web-landing
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+# ─── Web Admin Deployment ───────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-web-admin
+  namespace: cheetaxi
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cheetaxi-web-admin
+  template:
+    metadata:
+      labels:
+        app: cheetaxi-web-admin
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/bekicrypto/cheetaxi-web-admin:latest
+          ports:
+            - containerPort: 3001
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-web-admin
+  namespace: cheetaxi
+spec:
+  selector:
+    app: cheetaxi-web-admin
+  ports:
+    - port: 80
+      targetPort: 3001
+---
+# ─── Redis ──────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-redis
+  namespace: cheetaxi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cheetaxi-redis
+  template:
+    metadata:
+      labels:
+        app: cheetaxi-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-redis
+  namespace: cheetaxi
+spec:
+  selector:
+    app: cheetaxi-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: cheetaxi
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+# ─── Ingress ────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cheetaxi-ingress
+  namespace: cheetaxi
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts: [cheetaxi.africa, api.cheetaxi.africa, admin.cheetaxi.africa]
+      secretName: cheetaxi-tls
+  rules:
+    - host: cheetaxi.africa
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cheetaxi-web-landing
+                port: { number: 80 }
+    - host: api.cheetaxi.africa
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cheetaxi-api
+                port: { number: 80 }
+    - host: admin.cheetaxi.africa
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cheetaxi-web-admin
+                port: { number: 80 }
+---
+# ─── HPA: API autoscaling ───────────────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cheetaxi-api-hpa
+  namespace: cheetaxi
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cheetaxi-api
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

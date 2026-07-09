@@ -1,0 +1,179 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9.12.0"
+
+jobs:
+  # ─── Lint + Type-check + Unit Tests ─────────────────────────────────────
+  build-test:
+    name: Lint · Type-check · Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cheetaxi
+          POSTGRES_PASSWORD: cheetaxi
+          POSTGRES_DB: cheetaxi_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cheetaxi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @cheetaxi/database db:generate
+
+      - name: Type-check all packages
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Build packages
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://cheetaxi:cheetaxi@localhost:5432/cheetaxi_test
+          JWT_SECRET: ci-test-secret
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          DATABASE_URL: postgresql://cheetaxi:cheetaxi@localhost:5432/cheetaxi_test
+          JWT_SECRET: ci-test-secret
+          REDIS_URL: redis://localhost:6379
+
+  # ─── Docker build (smoke check) ─────────────────────────────────────────
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        target: [api, web-landing, web-admin, web-dispatcher]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.target }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.target }}/Dockerfile
+          push: false
+          tags: cheetaxi-${{ matrix.target }}:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─── Deploy to production on main branch ────────────────────────────────
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: [build-test, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/bekicrypto/cheetaxi-api:latest
+            ghcr.io/bekicrypto/cheetaxi-api:${{ github.sha }}
+
+      - name: Build & push landing image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web-landing/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/bekicrypto/cheetaxi-web-landing:latest
+            ghcr.io/bekicrypto/cheetaxi-web-landing:${{ github.sha }}
+
+      - name: Build & push admin image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web-admin/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/bekicrypto/cheetaxi-web-admin:latest
+            ghcr.io/bekicrypto/cheetaxi-web-admin:${{ github.sha }}
+
+      - name: Build & push dispatcher image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web-dispatcher/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/bekicrypto/cheetaxi-web-dispatcher:latest
+            ghcr.io/bekicrypto/cheetaxi-web-dispatcher:${{ github.sha }}
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > kubeconfig.yaml
+          export KUBECONFIG=$(pwd)/kubeconfig.yaml
+          kubectl apply -f infra/kubernetes/production.yaml
+          kubectl rollout restart deployment/cheetaxi-api -n cheetaxi
+          kubectl rollout restart deployment/cheetaxi-web-landing -n cheetaxi
+          kubectl rollout restart deployment/cheetaxi-web-admin -n cheetaxi
+          kubectl rollout status deployment/cheetaxi-api -n cheetaxi --timeout=300s

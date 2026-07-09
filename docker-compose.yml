@@ -1,0 +1,68 @@
+# CheeTaxi — Local Development Stack
+# Brings up: PostgreSQL, Redis, OpenSearch, Mailhog
+# Usage: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cheetaxi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cheetaxi
+      POSTGRES_PASSWORD: cheetaxi
+      POSTGRES_DB: cheetaxi
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cheetaxi -d cheetaxi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cheetaxi-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    container_name: cheetaxi-opensearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: cheetaxi-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+
+volumes:
+  postgres_data:
+  redis_data:
+  opensearch_data:

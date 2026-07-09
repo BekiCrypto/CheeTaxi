@@ -1,0 +1,46 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [".env"],
+  "globalEnv": [
+    "NODE_ENV",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "JWT_SECRET",
+    "JWT_ACCESS_EXPIRES_IN",
+    "JWT_REFRESH_EXPIRES_IN",
+    "GOOGLE_MAPS_API_KEY",
+    "OPENSTREETMAP_TILE_URL",
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_CLIENT_EMAIL",
+    "FIREBASE_PRIVATE_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "CHAPA_SECRET_KEY",
+    "TELEBIRR_API_KEY",
+    "SENTRY_DSN",
+    "OTEL_EXPORTER_OTLP_ENDPOINT"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "build/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": []
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

@@ -1,0 +1,56 @@
+# dependencies
+node_modules
+.pnpm-store
+
+# builds
+dist
+build
+.next
+out
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# turbo
+.turbo
+
+# coverage
+coverage
+
+# next.js
+next-env.d.ts
+
+# prisma
+packages/database/prisma/migrations/dev.db*
+
+# flutter / dart
+apps/mobile-*/build
+apps/mobile-*/.dart_tool
+apps/mobile-*/.flutter-plugins
+apps/mobile-*/.flutter-plugins-dependencies
+apps/mobile-*/ios/Pods
+apps/mobile-*/android/.gradle
+apps/mobile-*/android/local.properties
+
+# os
+.DS_Store
+Thumbs.db
+
+# ide
+.vscode
+.idea
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# misc
+.cache
+*.pem
+.envrc
