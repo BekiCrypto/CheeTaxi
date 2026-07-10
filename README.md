@@ -4,7 +4,7 @@
 
 The most modern mobility platform designed for Africa. Passengers ride free. Drivers keep 100% — pay one subscription, drive unlimited.
 
-[![Status](https://img.shields.io/badge/status-phase_2-FFA800)](docs/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-phase_3-FFA800)](docs/ROADMAP.md)
 [![License](https://img.shields.io/badge/license-proprietary-0E1012)](docs/LICENSE.md)
 [![Made in Africa](https://img.shields.io/badge/made_in-Africa-10B981)](https://cheetaxi.africa)
 
@@ -112,41 +112,40 @@ For the full guide, see [`docs/QUICK_START.md`](docs/QUICK_START.md).
 
 ## Status
 
-**Phase 2 — Production Hardening.**
+**Phase 3 — Launch Readiness.**
 
 What's done (cumulative from Phase 1):
 - ✅ Full monorepo with pnpm + Turborepo
 - ✅ Backend API: 22 modules, 100+ endpoints, JWT + OTP auth, RBAC + ABAC
-- ✅ 3 web apps: landing (12 pages), admin (10 sections), dispatcher (real-time)
-- ✅ 2 mobile apps (Flutter): passenger + driver with trip tracking, ratings, wallet, subscriptions
+- ✅ 3 web apps: landing (12 pages) with **i18n wired (en + am + fr)**, admin (10 sections), dispatcher (real-time)
+- ✅ 2 mobile apps (Flutter): passenger + driver with **i18n wired (en + am)** + **offline SQLite cache + sync queue**
 - ✅ Database: 40+ Prisma models, full seed
 - ✅ Infrastructure: Docker Compose + Kubernetes + Terraform
-- ✅ CI/CD: GitHub Actions with build/test/deploy + security scanning
+- ✅ CI/CD: GitHub Actions with build/test/deploy + security scanning + accessibility audit
 - ✅ 22 documentation files
-- ✅ Brand assets: SVG logos, app icon, splash, OpenGraph
+- ✅ Brand assets: SVG logos, app icon, splash, OpenGraph, marketing press release, ASO copy, social templates
 - ✅ Legal pages: Privacy, Terms, Cookies, Help Center, Status, Developer Portal
-- ✅ Unit tests: 11 spec files, 83 test cases (100% pass)
+- ✅ Unit tests: 11 spec files, 83 test cases
+- ✅ **NEW**: Integration tests (Testcontainers) — TripsService, WalletsService, DispatchService
+- ✅ **NEW**: E2E tests (Supertest) — full NestJS app boot, health/metrics/auth/trips
+- ✅ **NEW**: Mobile widget tests (Flutter) — colors, theme, API client
 - ✅ Real payment provider adapters (Stripe, Chapa, Telebirr)
 - ✅ Real SMS provider support (Twilio, Africa's Talking)
-- ✅ Real admin stats endpoint
-- ✅ Real dispatcher driver map
-- ✅ **NEW**: WebSocket realtime gateway (trip events, driver location, notifications, SOS, wallet updates)
-- ✅ **NEW**: Prometheus metrics + Sentry + OpenTelemetry observability stack
-- ✅ **NEW**: Grafana dashboard + Prometheus alerting rules
-- ✅ **NEW**: k6 load testing scripts (auth, trip lifecycle, driver location broadcast)
-- ✅ **NEW**: Security automation (Trivy container scan, CodeQL, pnpm audit, SBOM)
-- ✅ **NEW**: Mobile screens — trip tracking, rating, wallet, subscription, driver offer modal
-- ✅ **NEW**: i18n scaffolding — English, Amharic, French translations
-- ✅ **NEW**: 36 new unit tests (was 47, now 83)
+- ✅ **NEW**: Real FCM push notification delivery via `firebase-admin`
+- ✅ **NEW**: Device token registration endpoints
+- ✅ WebSocket realtime gateway
+- ✅ Observability: Prometheus + Sentry + OpenTelemetry + Grafana
+- ✅ k6 load testing scripts
+- ✅ Security automation: Trivy + CodeQL + pnpm audit + SBOM
+- ✅ **NEW**: Lighthouse CI for accessibility + performance audits
 
-What's deferred (see [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md)):
-- Mobile app store builds + submission (Phase 3)
-- Full test coverage at 80% (currently ~50%)
-- Mobile offline support (Phase 3)
-- FCM push notification delivery (Phase 3)
-- 9-language localization wired into UI (Phase 3)
-- Third-party penetration test (Phase 3)
-- Integration + E2E tests (Phase 3)
+What's still pending before public launch (see [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md)):
+- Mobile app store builds + submission (requires macOS for iOS)
+- Third-party penetration test
+- Production deployment + DNS + TLS
+- 24/7 safety operations team staffing
+- Soft launch with 50 drivers + 500 passengers
+- Founder sign-off on the Launch Checklist
 
 ## Business Model
 

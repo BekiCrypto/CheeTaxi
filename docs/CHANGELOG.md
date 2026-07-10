@@ -5,6 +5,118 @@ All notable changes to CheeTaxi are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-07-10
+
+### Added — Phase 3 Launch Readiness
+
+#### Internationalization (i18n) — fully wired
+- Web landing: next-intl integration with `middleware.ts`, `i18n/request.ts`, `NextIntlClientProvider`
+- Language switcher component in navbar (English / Amharic / French)
+- Hero, StatsBar, Navbar components use `useTranslations()` for all strings
+- Mobile (passenger + driver): `flutter_localizations` + ARB files (en + am)
+- `LocaleNotifier` persists preferred locale via SharedPreferences
+- Language switcher in passenger auth screen
+- Both apps pass `supportedLocales` and `localizationsDelegates` to MaterialApp
+
+#### FCM Push Notification Delivery
+- New `FcmService` (`notifications/providers/fcm.service.ts`)
+- Initializes `firebase-admin` with `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+- No-op if credentials not set (graceful degradation — notifications still stored + delivered via WebSocket)
+- Sends to all device tokens per user in batches of 500 (FCM limit)
+- Android priority `high`, iOS sound `default` + badge `1`
+- Auto-removes invalid tokens (UNREGISTERED / INVALID_ARGUMENT responses)
+- New endpoints: `POST /notifications/device/register`, `POST /notifications/device/unregister`
+- Wired into `NotificationsService.dispatch()` — replaces the previous log-only stub
+- `firebase-admin` added to API dependencies
+
+#### Mobile Offline Support
+- New `OfflineStore` in passenger app (`services/offline_store.dart`)
+  - SQLite database (`cheetaxi.db`) with tables: trips, notifications, pending_ops
+  - Listens to `connectivity_plus` for online/offline transitions
+  - Queues POST/PUT/DELETE operations when offline; replays on reconnect
+  - `syncPending()` called on app start and on connectivity restore
+  - Exposes `isOnline` + `onOnlineChange` stream for UI feedback
+- New `DriverOfflineStore` in driver app
+  - SQLite database (`cheetaxi_driver.db`) with tables: active_trip, earnings, pending_ops, pending_locations
+  - Queues location updates when offline; flushes most-recent on reconnect
+  - Same sync-queue pattern as passenger app
+- Both apps: `sqflite`, `connectivity_plus`, `path_provider` added to pubspec
+
+#### Integration Tests (Testcontainers)
+- New `jest.integration.config.js` with 120s timeout
+- New `test/integration-setup.ts` — starts real PostgreSQL 16 + Redis 7 containers
+- Runs Prisma migrations against the test database automatically
+- New integration test files:
+  - `trips.integration-spec.ts` — full trip lifecycle (request → accept → arrive → start → complete → cancel), fare computation, driver/passenger stats updates, invoice creation
+  - `wallets.integration-spec.ts` — wallet creation, topUp, charge (with insufficient balance rejection), transaction audit trail
+  - `dispatch.integration-spec.ts` — Redis GEO search, dispatch queue, driver offering
+- New npm script: `pnpm --filter @cheetaxi/api test:integration`
+- `testcontainers` added to devDependencies
+
+#### E2E Tests (Supertest)
+- New `jest.e2e.config.js` with 180s timeout
+- New `test/e2e/auth-trips.e2e-spec.ts` — boots the full NestJS app and exercises:
+  - OTP request + verify flow
+  - Unauthenticated trip request rejected (401)
+  - Health check (200 + status:ok)
+  - Readiness check (postgres + redis both ok)
+  - Prometheus metrics endpoint contains `cheetaxi_http_requests_total`
+  - Subscription plans list (public)
+  - Pricing tiers list (public)
+  - Trip share token lookup (404 for non-existent)
+- New npm script: `pnpm --filter @cheetaxi/api test:e2e`
+
+#### Mobile Widget Tests
+- New `apps/mobile-passenger/test/` directory with 3 test files:
+  - `app_colors_test.dart` — color palette integrity
+  - `theme_smoke_test.dart` — MaterialApp renders, FAB tap increments counter
+  - `api_client_test.dart` — singleton, logout clears storage
+- New `apps/mobile-driver/test/api_client_test.dart` — singleton, Dio instance, stopLocationBroadcast
+
+#### Accessibility & Performance Audit
+- New `lighthouserc.json` for the landing page with assertions:
+  - Performance ≥ 0.8 (warn)
+  - Accessibility ≥ 0.9 (error — blocking)
+  - Best Practices ≥ 0.9 (warn)
+  - SEO ≥ 0.9 (error — blocking)
+- New `.github/workflows/accessibility-audit.yml` — runs Lighthouse CI on every PR + weekly
+- Audits 6 pages: home, drivers, corporate, help, privacy, terms
+
+#### Launch Marketing Assets
+- `brand/marketing/press/press-release-2026-07-10.md` — full press release
+- `brand/marketing/aso/app-store-copy.md` — ASO copy for both apps (titles, descriptions, keywords, categories)
+- `brand/marketing/social/templates.md` — Twitter, Instagram, LinkedIn, Telegram, email templates
+
+### Changed
+- `apps/web-landing/package.json` — added `next-intl`
+- `apps/web-landing/next.config.js` — wrapped with `withNextIntl` plugin
+- `apps/web-landing/src/app/layout.tsx` — wraps children in `NextIntlClientProvider`
+- `apps/web-landing/src/components/navbar.tsx` — uses `useTranslations()`, includes `LanguageSwitcher`
+- `apps/web-landing/src/components/hero.tsx` — uses `useTranslations()` for all strings
+- `apps/web-landing/src/components/stats-bar.tsx` — uses `useTranslations()`
+- `apps/mobile-passenger/lib/main.dart` — `ConsumerStatefulWidget`, locale provider, `localizationsDelegates`
+- `apps/mobile-passenger/lib/screens/auth_screen.dart` — uses `AppLocalizations`, language switcher
+- `apps/mobile-passenger/pubspec.yaml` — added sqflite, connectivity_plus, path_provider
+- `apps/mobile-driver/lib/main.dart` — same locale provider pattern
+- `apps/mobile-driver/pubspec.yaml` — added sqflite, connectivity_plus, path_provider
+- `apps/api/src/notifications/notifications.service.ts` — uses real `FcmService` for PUSH channel
+- `apps/api/src/notifications/notifications.module.ts` — provides `FcmService`
+- `apps/api/src/notifications/notifications.controller.ts` — device register/unregister endpoints
+- `apps/api/package.json` — added `firebase-admin`, `testcontainers`, integration + e2e test scripts
+
+### Honest Status
+Phase 3 is the launch-readiness phase. Major additions: real i18n wired into UIs, real FCM push delivery,
+mobile offline support with SQLite cache, integration + e2e tests against real containers,
+mobile widget tests, accessibility audit, marketing launch assets.
+
+What's still pending before public launch (per `docs/LAUNCH_CHECKLIST.md`):
+- Mobile app store builds + submission (requires macOS for iOS)
+- Third-party penetration test
+- Production deployment + DNS + TLS
+- 24/7 safety operations team staffing
+- Soft launch with 50 drivers + 500 passengers
+- Founder sign-off on the Launch Checklist
+
 ## [1.1.0] — 2026-07-10
 
 ### Added — Phase 2 Production Hardening

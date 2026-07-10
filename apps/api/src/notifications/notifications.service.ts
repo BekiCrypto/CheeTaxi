@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { FcmService } from './providers/fcm.service';
 
 interface SendInput {
   channel: 'PUSH' | 'SMS' | 'EMAIL' | 'IN_APP' | 'WHATSAPP';
@@ -15,6 +16,7 @@ export class NotificationsService {
   constructor(
     private prisma: PrismaService,
     private realtime: RealtimeGateway,
+    private fcm: FcmService,
   ) {}
 
   /** Resolve template + render variables + persist + dispatch to provider. */
@@ -60,8 +62,13 @@ export class NotificationsService {
     try {
       switch (channel) {
         case 'PUSH': {
-          // Real impl: admin.messaging(firebaseApp).send({...})
-          this.logger.log(`[PUSH] ${notification.title} → user ${notification.userId}`);
+          // Real FCM delivery via firebase-admin
+          await this.fcm.sendToUser(
+            notification.userId,
+            notification.title,
+            notification.body,
+            (notification.payload as any)?.code ? { code: (notification.payload as any).code } : undefined,
+          );
           break;
         }
         case 'SMS': {

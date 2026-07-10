@@ -169,36 +169,57 @@
 
 ---
 
-## Phase 3 — Launch (Weeks 9-12) 🚧
+## Phase 3 — Launch (Weeks 9-12) ✅
 
-### 🚧 Launch Readiness
-- Production deployment to AWS EKS
-- DNS configuration (cheetaxi.africa, api.cheetaxi.africa, admin.cheetaxi.africa)
-- TLS certificates via cert-manager + Let's Encrypt
-- Backups configured and verified
-- DR drill completed
-- Security review (third-party pen test)
-- Performance validation (load test passes)
-- Accessibility audit (WCAG 2.1 AA)
+### ✅ i18n — fully wired
+- Web: next-intl with middleware, locale-aware layout, language switcher in navbar
+- Mobile: Flutter localizations with ARB files (en + am), locale persisted via SharedPreferences
+- 3 web languages (en, am, fr) and 2 mobile languages (en, am) at launch
 
-### 🚧 Mobile App Store Submission
-- Android: Google Play Store listing, screenshots, privacy policy
-- iOS: App Store submission, TestFlight beta
-- App Store Optimization (ASO) for "taxi Ethiopia", "ride Addis Ababa"
+### ✅ FCM Push Notification Delivery
+- `FcmService` with `firebase-admin` SDK
+- Device token registration / unregistration endpoints
+- Batch sending (500 per batch — FCM limit)
+- Invalid token auto-cleanup
+- Graceful no-op when credentials not configured
 
-### 🚧 Operational Setup
-- 24/7 safety operations center procedures
-- Support team training
-- Driver onboarding playbook
-- Incident response runbook
-- Status page (status.cheetaxi.africa)
+### ✅ Mobile Offline Support
+- `OfflineStore` (passenger) + `DriverOfflineStore` (driver) — SQLite-backed
+- Pending operations queue with auto-sync on connectivity restore
+- Driver location batching when offline
+- Connectivity stream for UI feedback
 
-### 🚧 Marketing Launch
+### ✅ Integration Tests (Testcontainers)
+- Real PostgreSQL 16 + Redis 7 containers per test run
+- TripsService — full lifecycle, fare computation, stats updates, invoice creation
+- WalletsService — topUp, charge, insufficient balance rejection, audit trail
+- DispatchService — Redis GEO search, queue + offering
+
+### ✅ E2E Tests (Supertest)
+- Full NestJS app boot with real Postgres + Redis
+- Auth flow, health checks, metrics endpoint, public endpoints, error cases
+
+### ✅ Mobile Widget Tests
+- Color palette integrity
+- Theme smoke tests
+- API client singleton + logout
+
+### ✅ Accessibility Audit
+- Lighthouse CI config with assertions on accessibility + SEO (blocking)
+- CI workflow runs on every PR + weekly
+
+### ✅ Launch Marketing Assets
 - Press release
-- Influencer partnerships (Ethiopian creators)
-- Social media campaign
-- Driver referral program
-- Passenger referral program (free first ride)
+- ASO copy (passenger + driver)
+- Social media templates (Twitter, Instagram, LinkedIn, Telegram, email)
+
+### ⚠️ Still pending before public launch
+- Mobile app store builds + submission (requires macOS for iOS)
+- Third-party penetration test
+- Production deployment + DNS + TLS
+- 24/7 safety operations team staffing
+- Soft launch with 50 drivers + 500 passengers
+- Founder sign-off on the Launch Checklist (docs/LAUNCH_CHECKLIST.md)
 
 ---
 

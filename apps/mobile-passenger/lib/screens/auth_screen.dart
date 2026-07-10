@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/api_client.dart';
 import '../theme/app_colors.dart';
-import 'home_screen.dart';
+import '../l10n/app_localizations.dart';
+import '../main.dart' show localeProvider;
 import 'otp_verify_screen.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _phoneCtrl = TextEditingController();
   bool _loading = false;
 
@@ -23,10 +25,11 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _sendOtp() async {
+    final l = AppLocalizations.of(context)!;
     final phone = _phoneCtrl.text.trim();
     if (phone.length < 9) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid phone number')),
+        SnackBar(content: Text(l.phoneNumber)),
       );
       return;
     }
@@ -47,8 +50,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
+      appBar: AppBar(title: Text(l.signIn)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -56,26 +60,26 @@ class _AuthScreenState extends State<AuthScreen> {
           children: [
             const SizedBox(height: 24),
             Text(
-              'Welcome to CheeTaxi',
+              l.welcome,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: AppColors.ink900,
                   ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Free rides, no platform charges. Sign in with your phone number.',
-              style: TextStyle(color: AppColors.ink500),
+            Text(
+              l.byContinuing,
+              style: const TextStyle(color: AppColors.ink500, fontSize: 12),
             ),
             const SizedBox(height: 32),
-            const Text('Phone number', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text(l.phoneNumber, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             TextField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                hintText: '+251911223344',
-                prefixIcon: Icon(Icons.phone_outlined),
+              decoration: InputDecoration(
+                hintText: l.phoneHint,
+                prefixIcon: const Icon(Icons.phone_outlined),
               ),
             ),
             const SizedBox(height: 24),
@@ -87,17 +91,37 @@ class _AuthScreenState extends State<AuthScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Send verification code'),
+                  : Text(l.sendCode),
             ),
             const Spacer(),
-            const Center(
-              child: Text(
-                'By signing in you agree to our Terms & Privacy Policy',
-                style: TextStyle(fontSize: 12, color: AppColors.ink400),
-                textAlign: TextAlign.center,
-              ),
+            // Language switcher
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _langButton('en', 'English'),
+                const SizedBox(width: 8),
+                _langButton('am', 'አማርኛ'),
+                const SizedBox(width: 8),
+                _langButton('fr', 'Français'),
+              ],
             ),
+            const SizedBox(height: 16),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _langButton(String code, String label) {
+    final locale = ref.watch(localeProvider);
+    final isSelected = locale.languageCode == code;
+    return TextButton(
+      onPressed: () => ref.read(localeProvider.notifier).set(Locale(code)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w400,
+          color: isSelected ? AppColors.brand : AppColors.ink500,
         ),
       ),
     );

@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 export function Hero() {
+  const t = useTranslations();
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-brand-50 via-white to-white">
       {/* Decorative blobs */}
@@ -17,28 +20,28 @@ export function Hero() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-500" />
               </span>
-              Now live in Addis Ababa
+              {t('hero.badge')}
             </span>
 
             <h1 className="mt-6 font-display text-5xl font-extrabold leading-tight tracking-tight text-ink-900 md:text-6xl lg:text-7xl">
-              The ride of <span className="text-brand-500">Africa</span>, reimagined.
+              {t('hero.title').split(',')[0]},
+              <br />
+              <span className="text-brand-500">{t('hero.title').split(',')[1] ?? 'reimagined.'}</span>
             </h1>
 
             <p className="mt-6 max-w-xl text-lg text-ink-600">
-              CheeTaxi is the most modern mobility platform built for African cities.
-              Passengers ride free of platform charges. Drivers keep 100% of every fare —
-              just one simple subscription.
+              {t('hero.subtitle')}
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link href="#download" className="btn-primary">
-                Download the app
+                {t('hero.download')}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M5 12h14M13 5l7 7-7 7" />
                 </svg>
               </Link>
               <Link href="#drivers" className="btn-ghost">
-                Drive with CheeTaxi
+                {t('hero.driveWith')}
               </Link>
             </div>
 
@@ -47,19 +50,19 @@ export function Hero() {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 13l4 4L19 7" />
                 </svg>
-                No commission, ever
+                {t('hero.noCommission')}
               </div>
               <div className="flex items-center gap-2">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 13l4 4L19 7" />
                 </svg>
-                24/7 safety
+                {t('hero.safety247')}
               </div>
               <div className="flex items-center gap-2">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 13l4 4L19 7" />
                 </svg>
-                9 languages
+                {t('hero.languages')}
               </div>
             </div>
           </div>
@@ -69,7 +72,7 @@ export function Hero() {
             <div className="relative mx-auto aspect-[9/19] w-72 animate-fade-in rounded-[2.5rem] border-8 border-ink-900 bg-ink-900 shadow-2xl">
               <div className="absolute left-1/2 top-2 h-6 w-32 -translate-x-1/2 rounded-full bg-ink-900" />
               <div className="flex h-full flex-col overflow-hidden rounded-[2rem] bg-white">
-                {/* Map placeholder */}
+                {/* Map */}
                 <div className="relative flex-1 bg-gradient-to-br from-emerald-50 to-brand-50">
                   <svg className="absolute inset-0 h-full w-full" viewBox="0 0 200 350" preserveAspectRatio="none">
                     <path d="M 20 50 Q 60 80 80 140 T 160 280" stroke="#94a3b8" strokeWidth="2" fill="none" strokeDasharray="4 4" />

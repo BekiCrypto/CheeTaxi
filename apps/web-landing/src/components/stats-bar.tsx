@@ -1,11 +1,14 @@
-const STATS = [
-  { value: '0%', label: 'Commission for drivers' },
-  { value: '0', label: 'Platform fees for passengers' },
-  { value: '9', label: 'African languages' },
-  { value: '54+', label: 'Countries ready to scale' },
-];
+import { useTranslations } from 'next-intl';
 
 export function StatsBar() {
+  const t = useTranslations();
+  const STATS = [
+    { value: '0%', label: t('stats.commissionFree') },
+    { value: '0', label: t('stats.passengerFee') },
+    { value: '9', label: t('stats.languages') },
+    { value: '54+', label: t('stats.countries') },
+  ];
+
   return (
     <section className="border-y border-ink-100 bg-ink-900 text-white">
       <div className="container-px mx-auto max-w-7xl py-12">

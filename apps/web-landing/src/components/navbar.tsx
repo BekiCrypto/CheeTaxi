@@ -2,9 +2,12 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { LanguageSwitcher } from './language-switcher';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const t = useTranslations();
 
   return (
     <header className="sticky top-0 z-50 border-b border-ink-100 bg-white/80 backdrop-blur-lg">
@@ -19,23 +22,24 @@ export function Navbar() {
         </Link>
 
         <div className="hidden items-center gap-6 lg:flex">
-          <Link href="/drivers" className="text-sm font-medium text-ink-600 hover:text-brand-600">Drive</Link>
-          <Link href="/corporate" className="text-sm font-medium text-ink-600 hover:text-brand-600">Business</Link>
-          <Link href="/fleet" className="text-sm font-medium text-ink-600 hover:text-brand-600">Fleet</Link>
-          <Link href="/developers" className="text-sm font-medium text-ink-600 hover:text-brand-600">Developers</Link>
-          <Link href="/help" className="text-sm font-medium text-ink-600 hover:text-brand-600">Help</Link>
-          <Link href="/status" className="text-sm font-medium text-ink-600 hover:text-brand-600">Status</Link>
+          <Link href="/drivers" className="text-sm font-medium text-ink-600 hover:text-brand-600">{t('nav.drive')}</Link>
+          <Link href="/corporate" className="text-sm font-medium text-ink-600 hover:text-brand-600">{t('nav.business')}</Link>
+          <Link href="/fleet" className="text-sm font-medium text-ink-600 hover:text-brand-600">{t('nav.fleet')}</Link>
+          <Link href="/developers" className="text-sm font-medium text-ink-600 hover:text-brand-600">{t('nav.developers')}</Link>
+          <Link href="/help" className="text-sm font-medium text-ink-600 hover:text-brand-600">{t('nav.help')}</Link>
+          <Link href="/status" className="text-sm font-medium text-ink-600 hover:text-brand-600">{t('nav.status')}</Link>
         </div>
 
         <div className="hidden items-center gap-3 lg:flex">
+          <LanguageSwitcher />
           <Link
             href={`${process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3001'}/login`}
             className="btn-ghost"
           >
-            Sign in
+            {t('nav.signIn')}
           </Link>
           <Link href="/drivers#download" className="btn-primary">
-            Get the app
+            {t('nav.getApp')}
           </Link>
         </div>
 
@@ -53,15 +57,16 @@ export function Navbar() {
       {open && (
         <div className="border-t border-ink-100 bg-white lg:hidden">
           <div className="container-px mx-auto flex max-w-7xl flex-col gap-3 py-4">
-            <Link href="/drivers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Drive</Link>
-            <Link href="/corporate" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Business</Link>
-            <Link href="/fleet" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Fleet</Link>
-            <Link href="/developers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Developers</Link>
-            <Link href="/help" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Help</Link>
-            <Link href="/status" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Status</Link>
+            <Link href="/drivers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">{t('nav.drive')}</Link>
+            <Link href="/corporate" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">{t('nav.business')}</Link>
+            <Link href="/fleet" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">{t('nav.fleet')}</Link>
+            <Link href="/developers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">{t('nav.developers')}</Link>
+            <Link href="/help" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">{t('nav.help')}</Link>
+            <Link href="/status" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">{t('nav.status')}</Link>
             <Link href="/blog" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Blog</Link>
             <Link href="/contact" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Contact</Link>
-            <Link href="/drivers#download" onClick={() => setOpen(false)} className="btn-primary mt-2">Get the app</Link>
+            <div className="mt-2"><LanguageSwitcher /></div>
+            <Link href="/drivers#download" onClick={() => setOpen(false)} className="btn-primary mt-2">{t('nav.getApp')}</Link>
           </div>
         </div>
       )}
