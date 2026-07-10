@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { nanoid } from 'nanoid';
 import { PrismaService } from '../common/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class WalletsService {
   private readonly logger = new Logger('WalletsService');
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeGateway,
+  ) {}
 
   async getMyWallet(userId: string) {
     let wallet = await this.prisma.wallet.findUnique({ where: { userId } });
@@ -24,11 +28,13 @@ export class WalletsService {
     const wallet = await this.getMyWallet(userId);
     const balanceBefore = Number(wallet.balance);
 
+    let newBalance: number;
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.wallet.update({
         where: { id: wallet.id },
         data: { balance: { increment: amount } },
       });
+      newBalance = Number(updated.balance);
 
       await tx.walletTransaction.create({
         data: {
@@ -47,6 +53,8 @@ export class WalletsService {
         },
       });
     });
+    // Real-time wallet update to user
+    this.realtime.emitWalletUpdate(userId, String(newBalance!), currency);
   }
 
   async charge(userId: string, amount: number, currency: string, type: string, referenceId?: string): Promise<void> {
@@ -57,11 +65,13 @@ export class WalletsService {
     }
     const balanceBefore = Number(wallet.balance);
 
+    let newBalance: number;
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.wallet.update({
         where: { id: wallet.id },
         data: { balance: { decrement: amount } },
       });
+      newBalance = Number(updated.balance);
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
@@ -77,6 +87,7 @@ export class WalletsService {
         },
       });
     });
+    this.realtime.emitWalletUpdate(userId, String(newBalance!), currency);
   }
 
   /** Pay driver earnings on trip completion (called by TripsService). */
@@ -92,11 +103,13 @@ export class WalletsService {
     }
     const balanceBefore = Number(wallet.balance);
 
+    let newBalance: number;
     await this.prisma.$transaction(async (tx) => {
       const updated = await tx.wallet.update({
         where: { id: wallet.id },
         data: { balance: { increment: amount } },
       });
+      newBalance = Number(updated.balance);
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
@@ -112,6 +125,7 @@ export class WalletsService {
         },
       });
     });
+    this.realtime.emitWalletUpdate(driver.userId, String(newBalance!), currency);
   }
 
   async requestWithdrawal(driverUserId: string, amount: number, method: string, destination: unknown): Promise<void> {

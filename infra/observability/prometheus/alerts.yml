@@ -1,0 +1,65 @@
+# CheeTaxi — Prometheus alerting rules
+# These fire on conditions that indicate production issues.
+
+groups:
+  - name: cheetaxi-api
+    rules:
+      - alert: ApiHighErrorRate
+        expr: |
+          sum(rate(cheetaxi_http_request_errors_total[5m])) by (route)
+          /
+          sum(rate(cheetaxi_http_requests_total[5m])) by (route)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate > 5% on {{ $labels.route }}"
+          description: "5xx error rate is {{ $value | humanizePercentage }} on route {{ $labels.route }}"
+
+      - alert: ApiHighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(cheetaxi_http_request_duration_seconds_bucket[5m])) by (le, route)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p99 latency > 1s on {{ $labels.route }}"
+
+      - alert: ApiDown
+        expr: up{job="cheetaxi-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CheeTaxi API is down"
+
+      - alert: SosAlertTriggered
+        expr: increase(cheetaxi_sos_triggered_total[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "SOS alert triggered — safety team must acknowledge within 60s"
+
+      - alert: PaymentFailureSpike
+        expr: |
+          sum(rate(cheetaxi_payments_failed_total[5m])) by (provider)
+          /
+          sum(rate(cheetaxi_payments_processed_total[5m])) by (provider)
+          > 0.1
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payment failure rate > 10% for provider {{ $labels.provider }}"
+
+      - alert: DriversOnlineDropping
+        expr: cheetaxi_drivers_online < 50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fewer than 50 drivers online for 15 minutes"

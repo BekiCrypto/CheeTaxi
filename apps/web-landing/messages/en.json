@@ -1,0 +1,54 @@
+{
+  "common.welcome": "Welcome to CheeTaxi",
+  "common.tagline": "Fast. Reliable. African. Modern.",
+  "common.description": "The most modern mobility platform designed for Africa. Passengers ride free. Drivers keep 100% — pay one subscription, drive unlimited.",
+
+  "nav.drive": "Drive",
+  "nav.business": "Business",
+  "nav.fleet": "Fleet",
+  "nav.developers": "Developers",
+  "nav.help": "Help",
+  "nav.status": "Status",
+  "nav.signIn": "Sign in",
+  "nav.getApp": "Get the app",
+
+  "hero.badge": "Now live in Addis Ababa",
+  "hero.title": "The ride of Africa, reimagined.",
+  "hero.subtitle": "CheeTaxi is the most modern mobility platform built for African cities. Passengers ride free of platform charges. Drivers keep 100% of every fare — just one simple subscription.",
+  "hero.download": "Download the app",
+  "hero.driveWith": "Drive with CheeTaxi",
+  "hero.noCommission": "No commission, ever",
+  "hero.safety247": "24/7 safety",
+  "hero.languages": "9 languages",
+
+  "stats.commissionFree": "Commission for drivers",
+  "stats.passengerFee": "Platform fees for passengers",
+  "stats.languages": "African languages",
+  "stats.countries": "Countries ready to scale",
+
+  "passengers.title": "Free forever. No subscriptions.",
+  "passengers.subtitle": "No platform charges.",
+  "passengers.body": "CheeTaxi passengers never pay a cent in platform fees. Request a ride in seconds, track your driver live, share your trip with loved ones, and pay the way that works for you — cash, card, wallet, or corporate account.",
+
+  "drivers.title": "Keep 100% of every fare.",
+  "drivers.subtitle": "Just one subscription.",
+  "drivers.body": "No more losing 20-25% of every trip to the platform. Pay one flat subscription, drive unlimited rides, and keep every birr you earn.",
+
+  "modes.title": "One platform, every mode",
+  "modes.subtitle": "However you move, CheeTaxi moves you.",
+
+  "plans.title": "Pick the plan that fits your hustle.",
+  "plans.subtitle": "Every plan unlocks unlimited rides. No commission, no hidden fees, no per-trip deduction. Cancel anytime.",
+
+  "africa.title": "Built for the continent,",
+  "africa.subtitle": "in every language.",
+
+  "safety.title": "Your safety is not a feature.",
+  "safety.subtitle": "It is the foundation.",
+
+  "faq.title": "Questions, answered.",
+
+  "footer.product": "Product",
+  "footer.company": "Company",
+  "footer.getTheApp": "Get the app"
+}

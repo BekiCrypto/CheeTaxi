@@ -1,0 +1,54 @@
+{
+  "common.welcome": "Bienvenue sur CheeTaxi",
+  "common.tagline": "Rapide. Fiable. Africain. Moderne.",
+  "common.description": "La plateforme de mobilité la plus moderne conçue pour l'Afrique. Les passagers voyagent gratuitement. Les chauffeurs gardent 100% — un abonnement, trajets illimités.",
+
+  "nav.drive": "Conduire",
+  "nav.business": "Entreprise",
+  "nav.fleet": "Flotte",
+  "nav.developers": "Développeurs",
+  "nav.help": "Aide",
+  "nav.status": "Statut",
+  "nav.signIn": "Se connecter",
+  "nav.getApp": "Télécharger",
+
+  "hero.badge": "Maintenant à Addis Abeba",
+  "hero.title": "Le trajet de l'Afrique, réinventé.",
+  "hero.subtitle": "CheeTaxi est la plateforme de mobilité la plus moderne pour les villes africaines. Les passagers ne paient aucun frais de plateforme. Les chauffeurs gardent 100% de chaque trajet — un seul abonnement simple.",
+  "hero.download": "Télécharger l'app",
+  "hero.driveWith": "Conduire avec CheeTaxi",
+  "hero.noCommission": "Zéro commission, toujours",
+  "hero.safety247": "Sécurité 24/7",
+  "hero.languages": "9 langues",
+
+  "stats.commissionFree": "Commission pour chauffeurs",
+  "stats.passengerFee": "Frais plateforme pour passagers",
+  "stats.languages": "Langues africaines",
+  "stats.countries": "Pays prêts à scalonner",
+
+  "passengers.title": "Gratuit pour toujours. Aucun abonnement.",
+  "passengers.subtitle": "Aucun frais de plateforme.",
+  "passengers.body": "Les passagers CheeTaxi ne paient jamais de frais de plateforme. Demandez un trajet en secondes, suivez votre chauffeur en direct, partagez votre trajet avec vos proches.",
+
+  "drivers.title": "Gardez 100% de chaque trajet.",
+  "drivers.subtitle": "Un seul abonnement.",
+  "drivers.body": "Ne perdez plus 20-25% de chaque trajet au profit de la plateforme. Payez un abonnement forfaitaire, roulez sans limite, gardez chaque birr gagné.",
+
+  "modes.title": "Une plateforme, tous les modes",
+  "modes.subtitle": "Cependant que vous bougiez, CheeTaxi vous meut.",
+
+  "plans.title": "Choisissez l'abonnement qui vous convient.",
+  "plans.subtitle": "Chaque abonnement offre des trajets illimités. Zéro commission, zéro frais cachés.",
+
+  "africa.title": "Conçu pour le continent,",
+  "africa.subtitle": "dans chaque langue.",
+
+  "safety.title": "Votre sécurité n'est pas une fonctionnalité.",
+  "safety.subtitle": "C'est la fondation.",
+
+  "faq.title": "Questions, répondues.",
+
+  "footer.product": "Produit",
+  "footer.company": "Entreprise",
+  "footer.getTheApp": "Télécharger"
+}

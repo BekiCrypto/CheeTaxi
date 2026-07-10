@@ -5,9 +5,10 @@ import { DispatchService } from '../dispatch/dispatch.service';
 import { PricingService } from '../pricing/pricing.service';
 import { GeoService } from '../geo/geo.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
-  imports: [],
+  imports: [RealtimeModule],
   controllers: [TripsController],
   providers: [TripsService, DispatchService, PricingService, GeoService, NotificationsService],
   exports: [TripsService],

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 interface SendInput {
   channel: 'PUSH' | 'SMS' | 'EMAIL' | 'IN_APP' | 'WHATSAPP';
@@ -11,7 +12,10 @@ interface SendInput {
 export class NotificationsService {
   private readonly logger = new Logger('NotificationsService');
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeGateway,
+  ) {}
 
   /** Resolve template + render variables + persist + dispatch to provider. */
   async sendToUser(userId: string, input: SendInput): Promise<void> {
@@ -30,6 +34,17 @@ export class NotificationsService {
         payload: { code: input.code, vars: input.vars },
         status: 'QUEUED' as any,
       },
+    });
+
+    // Real-time push via WebSocket to online clients (instant UI update)
+    this.realtime.emitNotification(userId, {
+      id: notification.id,
+      title,
+      body,
+      channel: input.channel,
+      code: input.code,
+      vars: input.vars,
+      createdAt: notification.createdAt,
     });
 
     // Dispatch (non-blocking) — real impl wires Firebase / Twilio / SendGrid / WhatsApp BSP

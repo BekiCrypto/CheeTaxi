@@ -1,0 +1,112 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "title": "CheeTaxi API Overview",
+  "uid": "cheetaxi-api",
+  "version": 1,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "title": "Request Rate (req/s)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(cheetaxi_http_requests_total[1m]))",
+          "legendFormat": "total"
+        },
+        {
+          "expr": "sum(rate(cheetaxi_http_requests_total[1m])) by (route)",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "title": "p50 / p99 Latency (s)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(cheetaxi_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(cheetaxi_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "title": "Error Rate (%)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(cheetaxi_http_request_errors_total[5m])) / sum(rate(cheetaxi_http_requests_total[5m]))",
+          "legendFormat": "error %"
+        }
+      ]
+    },
+    {
+      "title": "Trips / min",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(cheetaxi_trips_requested_total[1m]) * 60",
+          "legendFormat": "requested"
+        },
+        {
+          "expr": "rate(cheetaxi_trips_completed_total[1m]) * 60",
+          "legendFormat": "completed"
+        },
+        {
+          "expr": "rate(cheetaxi_trips_cancelled_total[1m]) * 60",
+          "legendFormat": "cancelled"
+        }
+      ]
+    },
+    {
+      "title": "Drivers Online",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "cheetaxi_drivers_online", "legendFormat": "" }
+      ]
+    },
+    {
+      "title": "Trips In Progress",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 16 },
+      "targets": [
+        { "expr": "cheetaxi_trips_in_progress", "legendFormat": "" }
+      ]
+    },
+    {
+      "title": "Active Subscriptions",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "cheetaxi_active_subscriptions", "legendFormat": "" }
+      ]
+    },
+    {
+      "title": "WebSocket Connections",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 16 },
+      "targets": [
+        { "expr": "cheetaxi_websocket_connections", "legendFormat": "" }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,98 @@ All notable changes to CheeTaxi are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-07-10
+
+### Added — Phase 2 Production Hardening
+
+#### Realtime & WebSocket
+- New `RealtimeModule` with `RealtimeGateway` (Socket.IO) on `/realtime` namespace
+- JWT-authenticated WebSocket connections (token via handshake auth or query)
+- Auto-join personal channel `user:<userId>` on connect
+- Subscribe/unsubscribe to trip channels via `trip:subscribe` / `trip:unsubscribe`
+- Driver location broadcast via `driver:location` event (alternative to REST polling)
+- Trip offer response via `driver:offer:respond` event
+- Server emits typed events for: trip lifecycle (requested/assigned/arrived/started/completed/cancelled), driver location, driver status, trip offer, notification, SOS triggered, wallet updated
+- Wired into `TripsService` (every lifecycle method now emits WS events)
+- Wired into `NotificationsService` (every notification pushes to WS)
+- Wired into `SosService` (SOS triggers broadcast to all safety-team sockets)
+- Wired into `WalletsService` (every balance change pushes to WS)
+
+#### Observability
+- New `ObservabilityModule` with `MetricsService` (Prometheus)
+- `/metrics` endpoint exposing Prometheus text format
+- Counters: HTTP requests, errors, trips requested/completed/cancelled, payments processed/failed, SOS triggered, OTP sent
+- Histograms: HTTP request latency (10 buckets), DB query latency (7 buckets)
+- Gauges: drivers online, trips in progress, active subscriptions, WebSocket connections
+- `MetricsInterceptor` records every HTTP request automatically
+- Sentry integration (`@sentry/node` + `@sentry/profiling-node`) — auto-captures errors, scrubs auth headers
+- OpenTelemetry tracing (`@opentelemetry/sdk-node`) with HTTP + Express instrumentation
+- Tracing initialized before NestJS bootstrap (per OTel best practice)
+- Graceful shutdown flushes Sentry + OTel on SIGTERM
+- Prometheus config (`infra/observability/prometheus/prometheus.yml`) for scraping
+- Alerting rules (`infra/observability/prometheus/alerts.yml`) for: API down, high error rate, high latency, SOS triggered, payment failure spike, driver count drop
+- Grafana dashboard (`infra/observability/grafana/dashboards/api-overview.json`) with: request rate, p50/p99 latency, error rate, trips/min, drivers online, trips in progress, active subscriptions, WebSocket connections
+
+#### Mobile Polish — Passenger App
+- `TripTrackingScreen` — live Google Maps with driver marker, status banner, driver card with call/SOS buttons, cancel button
+- `RatingScreen` — 5-star rating, tag chips (safe driving, friendly, clean car, on time, quiet ride, knows city, helped with bags), optional comment
+- `WalletScreen` — balance card with gradient, top-up sheet (Chapa), transaction history with credit/debit indicators
+- `RealtimeClient` — WebSocket client with auto-reconnect, trip subscribe/unsubscribe, typed events
+
+#### Mobile Polish — Driver App
+- `TripOfferModal` — pulsing header with 15-second countdown, fare + distance + ETA, pickup/dropoff route card, accept/decline buttons
+- `SubscriptionScreen` — active subscription card, plan list with "Most popular" badge on MONTHLY, one-tap purchase (CASH)
+- `DriverWalletScreen` — earnings balance, withdrawal sheet with method dropdown (bank/mobile_money/cash_pickup), earnings history
+- `DriverRealtimeClient` — WebSocket client with location broadcasting and offer response
+
+#### Internationalization (i18n)
+- Web landing: 3 language files (en, am, fr) in `apps/web-landing/messages/`
+- Passenger app: ARB files for English + Amharic in `apps/mobile-passenger/lib/l10n/`
+- Driver app: ARB files for English + Amharic in `apps/mobile-driver/lib/l10n/`
+- l10n.yaml config for both Flutter apps (generates `AppLocalizations` class)
+- All major UI strings externalized to translation files
+
+#### Load Testing
+- New `tests/load/` directory with 3 k6 scripts:
+  - `auth-flow.js` — simulates 100-500 concurrent OTP auth flows
+  - `trip-lifecycle.js` — simulates 50-200 concurrent trip requests
+  - `driver-location.js` — simulates up to 10K drivers broadcasting location (2K RPS)
+- Each script outputs JSON summary + human-readable stdout
+- Targets documented: p99 < 500ms auth, < 1s trip, < 200ms location
+- README with usage and CI integration example
+
+#### Security Automation
+- New `.github/workflows/security-scan.yml`:
+  - **Dependency scan**: `pnpm audit --audit-level=high --prod` (blocking)
+  - **SBOM generation**: CycloneDX format, uploaded as artifact
+  - **Container scan**: Trivy scans all 4 Docker images for HIGH/CRITICAL vulns (blocking)
+  - **CodeQL**: GitHub's static analysis with `security-extended` queries
+- Runs on every push + PR + weekly schedule (Monday 06:00 UTC)
+
+#### Tests (Phase 2 expansion)
+- 5 new unit test files:
+  - `auth.service.spec.ts` — signup, login, OTP verify, conflict handling (8 tests)
+  - `wallets.service.spec.ts` — topUp, charge, creditDriver, requestWithdrawal (8 tests)
+  - `ratings.service.spec.ts` — rateTrip, duplicate prevention, average recompute (7 tests)
+  - `permissions.guard.spec.ts` — ABAC enforcement (3 tests)
+  - `role.service.spec.ts` — RBAC + caching + invalidation (6 tests)
+  - `stats.service.spec.ts` — platform stats + trip funnel (4 tests)
+- Total: 36 new test cases (was 47, now 83)
+
+### Fixed
+- `RealtimeGateway` properly injected via module imports (not circular)
+- `WalletsService` now emits `wallet.updated` events after every balance change
+- `TripsService` emits trip lifecycle events after every state transition
+- `SosService` broadcasts SOS triggers to all connected safety-team sockets in real-time
+
+### Changed
+- `main.ts` now initializes OpenTelemetry tracing before any NestJS imports
+- `main.ts` initializes Sentry (no-op if SENTRY_DSN not set)
+- `main.ts` registers `MetricsInterceptor` as a global interceptor
+- `app.module.ts` imports `RealtimeModule` and `ObservabilityModule`
+- API package.json adds: `prom-client`, `@sentry/node`, `@sentry/profiling-node`, `@opentelemetry/*`
+- All WebSocket events use the typed constants from `@cheetaxi/shared` `WS_EVENTS`
+
 ## [1.0.0] — 2026-07-10
 
 ### Added

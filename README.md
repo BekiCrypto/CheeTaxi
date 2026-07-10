@@ -4,7 +4,7 @@
 
 The most modern mobility platform designed for Africa. Passengers ride free. Drivers keep 100% — pay one subscription, drive unlimited.
 
-[![Status](https://img.shields.io/badge/status-phase_1.5-FFA800)](docs/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-phase_2-FFA800)](docs/ROADMAP.md)
 [![License](https://img.shields.io/badge/license-proprietary-0E1012)](docs/LICENSE.md)
 [![Made in Africa](https://img.shields.io/badge/made_in-Africa-10B981)](https://cheetaxi.africa)
 
@@ -112,33 +112,41 @@ For the full guide, see [`docs/QUICK_START.md`](docs/QUICK_START.md).
 
 ## Status
 
-**Phase 1.5 — Foundation hardened.**
+**Phase 2 — Production Hardening.**
 
-What's done:
+What's done (cumulative from Phase 1):
 - ✅ Full monorepo with pnpm + Turborepo
-- ✅ Backend API: 20 modules, 100+ endpoints, JWT + OTP auth, RBAC + ABAC
+- ✅ Backend API: 22 modules, 100+ endpoints, JWT + OTP auth, RBAC + ABAC
 - ✅ 3 web apps: landing (12 pages), admin (10 sections), dispatcher (real-time)
-- ✅ 2 mobile apps (Flutter): passenger + driver
+- ✅ 2 mobile apps (Flutter): passenger + driver with trip tracking, ratings, wallet, subscriptions
 - ✅ Database: 40+ Prisma models, full seed
 - ✅ Infrastructure: Docker Compose + Kubernetes + Terraform
-- ✅ CI/CD: GitHub Actions
+- ✅ CI/CD: GitHub Actions with build/test/deploy + security scanning
 - ✅ 22 documentation files
 - ✅ Brand assets: SVG logos, app icon, splash, OpenGraph
 - ✅ Legal pages: Privacy, Terms, Cookies, Help Center, Status, Developer Portal
-- ✅ Unit tests: 6 spec files, 47 test cases
-- ✅ Real payment provider adapters (Stripe, Chapa, Telebirr — not stubs)
-- ✅ Real SMS provider support (Twilio, Africa's Talking — not stubs)
-- ✅ Real admin stats endpoint (no mock data)
-- ✅ Real dispatcher driver map (no mock data)
+- ✅ Unit tests: 11 spec files, 83 test cases (100% pass)
+- ✅ Real payment provider adapters (Stripe, Chapa, Telebirr)
+- ✅ Real SMS provider support (Twilio, Africa's Talking)
+- ✅ Real admin stats endpoint
+- ✅ Real dispatcher driver map
+- ✅ **NEW**: WebSocket realtime gateway (trip events, driver location, notifications, SOS, wallet updates)
+- ✅ **NEW**: Prometheus metrics + Sentry + OpenTelemetry observability stack
+- ✅ **NEW**: Grafana dashboard + Prometheus alerting rules
+- ✅ **NEW**: k6 load testing scripts (auth, trip lifecycle, driver location broadcast)
+- ✅ **NEW**: Security automation (Trivy container scan, CodeQL, pnpm audit, SBOM)
+- ✅ **NEW**: Mobile screens — trip tracking, rating, wallet, subscription, driver offer modal
+- ✅ **NEW**: i18n scaffolding — English, Amharic, French translations
+- ✅ **NEW**: 36 new unit tests (was 47, now 83)
 
 What's deferred (see [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md)):
-- WebSocket realtime gateway (Phase 2)
 - Mobile app store builds + submission (Phase 3)
-- Full test coverage at 80% (Phase 2)
-- Load testing (Phase 2)
-- Mobile offline support (Phase 2)
-- 9-language localization (Phase 2)
-- Third-party penetration test (Phase 2)
+- Full test coverage at 80% (currently ~50%)
+- Mobile offline support (Phase 3)
+- FCM push notification delivery (Phase 3)
+- 9-language localization wired into UI (Phase 3)
+- Third-party penetration test (Phase 3)
+- Integration + E2E tests (Phase 3)
 
 ## Business Model
 

@@ -5,6 +5,8 @@ import { PricingService } from '../pricing/pricing.service';
 import { GeoService } from '../geo/geo.service';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { WS_EVENTS } from '@cheetaxi/shared';
 
 interface RequestTripInput {
   passengerUserId: string;
@@ -30,6 +32,7 @@ export class TripsService {
     private geo: GeoService,
     private dispatch: DispatchService,
     private notifications: NotificationsService,
+    private realtime: RealtimeGateway,
   ) {}
 
   async request(input: RequestTripInput) {
@@ -136,6 +139,11 @@ export class TripsService {
 
     await this.dispatch.markAssigned(tripId);
     await this.recordEvent(tripId, 'assigned', { driverId: driver.id }, driverUserId);
+    this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_ASSIGNED, {
+      tripId, driverId: driver.id, vehicleId: driver.currentVehicleId,
+      driverName: `${driver.user.firstName} ${driver.user.lastName}`,
+      plateNumber: driver.currentVehicle?.plateNumber,
+    });
 
     // Notify passenger
     await this.notifications.sendToUser(updated.passengerUserId, {
@@ -162,6 +170,7 @@ export class TripsService {
       data: { status: 'DRIVER_ARRIVED', arrivedAt: new Date() },
     });
     await this.recordEvent(tripId, 'arrived', {}, driverUserId);
+    this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_ARRIVED, { tripId });
     await this.notifications.sendToUser(trip.passengerUserId, {
       channel: 'PUSH',
       code: 'DRIVER_ARRIVED',
@@ -185,6 +194,7 @@ export class TripsService {
       data: { status: 'ON_TRIP' },
     });
     await this.recordEvent(tripId, 'started', {}, driverUserId);
+    this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_STARTED, { tripId });
     return updated;
   }
 
@@ -239,6 +249,9 @@ export class TripsService {
     });
 
     await this.recordEvent(tripId, 'completed', completionData ?? {}, driverUserId);
+    this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_COMPLETED, {
+      tripId, totalFare: updated.totalFare, currency: updated.currency,
+    });
 
     // Notify passenger — request rating
     await this.notifications.sendToUser(trip.passengerUserId, {
@@ -265,6 +278,7 @@ export class TripsService {
 
     await this.dispatch.markExpired(tripId);
     await this.recordEvent(tripId, 'cancelled', { by, reason }, userId);
+    this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_CANCELLED, { tripId, by, reason });
 
     // Stats
     if (by === 'passenger') {

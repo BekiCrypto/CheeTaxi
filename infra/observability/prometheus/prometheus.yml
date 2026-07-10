@@ -1,0 +1,28 @@
+# CheeTaxi — Prometheus scrape config
+# Scrape the API every 15 seconds for metrics.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: cheetaxi-production
+    region: eu-central-1
+
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  - job_name: 'cheetaxi-api'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['cheetaxi-api.cheetaxi.svc.cluster.local:80']
+        labels:
+          service: api
+
+  - job_name: 'cheetaxi-web-landing'
+    static_configs:
+      - targets: ['cheetaxi-web-landing.cheetaxi.svc.cluster.local:80']
+        labels:
+          service: web-landing
+
+  # kube-state-metrics + node-exporter are added via Helm chart in production

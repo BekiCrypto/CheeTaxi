@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class SosService {
@@ -9,6 +10,7 @@ export class SosService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private realtime: RealtimeGateway,
   ) {}
 
   async trigger(userId: string, data: { tripId?: string; latitude: number; longitude: number; accuracyMeters?: number; reason?: string }) {
@@ -23,6 +25,12 @@ export class SosService {
         status: 'TRIGGERED' as any,
       },
       include: { user: { select: { firstName: true, lastName: true, phone: true } } },
+    });
+
+    // Real-time broadcast to all connected safety-team sockets
+    this.realtime.emitSosTriggered(alert.id, userId, {
+      latitude: data.latitude,
+      longitude: data.longitude,
     });
 
     // Notify safety team (super_admin + safety role) in parallel
