@@ -1,6 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
-import { MetricsService } from '../observability/metrics.service';
+import { MetricsService } from '../../observability/metrics.service';
 
 /**
  * Records HTTP request count + latency in Prometheus.

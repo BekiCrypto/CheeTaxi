@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 import { PricingService } from '../pricing/pricing.service';
 import { GeoService } from '../geo/geo.service';
@@ -83,7 +83,7 @@ export class TripsService {
         currency: quote.currency,
         paymentMethod: input.paymentMethod as any,
         scheduledFor: input.scheduledFor ? new Date(input.scheduledFor) : null,
-        shareToken: nanoid(16),
+        shareToken: randomUUID().slice(0, 16),
         shareExpiresAt: new Date(Date.now() + 24 * 3600 * 1000),
       },
       include: { passenger: { include: { user: true } } },
@@ -153,7 +153,7 @@ export class TripsService {
       code: 'DRIVER_ASSIGNED',
       vars: {
         driverName: `${driver.user.firstName} ${driver.user.lastName}`,
-        eta: 5, // computed from distance in real impl
+        eta: '5', // computed from distance in real impl
         plateNumber: driver.currentVehicle?.plateNumber ?? '',
       },
     });
@@ -176,7 +176,7 @@ export class TripsService {
     await this.notifications.sendToUser(trip.passengerUserId, {
       channel: 'PUSH',
       code: 'DRIVER_ARRIVED',
-      vars: { driverName: `${driver.user.firstName}` },
+      vars: { driverName: `${(driver as any).user?.firstName ?? 'Driver'}` },
     });
     return updated;
   }
@@ -242,7 +242,7 @@ export class TripsService {
       data: {
         tripId: trip.id,
         passengerUserId: trip.passengerUserId,
-        subtotal: trip.baseFare + trip.distanceFare + trip.timeFare,
+        subtotal: Number(trip.baseFare) + Number(trip.distanceFare) + Number(trip.timeFare),
         tax: trip.taxAmount,
         discount: trip.promoDiscount,
         total: trip.totalFare,

@@ -13,7 +13,7 @@ interface FareInput {
   promoCode?: string;
 }
 
-interface FareBreakdown {
+export interface FareBreakdown {
   baseFare: number;
   distanceFare: number;
   timeFare: number;

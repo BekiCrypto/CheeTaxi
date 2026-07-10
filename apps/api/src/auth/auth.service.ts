@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 import { RedisService } from '../common/redis.service';
 import { OtpService } from './otp.service';
@@ -54,7 +54,7 @@ export class AuthService {
         role,
         status: role === 'DRIVER' ? 'PENDING_VERIFICATION' : 'ACTIVE',
         phoneVerified: false,
-        referralCode: `CHEE-${nanoid(8).toUpperCase()}`,
+        referralCode: `CHEE-${randomUUID().slice(0, 8).toUpperCase()}`,
       },
     });
 
@@ -77,7 +77,7 @@ export class AuthService {
             referrerUserId: referrer.id,
             referredUserId: user.id,
             status: 'pending',
-          },
+          } as any,
         });
       }
     }
@@ -127,7 +127,7 @@ export class AuthService {
           role: 'PASSENGER',
           status: 'ACTIVE',
           phoneVerified: true,
-          referralCode: `CHEE-${nanoid(8).toUpperCase()}`,
+          referralCode: `CHEE-${randomUUID().slice(0, 8).toUpperCase()}`,
         },
       });
       await this.prisma.userRoleAssignment.create({

@@ -62,7 +62,7 @@ export class DispatchService {
         id: { in: driverIds },
         online: true,
         status: 'ONLINE',
-        availableModes: { has: vehicleType },
+        availableModes: { has: vehicleType as any },
       },
       include: { subscriptionAssignments: { where: { plan: { isActive: true } }, include: { plan: true } } },
     });
@@ -120,7 +120,7 @@ export class DispatchService {
 
     await this.prisma.driverOffer.update({
       where: { id: offer.id },
-      data: { accepted, rejected: !accept, respondedAt: new Date() },
+      data: { accepted: accept, rejected: !accept, respondedAt: new Date() },
     });
 
     if (!accept) {

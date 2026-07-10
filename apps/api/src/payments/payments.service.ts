@@ -211,7 +211,7 @@ class StripeAdapter implements PaymentProviderAdapter {
       event.data.object.payment_status === 'paid';
     return {
       reference: event.data.object.client_reference_id ?? '',
-      status: isSucceeded ? 'SUCCESS' : 'FAILED',
+      status: isSucceeded ? 'SUCCESS' as const : 'FAILED' as const,
       amount: (event.data.object.amount_total ?? 0) / 100,
       providerRef: event.id,
     };
@@ -260,7 +260,7 @@ class ChapaAdapter implements PaymentProviderAdapter {
     const p = payload as { tx_ref?: string; status?: string; amount?: number; id?: string };
     return {
       reference: p.tx_ref ?? '',
-      status: p.status === 'success' ? 'SUCCESS' : 'FAILED',
+      status: p.status === 'success' ? 'SUCCESS' as const : 'FAILED' as const,
       amount: Number(p.amount ?? 0),
       providerRef: p.id ?? '',
     };
@@ -308,7 +308,7 @@ class TelebirrAdapter implements PaymentProviderAdapter {
     const p = payload as { outTradeNo?: string; code?: number; amount?: number; tradeNo?: string };
     return {
       reference: p.outTradeNo ?? '',
-      status: p.code === 0 ? 'SUCCESS' : 'FAILED',
+      status: p.code === 0 ? 'SUCCESS' as const : 'FAILED' as const,
       amount: Number(p.amount ?? 0),
       providerRef: p.tradeNo ?? '',
     };

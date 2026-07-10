@@ -326,6 +326,7 @@ model User {
   walletTransactions WalletTransaction[] @relation("WalletTxUser")
   subscriptions     Subscription[]
   promoRedemptions  PromoRedemption[]
+  tripsAsPassenger  Trip[]          @relation("TripPassenger")
   tripEventsTriggered TripEvent[]   @relation("TripEventActor")
   savedPlaces       SavedPlace[]
   favoriteDrivers   FavoriteDriver[]
@@ -471,7 +472,7 @@ model Driver {
   online            Boolean  @default(false)
   fleetId           String?
   fleet             Fleet?   @relation(fields: [fleetId], references: [id])
-  currentVehicleId  String?  @unique
+  currentVehicleId  String?
   currentVehicle    Vehicle? @relation("CurrentVehicle", fields: [currentVehicleId], references: [id])
   ratingAverage     Float    @default(5.0)
   ratingCount       Int      @default(0)
@@ -501,6 +502,7 @@ model Driver {
 
   vehicles          Vehicle[]
   trips             Trip[]   @relation("TripDriver")
+  ratingsReceived   Rating[] @relation("RatingToUser")
   fleetMemberships  FleetMember[]
   subscriptionAssignments DriverSubscriptionAssignment[]
   locationHistory   DriverLocationHistory[]
@@ -565,7 +567,8 @@ model Vehicle {
   id              String   @id @default(cuid())
   driverId        String
   driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  currentDriver   Driver?  @relation("CurrentVehicle")
+  currentDriver   Driver?  @relation("CurrentVehicle", fields: [currentDriverId], references: [id])
+  currentDriverId String?  @unique
   fleetId         String?
   fleet           Fleet?   @relation(fields: [fleetId], references: [id])
   plateNumber     String   @unique
@@ -616,7 +619,6 @@ model Fleet {
 
   members     FleetMember[]
   vehicles    Vehicle[]
-  drivers     Driver[]
   trips       Trip[]   @relation("TripFleet")
   corporateWallet Wallet? @relation("FleetWallet")
 
@@ -1320,8 +1322,6 @@ model InsurancePolicy {
   tripId          String?  // for per-trip insurance
   metadata        Json?
   createdAt       DateTime @default(now())
-
-  claims          InsuranceClaim[]
 
   @@index([userId, status])
   @@index([type, status])

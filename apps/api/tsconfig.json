@@ -9,6 +9,9 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictPropertyInitialization": false,
     "noUncheckedIndexedAccess": false,
     "skipLibCheck": true
   },

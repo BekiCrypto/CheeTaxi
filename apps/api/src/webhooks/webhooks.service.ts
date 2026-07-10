@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { createHmac } from 'crypto';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 
 /**
@@ -28,7 +28,7 @@ export class WebhooksService {
 
   /** Register a new webhook endpoint. Returns the secret ONCE — partners must store it. */
   async createEndpoint(userId: string, data: { url: string; events: string[]; description?: string }): Promise<{ id: string; secret: string }> {
-    const secret = `whsec_${nanoid(32)}`;
+    const secret = `whsec_${randomUUID().slice(0, 32)}`;
     const endpoint = await this.prisma.webhookEndpoint.create({
       data: {
         userId,

@@ -49,7 +49,7 @@ export class SubscriptionsService {
     if (data.paymentMethod === 'CASH') {
       await this.activate(subscription.id, userId, 'cash');
     } else if (data.paymentMethod === 'WALLET') {
-      await this.wallets.charge(userId, plan.price, plan.currency, 'SUBSCRIPTION_PAYMENT', subscription.id);
+      await this.wallets.charge(userId, Number(plan.price), plan.currency, 'SUBSCRIPTION_PAYMENT', subscription.id);
       await this.activate(subscription.id, userId, 'wallet');
     }
     // For CARD: webhook from payment provider will trigger activate()

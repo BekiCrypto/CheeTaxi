@@ -8,6 +8,7 @@ module.exports = {
     '^@cheetaxi/database$': '<rootDir>/../../packages/database/src',
     '^@cheetaxi/shared$': '<rootDir>/../../packages/shared/src',
   },
+  transformIgnorePatterns: ['node_modules/(?!(nanoid|@prisma/client|@cheetaxi))'],
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/main.ts',

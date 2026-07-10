@@ -6,7 +6,7 @@ export default function SafetyPage() {
   const [alerts, setAlerts] = useState<any[]>([]);
 
   useEffect(() => {
-    api('/sos/active').then(setAlerts).catch(() => setAlerts([]));
+    api('/sos/active').then((r) => setAlerts(r as any[])).catch(() => setAlerts([]));
   }, []);
 
   return (

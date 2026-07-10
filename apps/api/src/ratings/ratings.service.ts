@@ -14,9 +14,9 @@ export class RatingsService {
     if (trip.status !== 'COMPLETED') throw new BadRequestException('Can only rate completed trips');
     if (data.stars < 1 || data.stars > 5) throw new BadRequestException('Stars must be 1-5');
 
-    const fromUser = userId;
-    const toUser = data.role === 'PASSENGER_TO_DRIVER' ? trip.driver?.userId : trip.passengerUserId;
-    if (!toUser) throw new BadRequestException('Cannot rate — counterparty missing');
+    const fromUserId = userId;
+    const toUserId = data.role === 'PASSENGER_TO_DRIVER' ? trip.driver?.userId : trip.passengerUserId;
+    if (!toUserId) throw new BadRequestException('Cannot rate — counterparty missing');
 
     // Idempotency
     const existing = await this.prisma.rating.findUnique({
@@ -28,7 +28,7 @@ export class RatingsService {
       data: {
         tripId,
         fromUserId,
-        toUserId: toUser,
+        toUserId: toUserId,
         role: data.role as any,
         stars: data.stars,
         comment: data.comment,

@@ -43,7 +43,7 @@ export class CarbonService {
   /** Record carbon emissions for a completed trip. Called by TripsService on completion. */
   async recordTripEmissions(tripId: string, userId: string, vehicleType: string, distanceMeters: number): Promise<void> {
     const distanceKm = distanceMeters / 1000;
-    const co2Kg = (this.EMISSIONS_PER_KG[vehicleType] ?? 0.21) * distanceKm;
+    const co2Kg = (this.EMISSIONS_PER_KM[vehicleType] ?? 0.21) * distanceKm;
     const offsetCost = Math.round(co2Kg * this.OFFSET_COST_PER_KG * 100) / 100;
 
     await this.prisma.carbonOffset.create({

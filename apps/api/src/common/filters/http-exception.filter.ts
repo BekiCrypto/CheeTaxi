@@ -39,13 +39,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
           code = 'VALIDATION_ERROR';
         }
       }
-    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      switch (exception.code) {
+    } else if ((exception as any)?.code?.startsWith?.('P')) {
+      // Prisma known request error
+      const prismaErr = exception as any;
+      switch (prismaErr.code) {
         case 'P2002':
           status = HttpStatus.CONFLICT;
           code = 'DUPLICATE_RESOURCE';
           message = 'A resource with this unique value already exists.';
-          details = exception.meta;
+          details = prismaErr.meta;
           break;
         case 'P2025':
           status = HttpStatus.NOT_FOUND;
@@ -56,13 +58,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
           status = HttpStatus.BAD_REQUEST;
           code = 'FOREIGN_KEY_VIOLATION';
           message = 'Referenced resource does not exist.';
-          details = exception.meta;
+          details = prismaErr.meta;
           break;
         default:
           status = HttpStatus.BAD_REQUEST;
-          code = `PRISMA_${exception.code}`;
+          code = `PRISMA_${prismaErr.code}`;
           message = 'Database operation failed.';
-          details = exception.meta;
+          details = prismaErr.meta;
       }
     } else if (exception instanceof Error) {
       message = exception.message;

@@ -22,7 +22,7 @@ export function LanguageSwitcher() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const current = LANGUAGES.find((l) => l.code === locale) ?? LANGUAGES[0];
+  const current = LANGUAGES.find((l) => l.code === locale) ?? LANGUAGES[0]!;
 
   function switchTo(code: string) {
     setOpen(false);

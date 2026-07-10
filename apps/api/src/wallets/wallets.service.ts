@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../common/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
@@ -45,7 +45,7 @@ export class WalletsService {
           balanceBefore,
           balanceAfter: Number(updated.balance),
           currency,
-          reference: `WAL-${nanoid(12).toUpperCase()}`,
+          reference: `WAL-${randomUUID().slice(0, 12).toUpperCase()}`,
           paymentId: providerRef,
           initiatedBy: userId,
           status: 'SUCCESS' as any,
@@ -81,7 +81,7 @@ export class WalletsService {
           balanceBefore,
           balanceAfter: Number(updated.balance),
           currency,
-          reference: `WAL-${nanoid(12).toUpperCase()}`,
+          reference: `WAL-${randomUUID().slice(0, 12).toUpperCase()}`,
           description: referenceId,
           status: 'SUCCESS' as any,
         },

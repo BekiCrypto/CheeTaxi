@@ -13,7 +13,7 @@ export class PassengersService {
           select: { id: true, phone: true, email: true, firstName: true, lastName: true, avatarUrl: true },
         },
         savedPlaces: true,
-        favoriteDrivers: { include: { driver: { include: { user: { select: { firstName: true, lastName: true, avatarUrl: true } }, currentVehicle: true } } } },
+        favoriteDrivers: { include: { driver: { include: { user: { select: { firstName: true, lastName: true, avatarUrl: true } }, currentVehicle: true } } } } as any,
       },
     });
     if (!p) throw new NotFoundException('Passenger profile not found');

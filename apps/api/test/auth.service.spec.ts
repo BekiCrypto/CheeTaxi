@@ -102,12 +102,10 @@ describe('AuthService', () => {
       });
       prismaMock.user.update.mockResolvedValue({});
       prismaMock.userSession.create.mockResolvedValue({ id: 'session1' });
-      jwtMock.signAsync.mockResolvedValue('access-token');
-      jwtMock.sign.mockReturnValue('refresh-token');
 
       const result = await service.login({ identifier: '+251911223344', password: 'Password1' });
       expect(result.accessToken).toBe('access-token');
-      expect(result.refreshToken).toContain('refresh-token');
+      expect(result.refreshToken).toContain('session1.');
       expect(result.user.phone).toBe('+251911223344');
     });
 

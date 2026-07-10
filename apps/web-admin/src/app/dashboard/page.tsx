@@ -12,13 +12,13 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.allSettled([
       api('/stats/platform'),
-      api('/trips/me/passenger?page=1&limit=5').catch(() => ({ items: [] })),
-      api('/drivers/pending?page=1&limit=5').catch(() => ({ items: [] })),
+      api('/trips/me/passenger?page=1&limit=5').catch(() => ({ items: [] as any[] })),
+      api('/drivers/pending?page=1&limit=5').catch(() => ({ items: [] as any[] })),
     ])
       .then(([statsRes, tripsRes, driversRes]) => {
         if (statsRes.status === 'fulfilled') setStats(statsRes.value);
-        if (tripsRes.status === 'fulfilled') setRecentTrips(tripsRes.value?.items ?? []);
-        if (driversRes.status === 'fulfilled') setPendingDrivers(driversRes.value?.items ?? []);
+        if (tripsRes.status === 'fulfilled') setRecentTrips((tripsRes.value as any)?.items ?? []);
+        if (driversRes.status === 'fulfilled') setPendingDrivers((driversRes.value as any)?.items ?? []);
       })
       .finally(() => setLoading(false));
   }, []);
