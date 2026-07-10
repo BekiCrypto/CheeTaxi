@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd ../.. && pnpm install && pnpm --filter @cheetaxi/web-admin build",
+  "buildCommand": "pnpm --filter @cheetaxi/shared build && pnpm --filter @cheetaxi/web-admin build",
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "regions": ["fra1"]
