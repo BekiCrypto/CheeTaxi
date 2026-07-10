@@ -223,39 +223,47 @@
 
 ---
 
-## Phase 4 — Scale (Months 4-12) 📋
+## Phase 4 — Scale (Months 4-12) ✅ (partial)
 
-### 📋 Multi-city expansion
-- Dire Dawa, Bahir Dar, Hawassa (Ethiopia)
-- Nairobi (Kenya)
-- Lagos (Nigeria)
-- Accra (Ghana)
-- Per-city pricing tiers, geofences, local payment providers
+### ✅ Advanced dispatch
+- Driver heat maps (demand vs supply per geohash, cached 30 min)
+- Predictive demand (4-week historical aggregation per geohash × hour-of-week)
+- Driver recommendations (top 5 hot zones based on demand-supply gap + distance)
+- Scheduled pre-allocation (scans scheduled trips ≤30 min ahead)
+- Cron-based periodic refresh (every 5 min heat map, every hour demand)
 
-### 📋 Advanced dispatch
-- Predictive demand forecasting (ML)
-- Driver heat maps with recommendations
-- Multi-destination matching for ride-sharing
-- Scheduled trip pre-allocation
+### ✅ Corporate / Enterprise
+- New `apps/web-corporate/` Next.js portal for fleet managers
+- Login, drivers, vehicles, billing, reports, settings pages
+- Production Dockerfile
 
-### 📋 Corporate / Enterprise
-- Corporate portal with employee management
-- Centralized billing with monthly invoicing
-- Custom SLA tiers
-- API access for corporate clients
-
-### 📋 Delivery Platform
-- Restaurant partner portal
-- Live order tracking
-- Multi-order batching
-- Proof of delivery (photo + signature + OTP)
-
-### 📋 Analytics Platform
-- Executive dashboard
-- Revenue forecasting
-- Driver churn prediction
-- Passenger cohort analysis
+### ✅ Analytics Platform
+- Executive dashboard (totals, period stats, week-over-week deltas)
+- Revenue trend (daily for last N days)
+- Passenger cohort analysis (retention by signup month)
+- Driver churn analysis (active vs churned, by trip count)
 - City-level performance comparison
+- Revenue forecast (linear regression, 7-day projection)
+- All cached 1 hour in Redis
+
+### ✅ Webhook System
+- HMAC-SHA256 signed payloads
+- Exponential backoff retry (5 attempts: 1m, 5m, 25m, 125m, 625m)
+- Endpoint management (create, list, delete)
+- Auto-disable on repeated failures
+- Wired into trip.completed + trip.cancelled events
+
+### ✅ Developer SDKs
+- JavaScript / TypeScript SDK (`sdks/javascript/`) — typed client with all resources
+- Python SDK (`sdks/python/`) — sync + async clients, httpx-based
+
+### ⚠️ Still pending (Phase 5)
+- Delivery platform UI (restaurant/merchant portal)
+- Full multi-city expansion (per-city pricing + geofences)
+- Additional API tests for new modules (analytics, webhooks, heat map)
+- Mobile offline support deep UI integration
+- Multi-region active-active deployment
+- Autonomous vehicle support
 
 ---
 

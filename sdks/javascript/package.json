@@ -1,0 +1,24 @@
+{
+  "name": "@cheetaxi/sdk",
+  "version": "1.0.0",
+  "description": "Official JavaScript / TypeScript SDK for the CheeTaxi API",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "keywords": ["cheetaxi", "ride-hailing", "africa", "mobility", "sdk"],
+  "license": "Proprietary",
+  "dependencies": {
+    "typescript": "^5.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5"
+  }
+}

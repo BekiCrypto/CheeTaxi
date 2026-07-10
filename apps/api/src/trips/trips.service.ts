@@ -6,6 +6,7 @@ import { GeoService } from '../geo/geo.service';
 import { DispatchService } from '../dispatch/dispatch.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { WebhooksService } from '../webhooks/webhooks.service';
 import { WS_EVENTS } from '@cheetaxi/shared';
 
 interface RequestTripInput {
@@ -33,6 +34,7 @@ export class TripsService {
     private dispatch: DispatchService,
     private notifications: NotificationsService,
     private realtime: RealtimeGateway,
+    private webhooks: WebhooksService,
   ) {}
 
   async request(input: RequestTripInput) {
@@ -252,6 +254,10 @@ export class TripsService {
     this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_COMPLETED, {
       tripId, totalFare: updated.totalFare, currency: updated.currency,
     });
+    void this.webhooks.trigger('trip.completed', {
+      tripId, publicId: updated.publicId, totalFare: updated.totalFare,
+      currency: updated.currency, completedAt: updated.completedAt,
+    }).catch(() => undefined);
 
     // Notify passenger — request rating
     await this.notifications.sendToUser(trip.passengerUserId, {
@@ -279,6 +285,9 @@ export class TripsService {
     await this.dispatch.markExpired(tripId);
     await this.recordEvent(tripId, 'cancelled', { by, reason }, userId);
     this.realtime.emitTripEvent(tripId, WS_EVENTS.TRIP_CANCELLED, { tripId, by, reason });
+    void this.webhooks.trigger('trip.cancelled', {
+      tripId, publicId: updated.publicId, by, reason, cancelledAt: updated.cancelledAt,
+    }).catch(() => undefined);
 
     // Stats
     if (by === 'passenger') {

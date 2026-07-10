@@ -5,6 +5,86 @@ All notable changes to CheeTaxi are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-07-10
+
+### Added — Phase 4 Scale Features
+
+#### Advanced Dispatch
+- New `HeatMapService` (`dispatch/heatmap.service.ts`)
+- `getHeatMap()` — demand vs supply per geohash cell, cached 30 min
+- `getDriverRecommendations()` — top 5 hot zones for a driver based on predicted demand + distance
+- Predictive demand — hourly cron aggregates 4 weeks of trip history per geohash × hour-of-week
+- Scheduled pre-allocation — every 5 min, scans scheduled trips ≤30 min ahead and pre-positions drivers
+- New endpoints: `GET /dispatch/heatmap`, `GET /dispatch/recommendations`
+- Periodic refresh via `@Cron` decorators (every 5 min for heat map, every hour for demand)
+
+#### Corporate Portal (new web app)
+- New `apps/web-corporate/` — Next.js portal for fleet managers
+- Login flow with JWT storage
+- Sidebar with 6 sections: Overview, Drivers, Vehicles, Billing, Reports, Settings
+- Drivers table with KYC status + ratings
+- Billing page with invoice history + plan summary
+- Reports page with 5 report types (trip summary, revenue, performance, utilization, cost)
+- Settings page (company profile, API access, spending limits, notifications)
+- Production Dockerfile with standalone output
+
+#### Analytics Platform
+- New `AnalyticsModule` with `AnalyticsService`
+- `getExecutiveDashboard()` — totals, period stats, week-over-week deltas (cached 1 hour)
+- `getRevenueTrend()` — daily revenue + trip count for the last N days
+- `getPassengerCohorts()` — retention by signup month (6 months default)
+- `getDriverChurn()` — active vs churned drivers, churn rate, breakdown by trip count
+- `getCityComparison()` — trips, revenue, completion rate per city
+- `getRevenueForecast()` — linear regression projection for next 7 days
+- New endpoints under `/analytics/*` (admin/finance/regional/auditor roles only)
+- All queries cached in Redis for 1 hour
+
+#### Webhook System
+- New `WebhookEndpoint` and `WebhookDelivery` Prisma models
+- New `WebhooksModule` with `WebhooksService`
+- HMAC-SHA256 signed payloads (constant-time signature verification)
+- Exponential backoff retry: 1m, 5m, 25m, 125m, 625m (5 attempts max)
+- 10-second delivery timeout
+- Auto-disables endpoints after repeated failures
+- Cron job every minute processes pending + retrying deliveries
+- New endpoints: `POST /webhooks/endpoints`, `GET /webhooks/endpoints`, `DELETE /webhooks/endpoints/:id`
+- Wired into `TripsService` — `trip.completed` and `trip.cancelled` events trigger webhooks
+- `verifySignature()` helper for partners to verify on receipt
+
+#### Developer SDKs
+- **JavaScript / TypeScript SDK** (`sdks/javascript/`)
+  - Typed client with `CheeTaxiClient` class
+  - Resources: `trips`, `pricing`, `subscriptions`, `wallets`, `webhooks`, `health`
+  - `CheeTaxiError` with status code + details
+  - Webhook signature verification helper
+  - 30-second default timeout, configurable
+- **Python SDK** (`sdks/python/`)
+  - Sync `CheeTaxiClient` + async `AsyncCheeTaxiClient`
+  - Same resource interface as JavaScript SDK
+  - Uses `httpx` for HTTP, supports async context manager
+  - `verify_webhook_signature()` helper using `hmac.compare_digest` (constant-time)
+  - `pyproject.toml` for modern packaging
+
+### Changed
+- `apps/api/src/app.module.ts` — imports `AnalyticsModule`, `WebhooksModule`
+- `apps/api/src/dispatch/dispatch.module.ts` — imports `GeoModule`, provides `HeatMapService`
+- `apps/api/src/dispatch/dispatch.controller.ts` — heat map + recommendations endpoints
+- `apps/api/src/geo/geo.module.ts` — exports `GeoService`
+- `apps/api/src/trips/trips.module.ts` — imports `WebhooksModule`
+- `apps/api/src/trips/trips.service.ts` — injects `WebhooksService`, triggers `trip.completed` + `trip.cancelled`
+- `packages/database/prisma/schema.prisma` — added `WebhookEndpoint` + `WebhookDelivery` models
+- `pnpm-workspace.yaml` — includes `sdks/javascript`
+
+### Honest Status
+Phase 4 adds the scale-out features: advanced dispatch (heat maps + predictive demand),
+corporate portal, analytics platform, webhook system, and official SDKs in JavaScript + Python.
+
+What's still pending:
+- Delivery platform UI (restaurant/merchant portal) — Phase 5
+- Full multi-city expansion (pricing + geofences per city) — Phase 5
+- Additional API tests for the new modules — Phase 5
+- Mobile offline support deep integration with UI — Phase 5
+
 ## [1.2.0] — 2026-07-10
 
 ### Added — Phase 3 Launch Readiness

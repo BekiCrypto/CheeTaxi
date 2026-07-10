@@ -1242,3 +1242,44 @@ model Place {
   @@index([geohash])
   @@index([category, city])
 }
+
+// ─── WEBHOOKS (Developer Platform) ──────────────────────────────────────────
+
+model WebhookEndpoint {
+  id            String   @id @default(cuid())
+  userId        String
+  url           String
+  secret        String   // HMAC signing secret
+  events        String[] // ['trip.completed', 'payment.success', ...]
+  isActive      Boolean  @default(true)
+  description   String?
+  lastTriggeredAt DateTime?
+  lastResponseStatus Int?
+  failureCount  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deliveries    WebhookDelivery[]
+
+  @@index([userId, isActive])
+}
+
+model WebhookDelivery {
+  id            String   @id @default(cuid())
+  endpointId    String
+  endpoint      WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event         String   // trip.completed, payment.success, etc.
+  payload       Json
+  signature     String   // HMAC-SHA256 of payload
+  status        String   @default("pending") // pending | success | failed | retrying
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(5)
+  nextRetryAt   DateTime?
+  responseStatus Int?
+  responseBody  String?
+  deliveredAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([endpointId, status])
+  @@index([status, nextRetryAt])
+}

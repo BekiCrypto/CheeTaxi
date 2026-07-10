@@ -28,6 +28,8 @@ import { HealthModule } from './health/health.module';
 import { StatsModule } from './stats/stats.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ObservabilityModule } from './observability/observability.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -62,6 +64,8 @@ import { ObservabilityModule } from './observability/observability.module';
     StatsModule,
     RealtimeModule,
     ObservabilityModule,
+    AnalyticsModule,
+    WebhooksModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

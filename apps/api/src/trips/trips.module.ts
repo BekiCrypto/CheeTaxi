@@ -6,9 +6,10 @@ import { PricingService } from '../pricing/pricing.service';
 import { GeoService } from '../geo/geo.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
-  imports: [RealtimeModule],
+  imports: [RealtimeModule, WebhooksModule],
   controllers: [TripsController],
   providers: [TripsService, DispatchService, PricingService, GeoService, NotificationsService],
   exports: [TripsService],
