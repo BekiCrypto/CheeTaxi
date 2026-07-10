@@ -1,0 +1,6 @@
+aws_region             = "eu-central-1"
+secondary_region       = "af-south-1"
+db_instance_class      = "db.r6g.large"
+redis_node_type        = "cache.r6g.large"
+cloudflare_zone_id     = "your-cloudflare-zone-id"
+cloudflare_api_token   = "your-cloudflare-api-token"

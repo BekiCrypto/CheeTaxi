@@ -1283,3 +1283,202 @@ model WebhookDelivery {
   @@index([endpointId, status])
   @@index([status, nextRetryAt])
 }
+
+// ─── SUPER APP MODULES ─────────────────────────────────────────────────────
+
+// Bill payments — electricity, water, telecom, TV
+model BillPayment {
+  id              String   @id @default(cuid())
+  userId          String
+  billType        String   // electricity | water | telecom | tv | internet
+  provider        String   // e.g. ethio_telecom, eeu, addis_water
+  accountNumber   String
+  amount          Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  fee             Decimal  @default(0) @db.Decimal(10, 2)
+  status          String   @default("pending") // pending | success | failed | refunded
+  providerRef     String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  processedAt     DateTime?
+
+  @@index([userId, createdAt])
+  @@index([billType, status])
+}
+
+// Micro-insurance — trip insurance, vehicle insurance, accident cover
+model InsurancePolicy {
+  id              String   @id @default(cuid())
+  userId          String
+  type            String   // trip | vehicle | accident | health_topup
+  provider        String
+  premium         Decimal  @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  coverageAmount  Decimal  @db.Decimal(14, 2)
+  status          String   @default("active") // active | expired | cancelled | claimed
+  startsAt        DateTime
+  endsAt          DateTime
+  tripId          String?  // for per-trip insurance
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([type, status])
+}
+
+model InsuranceClaim {
+  id              String   @id @default(cuid())
+  policyId        String
+  policy          InsurancePolicy @relation(fields: [policyId], references: [id])
+  userId          String
+  amount          Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  reason          String
+  description     String
+  attachments     Json?
+  status          String   @default("submitted") // submitted | under_review | approved | rejected | paid
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([policyId])
+  @@index([userId, status])
+}
+
+// Loyalty program — points, tiers, rewards
+model LoyaltyAccount {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  points          Int      @default(0)
+  tier            String   @default("bronze") // bronze | silver | gold | platinum
+  lifetimePoints  Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions    LoyaltyTransaction[]
+  redemptions     LoyaltyRedemption[]
+}
+
+model LoyaltyTransaction {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         LoyaltyAccount @relation(fields: [accountId], references: [id])
+  points          Int      // positive = earned, negative = redeemed
+  reason          String   // trip_completed | referral | bonus | redemption
+  tripId          String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([accountId, createdAt])
+}
+
+model LoyaltyRedemption {
+  id              String   @id @default(cuid())
+  accountId       String
+  account         LoyaltyAccount @relation(fields: [accountId], references: [id])
+  rewardType      String   // free_ride | wallet_credit | discount_coupon | partner_offer
+  pointsCost      Int
+  value           Decimal  @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  status          String   @default("pending") // pending | fulfilled | cancelled
+  fulfilledAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([accountId, status])
+}
+
+// Driver loans — advance against future earnings
+model DriverLoan {
+  id              String   @id @default(cuid())
+  driverId        String
+  amount          Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  interestRate    Float    // annual percentage rate
+  termDays        Int
+  status          String   @default("pending") // pending | approved | active | paid | defaulted | rejected
+  remainingBalance Decimal @db.Decimal(14, 2)
+  approvedBy      String?
+  approvedAt      DateTime?
+  disbursedAt     DateTime?
+  fullyRepaidAt   DateTime?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  repayments      DriverLoanRepayment[]
+
+  @@index([driverId, status])
+}
+
+model DriverLoanRepayment {
+  id              String   @id @default(cuid())
+  loanId          String
+  loan            DriverLoan @relation(fields: [loanId], references: [id])
+  amount          Decimal  @db.Decimal(14, 2)
+  currency        String   @default("ETB")
+  source          String   // trip_earnings | manual | wallet
+  tripId          String?
+  createdAt       DateTime @default(now())
+
+  @@index([loanId, createdAt])
+}
+
+// ─── AUTONOMOUS VEHICLE SUPPORT ────────────────────────────────────────────
+
+model AvFleet {
+  id              String   @id @default(cuid())
+  name            String
+  provider        String   // waymo | cruise | local_partner | in_house
+  apiEndpoint     String
+  apiKey          String?
+  isActive        Boolean  @default(true)
+  country         Country
+  city            String
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vehicles        AvVehicle[]
+
+  @@index([provider, isActive])
+  @@index([country, city])
+}
+
+model AvVehicle {
+  id              String   @id @default(cuid())
+  fleetId         String
+  fleet           AvFleet  @relation(fields: [fleetId], references: [id])
+  identifier      String   @unique  // provider's vehicle ID
+  vehicleType     VehicleType
+  capacity        Int      @default(4)
+  status          String   @default("idle") // idle | en_route | on_trip | charging | offline | error
+  latitude        Float?
+  longitude       Float?
+  batteryPercent  Float?
+  lastHeartbeatAt DateTime?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([fleetId, status])
+  @@index([status, lastHeartbeatAt])
+}
+
+// ─── DATA RESIDENCY COMPLIANCE ─────────────────────────────────────────────
+
+model DataResidencyRule {
+  id              String   @id @default(cuid())
+  country         Country
+  dataType        String   // pii | financial | health | biometric | trip_data
+  storageRegion   String   // e.g. "af-south-1" for Ethiopia data
+  replicationAllowed Boolean @default(false)
+  encryptionRequired Boolean @default(true)
+  retentionDays   Int      @default(2555)  // 7 years default
+  regulatoryBody  String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([country, dataType])
+}

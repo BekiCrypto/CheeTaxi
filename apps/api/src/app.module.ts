@@ -30,6 +30,10 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { SuperAppModule } from './superapp/superapp.module';
+import { AiModule } from './ai/ai.module';
+import { AvModule } from './av/av.module';
+import { ComplianceModule } from './compliance/compliance.module';
 
 @Module({
   imports: [
@@ -66,6 +70,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     ObservabilityModule,
     AnalyticsModule,
     WebhooksModule,
+    SuperAppModule,
+    AiModule,
+    AvModule,
+    ComplianceModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

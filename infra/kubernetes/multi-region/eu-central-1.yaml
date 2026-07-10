@@ -1,0 +1,129 @@
+# CheeTaxi — Multi-Region Kubernetes Deployment
+#
+# Deploys the platform to two EKS clusters (eu-central-1 + af-south-1)
+# with Cloudflare geo-routing in front. Each region runs independently;
+# Aurora Global Database + ElastiCache Global Datastore handle data sync.
+#
+# Apply to each cluster:
+#   aws eks update-kubeconfig --name cheetaxi-eu-central-1 --region eu-central-1
+#   kubectl apply -f infra/kubernetes/multi-region/eu-central-1.yaml
+#
+#   aws eks update-kubeconfig --name cheetaxi-af-south-1 --region af-south-1
+#   kubectl apply -f infra/kubernetes/multi-region/af-south-1.yaml
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cheetaxi
+  labels:
+    name: cheetaxi
+    region: eu-central-1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cheetaxi-config
+  namespace: cheetaxi
+data:
+  NODE_ENV: "production"
+  API_PORT: "4000"
+  REGION: "eu-central-1"
+  # Redis: local region endpoint (Global Datastore replicates reads)
+  REDIS_URL: "rediss://cheetaxi-eu-central-1.clustercfg.use1.cache.amazonaws.com:6379"
+  WEB_BASE_URL: "https://cheetaxi.africa"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-api
+  namespace: cheetaxi
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cheetaxi-api
+  template:
+    metadata:
+      labels:
+        app: cheetaxi-api
+        region: eu-central-1
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/bekicrypto/cheetaxi-api:latest
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - configMapRef:
+                name: cheetaxi-config
+            - secretRef:
+                name: cheetaxi-secrets
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: 1000m, memory: 1Gi }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 4000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 4000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-api
+  namespace: cheetaxi
+spec:
+  selector:
+    app: cheetaxi-api
+  ports:
+    - port: 80
+      targetPort: 4000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cheetaxi-api-hpa
+  namespace: cheetaxi
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cheetaxi-api
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+---
+# Web apps (landing, admin, dispatcher, corporate)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-web-landing
+  namespace: cheetaxi
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: cheetaxi-web-landing } }
+  template:
+    metadata: { labels: { app: cheetaxi-web-landing } }
+    spec:
+      containers:
+        - name: web
+          image: ghcr.io/bekicrypto/cheetaxi-web-landing:latest
+          ports: [{ containerPort: 3000 }]
+          resources: { requests: { cpu: 100m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-web-landing
+  namespace: cheetaxi
+spec:
+  selector: { app: cheetaxi-web-landing }
+  ports: [{ port: 80, targetPort: 3000 }]

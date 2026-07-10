@@ -7,7 +7,13 @@ import { useState } from 'react';
 const LANGUAGES = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'am', label: 'አማርኛ', flag: '🇪🇹' },
+  { code: 'om', label: 'Afaan Oromoo', flag: '🇪🇹' },
+  { code: 'ti', label: 'ትግርኛ', flag: '🇪🇷' },
+  { code: 'so', label: 'Soomaali', flag: '🇸🇴' },
+  { code: 'sw', label: 'Kiswahili', flag: '🇰🇪' },
   { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  { code: 'pt', label: 'Português', flag: '🇵🇹' },
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
 ];
 
 export function LanguageSwitcher() {

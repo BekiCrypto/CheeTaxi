@@ -5,6 +5,84 @@ All notable changes to CheeTaxi are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-07-10
+
+### Added — Phase 5 Long-Term Vision
+
+#### Multi-Region Active-Active Infrastructure
+- New `infra/terraform/multi-region.tf` — deploys to 2 AWS regions (eu-central-1 + af-south-1)
+- Aurora Global Database with write-forwarding for low-latency reads in secondary region
+- ElastiCache Global Datastore for cross-region Redis replication
+- Cloudflare geo-routing (Johannesburg + Nairobi → af-south-1, Frankfurt → eu-central-1)
+- S3 cross-region replication for user uploads
+- Reusable region module (`infra/terraform/modules/region/main.tf`)
+- Multi-region K8s manifests for both regions
+
+#### Super App Modules
+- New `SuperAppModule` with `SuperAppService`
+- **Bill payments**: electricity, water, telecom, TV — per-provider fee structure, wallet debit, async biller dispatch
+- **Micro-insurance**: per-trip and per-vehicle policies, claim filing with attachments, admin review workflow
+- **Loyalty program**: points per birr spent, tier auto-upgrade (bronze → silver → gold → platinum), redemption (free ride, wallet credit, discount coupon)
+- **Driver loans**: advance against future earnings, 20% auto-deduction from trip earnings, eligibility (≥50 trips)
+- New schema models: `BillPayment`, `InsurancePolicy`, `InsuranceClaim`, `LoyaltyAccount`, `LoyaltyTransaction`, `LoyaltyRedemption`, `DriverLoan`, `DriverLoanRepayment`
+
+#### AI/ML Foundation
+- New `AiModule` with `AiService` — rule-based models (upgradeable to ML)
+- **Fraud detection**: trip fraud scoring (6 rules), payment fraud scoring (3 rules), actions (allow/review/block)
+- **Dynamic pricing v2**: optimal surge multiplier (demand/supply ratio + rush hour + late night + weekend boosts, capped at 3.0)
+- **Demand prediction**: hour-ahead forecasting per geohash using 4-week historical averages, confidence scoring
+
+#### Additional Languages (9 total)
+- Web landing: 6 new translation files (om, ti, so, sw, pt, ar) — 9 languages total
+- Language switcher updated to show all 9 languages
+- next-intl middleware + request config updated for 9 locales
+
+#### Additional SDKs (5 total)
+- **Dart SDK** (`sdks/dart/`) — typed `CheeTaxiClient` with Dio, all resources + models
+- **Swift SDK** (`sdks/swift/`) — actor-based `CheeTaxiClient` with async/await, HMAC-SHA256 webhook verification using CryptoKit
+- **Kotlin SDK** (`sdks/kotlin/`) — coroutine-based `CheeTaxiClient` with HttpURLConnection, HMAC-SHA256 webhook verification
+- All SDKs cover: trips, pricing, subscriptions, wallets, webhooks, health
+- All SDKs include webhook signature verification
+
+#### Autonomous Vehicle Support
+- New `AvModule` with `AvService`
+- AV fleet registration (Waymo, Cruise, local partners, in-house)
+- AV vehicle registration with identifier, vehicle type, capacity
+- AV heartbeat ingestion (location + battery + status)
+- AV-specific dispatch (no offer/accept — direct command via fleet provider API)
+- AVs register in the same Redis GEO set as human drivers for unified nearby search
+- AV fleet status dashboard (idle/on-trip/offline counts)
+- New schema models: `AvFleet`, `AvVehicle`
+
+#### Data Residency Compliance
+- New `ComplianceModule` with `ComplianceService`
+- Per-country storage region rules (Ethiopia → af-south-1, EU → eu-central-1, etc.)
+- Data type classification (pii, financial, health, biometric, trip_data)
+- Replication allowed/disallowed per country + data type
+- Retention period enforcement (7 years default)
+- `validateWrite()` — throws if data would be stored in the wrong region
+- **GDPR right to erasure** — `POST /compliance/gdpr/erase` deletes all user data
+- **GDPR right to portability** — `GET /compliance/gdpr/export` returns all user data as JSON
+- New schema model: `DataResidencyRule`
+- Admin endpoints for rule management
+
+### Changed
+- `apps/api/src/app.module.ts` — imports `SuperAppModule`, `AiModule`, `AvModule`, `ComplianceModule`
+- `apps/web-landing/src/i18n/request.ts` — 9 locales
+- `apps/web-landing/src/middleware.ts` — 9 locales
+- `apps/web-landing/src/components/language-switcher.tsx` — 9 languages
+- `packages/database/prisma/schema.prisma` — added 11 new models (super app + AV + compliance)
+- `pnpm-workspace.yaml` — includes `sdks/javascript`
+
+### Honest Status
+Phase 5 adds the long-term vision features: multi-region active-active, super app
+(bill payments + insurance + loyalty + loans), AI/ML foundation, 9 languages,
+5 SDKs (JS + Python + Dart + Swift + Kotlin), AV support, data residency compliance.
+
+The platform now covers all 5 phases of the original roadmap. What remains is
+operational: production deployment, app store submission, third-party pen test,
+hiring the safety operations team, and the soft launch.
+
 ## [1.3.0] — 2026-07-10
 
 ### Added — Phase 4 Scale Features

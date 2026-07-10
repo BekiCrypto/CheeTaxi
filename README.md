@@ -4,7 +4,7 @@
 
 The most modern mobility platform designed for Africa. Passengers ride free. Drivers keep 100% — pay one subscription, drive unlimited.
 
-[![Status](https://img.shields.io/badge/status-phase_4-FFA800)](docs/ROADMAP.md)
+[![Status](https://img.shields.io/badge/status-phase_5-FFA800)](docs/ROADMAP.md)
 [![License](https://img.shields.io/badge/license-proprietary-0E1012)](docs/LICENSE.md)
 [![Made in Africa](https://img.shields.io/badge/made_in-Africa-10B981)](https://cheetaxi.africa)
 

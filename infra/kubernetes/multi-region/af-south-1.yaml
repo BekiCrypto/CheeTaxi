@@ -1,0 +1,97 @@
+# CheeTaxi — Secondary Region (af-south-1 / Cape Town)
+# Closer to East Africa — lower latency for Ethiopia, Kenya, Tanzania.
+#
+# Aurora Global Database write-forwarding enabled — apps can write to the
+# secondary cluster, which forwards to the primary asynchronously.
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cheetaxi
+  labels:
+    name: cheetaxi
+    region: af-south-1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cheetaxi-config
+  namespace: cheetaxi
+data:
+  NODE_ENV: "production"
+  API_PORT: "4000"
+  REGION: "af-south-1"
+  # Redis: local region endpoint (Global Datastore — reads are local, writes replicate)
+  REDIS_URL: "rediss://cheetaxi-af-south-1.clustercfg.afs1.cache.amazonaws.com:6379"
+  WEB_BASE_URL: "https://cheetaxi.africa"
+  # Aurora Global DB — secondary cluster endpoint (write-forwarding enabled)
+  DATABASE_READ_URL: "postgresql://cheetaxi:***@cheetaxi-af-south-1.cluster-cfxxx.af-south-1.rds.amazonaws.com/cheetaxi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheetaxi-api
+  namespace: cheetaxi
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cheetaxi-api
+  template:
+    metadata:
+      labels:
+        app: cheetaxi-api
+        region: af-south-1
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/bekicrypto/cheetaxi-api:latest
+          ports:
+            - containerPort: 4000
+          envFrom:
+            - configMapRef:
+                name: cheetaxi-config
+            - secretRef:
+                name: cheetaxi-secrets
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: 1000m, memory: 1Gi }
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 4000 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 4000 }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheetaxi-api
+  namespace: cheetaxi
+spec:
+  selector:
+    app: cheetaxi-api
+  ports:
+    - port: 80
+      targetPort: 4000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cheetaxi-api-hpa
+  namespace: cheetaxi
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cheetaxi-api
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
