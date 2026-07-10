@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- App icon for iOS / Android -->
+  <defs>
+    <linearGradient id="appicon-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFA800"/>
+      <stop offset="100%" stop-color="#F08C00"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="url(#appicon-bg)"/>
+  <path d="M345 165 a140 140 0 1 0 0 170" stroke="#fff" stroke-width="45" fill="none" stroke-linecap="round"/>
+  <circle cx="345" cy="165" r="32" fill="#fff"/>
+</svg>

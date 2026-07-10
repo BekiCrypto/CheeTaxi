@@ -1,594 +1,184 @@
 # CHEETAXI
 
-## Founder Executive Order
+**Fast. Reliable. African. Modern.**
 
-### Autonomous Product Development Constitution
+The most modern mobility platform designed for Africa. Passengers ride free. Drivers keep 100% — pay one subscription, drive unlimited.
 
-**Version:** 1.0
-**Status:** Supreme Project Authority
-
----
-
-## EXECUTIVE DIRECTIVE
-
-This Executive Order authorizes the AI Engineering Organization to autonomously design, architect, build, test, deploy, document, brand, secure, optimize, and launch the complete CheeTaxi Mobility Platform.
-
-No human approval shall be required between project phases unless an action would violate security, legal compliance, or production safety.
-
-The AI Organization shall behave as an elite technology company consisting of founders, product managers, designers, architects, engineers, DevOps, security engineers, QA, SREs, marketing teams, legal advisors, financial analysts, growth experts, and operations teams.
-
-Every decision shall optimize for long-term business value rather than minimum implementation effort.
-
-This document becomes the single source of truth.
+[![Status](https://img.shields.io/badge/status-phase_1.5-FFA800)](docs/ROADMAP.md)
+[![License](https://img.shields.io/badge/license-proprietary-0E1012)](docs/LICENSE.md)
+[![Made in Africa](https://img.shields.io/badge/made_in-Africa-10B981)](https://cheetaxi.africa)
 
 ---
 
-## PROJECT NAME
+## What is CheeTaxi?
 
-**CheeTaxi**
+CheeTaxi is a ride-hailing and delivery platform built for African cities. It launches in Addis Ababa, Ethiopia and scales to all 54 African countries without architectural redesign.
 
-Meaning:
+**Differentiators:**
+- **Passengers ride free** — no subscription, no platform charges
+- **Drivers keep 100%** of every fare — pay one flat subscription, drive unlimited
+- **Africa-first** — 9 languages, every African currency, timezone/tax/regulation aware
+- **Safety-first** — 24/7 SOS response, live trip sharing, verified drivers
 
-- Fast.
-- Reliable.
-- African.
-- Modern.
-- Technology-first.
+## Repository
 
----
+This is a **pnpm + Turborepo monorepo** containing the entire platform:
 
-## PRODUCT MISSION
+```
+apps/
+├── api/                  NestJS backend (20 modules, 100+ endpoints)
+├── web-landing/          Next.js marketing site (12 pages)
+├── web-admin/            Next.js admin dashboard (10 sections)
+├── web-dispatcher/       Next.js dispatcher console (real-time)
+├── mobile-passenger/     Flutter passenger app
+└── mobile-driver/        Flutter driver app
 
-Build the most modern mobility platform designed for Africa.
+packages/
+├── database/             Prisma schema (40+ models, 18 enums) + seed
+└── shared/               TypeScript domain types + DTOs
 
-The platform must exceed the quality of:
+brand/                    SVG logos, app icons, splash, social cards
+docs/                     22 documents covering everything
+infra/                    Kubernetes + Terraform
+.github/workflows/        CI/CD pipeline
+```
 
-- Uber
-- Bolt
-- Yango
-- InDrive
-- Little
-- Lyft
+## Quick Start (5 minutes)
 
-while remaining affordable for emerging markets.
+```bash
+git clone https://github.com/BekiCrypto/CheeTaxi.git
+cd CheeTaxi
+pnpm install
+cp .env.example .env         # set JWT_SECRET to a random string
+docker compose up -d         # PostgreSQL + Redis + OpenSearch + Mailhog
+pnpm db:generate
+pnpm --filter @cheetaxi/database exec prisma migrate dev --name init
+pnpm db:seed
+pnpm dev                     # API + landing + admin + dispatcher
+```
 
-The platform must launch first in Ethiopia and scale across Africa without architectural redesign.
+Then open:
+- API + Swagger: http://localhost:4000/docs
+- Landing: http://localhost:3000
+- Admin: http://localhost:3001 (login: `+251900000000` / `ChangeMe!2025`)
+- Dispatcher: http://localhost:3002
 
----
+For the full guide, see [`docs/QUICK_START.md`](docs/QUICK_START.md).
 
-## PRIMARY BUSINESS MODEL
+## Documentation
 
-### Passengers
+| Document | Purpose |
+| -------- | ------- |
+| [Founder Executive Order](docs/README.md) | The governing constitution |
+| [Architecture](docs/ARCHITECTURE.md) | System design, module map, data model |
+| [PRD](docs/PRD.md) | Product requirements, business model |
+| [API Reference](docs/API.md) | 100+ endpoints documented |
+| [Quick Start](docs/QUICK_START.md) | 5-minute local setup |
+| [Deployment](docs/DEPLOYMENT.md) | Production deployment guide |
+| [Security](docs/SECURITY.md) | Threat model, controls |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Code conventions, workflows |
+| [Operations Manual](docs/OPERATIONS_MANUAL.md) | Day-to-day ops procedures |
+| [Incident Response](docs/INCIDENT_RESPONSE.md) | SEV-1 runbooks |
+| [Backup Strategy](docs/BACKUP_STRATEGY.md) | Backup + DR procedures |
+| [Brand Guidelines](docs/BRAND_GUIDELINES.md) | Logo, colors, typography |
+| [Contributing](docs/CONTRIBUTING.md) | PR process, code standards |
+| [Repository Structure](docs/REPOSITORY_STRUCTURE.md) | Directory map |
+| [Roadmap](docs/ROADMAP.md) | Phase 1 (done) through Phase 5 |
+| [Testing Report](docs/TESTING_REPORT.md) | Test coverage status |
+| [Security Audit](docs/SECURITY_AUDIT.md) | OWASP review |
+| [Performance Report](docs/PERFORMANCE_REPORT.md) | Performance benchmarks |
+| [Known Limitations](docs/KNOWN_LIMITATIONS.md) | Honest gaps |
+| [Launch Checklist](docs/LAUNCH_CHECKLIST.md) | 153-item pre-launch gate |
+| [Release Notes](docs/RELEASE_NOTES.md) | v1.0.0 release notes |
+| [Changelog](docs/CHANGELOG.md) | Version history |
+| [License](docs/LICENSE.md) | Proprietary |
 
-- Free forever.
-- No subscriptions.
-- No platform charges.
+## Tech Stack
 
-### Drivers
+| Layer | Choice |
+| ----- | ------ |
+| Frontend | Next.js 14, React 18, TypeScript, Tailwind |
+| Mobile | Flutter 3 |
+| Backend | NestJS 10, TypeScript |
+| Database | PostgreSQL 16 (Aurora) |
+| Cache | Redis 7 (ElastiCache) |
+| Search | OpenSearch 2 |
+| Realtime | WebSockets (Socket.IO) — Phase 2 |
+| Push | Firebase Cloud Messaging |
+| Maps | Google Maps + OpenStreetMap + Mapbox (modular) |
+| Payments | Stripe + Chapa + Telebirr (modular, real adapters) |
+| Infra | Docker + Kubernetes (EKS) + Terraform + GitHub Actions |
+| CDN/WAF | Cloudflare |
 
-- Subscription only.
-- Unlimited rides.
-- Unlimited earnings.
-- No commission.
+## Status
 
-### Subscription Plans
+**Phase 1.5 — Foundation hardened.**
 
-- Daily
-- Weekly
-- Monthly
-- Quarterly
-- Yearly
-- Corporate Fleet
-- Enterprise
-- Government
+What's done:
+- ✅ Full monorepo with pnpm + Turborepo
+- ✅ Backend API: 20 modules, 100+ endpoints, JWT + OTP auth, RBAC + ABAC
+- ✅ 3 web apps: landing (12 pages), admin (10 sections), dispatcher (real-time)
+- ✅ 2 mobile apps (Flutter): passenger + driver
+- ✅ Database: 40+ Prisma models, full seed
+- ✅ Infrastructure: Docker Compose + Kubernetes + Terraform
+- ✅ CI/CD: GitHub Actions
+- ✅ 22 documentation files
+- ✅ Brand assets: SVG logos, app icon, splash, OpenGraph
+- ✅ Legal pages: Privacy, Terms, Cookies, Help Center, Status, Developer Portal
+- ✅ Unit tests: 6 spec files, 47 test cases
+- ✅ Real payment provider adapters (Stripe, Chapa, Telebirr — not stubs)
+- ✅ Real SMS provider support (Twilio, Africa's Talking — not stubs)
+- ✅ Real admin stats endpoint (no mock data)
+- ✅ Real dispatcher driver map (no mock data)
 
-Every subscription unlocks unlimited usage.
-No percentage deductions.
+What's deferred (see [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md)):
+- WebSocket realtime gateway (Phase 2)
+- Mobile app store builds + submission (Phase 3)
+- Full test coverage at 80% (Phase 2)
+- Load testing (Phase 2)
+- Mobile offline support (Phase 2)
+- 9-language localization (Phase 2)
+- Third-party penetration test (Phase 2)
 
----
+## Business Model
 
-## PRODUCT SUITE
+### Passengers — free forever
+- No subscription
+- No platform charges
+- Pay only the trip fare (cash, card, wallet, corporate account)
 
-The AI organization shall deliver the following production-ready products.
+### Drivers — subscription only
+- Daily: Br 100 (1 day)
+- Weekly: Br 500 (7 days, save 28%)
+- Monthly: Br 1,800 (30 days, save 40%)
+- Quarterly: Br 5,000 (90 days, save 44%)
+- Yearly: Br 18,000 (365 days, save 50%)
+- Corporate Fleet: Br 15,000 / month (10 drivers)
+- Enterprise: Br 65,000 / month (50 drivers)
+- Government: Custom (100+ drivers)
 
-- Passenger Mobile App
-  - Android
-  - iOS
-- Driver Mobile App
-  - Android
-  - iOS
-- Dispatcher Console
-  - Web
-- Operations Dashboard
-  - Web
-- Super Admin Platform
-  - Web
-- Landing Website
-- Marketing Website
-- Corporate Portal
-- Fleet Portal
-- Business API
-- Developer Portal
-- Support Portal
-- Knowledge Base
-- Help Center
-- Status Page
-- Public API Documentation
-- Partner Portal
-- Merchant Portal
-- Delivery Platform
-- Analytics Platform
+**Zero commission. Zero per-trip deduction. 100% of fares kept.**
 
----
+## Africa-First
 
-## TRANSPORT MODES
+- **9 languages**: English, Amharic (አማርኛ), Oromo (Afaan Oromoo), Tigrinya (ትግርኛ), Somali (Soomaali), Arabic (العربية), French (Français), Swahili (Kiswahili), Portuguese (Português)
+- **All African currencies**: ETB, KES, NGN, GHS, ZAR, EGP, MAD, RWF, TZS, UGX, XOF, USD
+- **Timezone / country / tax / regulation aware**
 
-- Taxi
-- Ride Sharing
-- Motorcycle
-- Three Wheeler
-- Courier
-- Food Delivery
-- Parcel Delivery
-- Medical Delivery
-- Business Logistics
-- Truck Delivery
-- Scheduled Trips
-- Airport Transfers
-- Corporate Transport
-- School Transport
-- Rental
-- Intercity
-- Emergency Transport
-- Future Autonomous Vehicle Support
+## License
 
----
+Proprietary — see [`LICENSE`](LICENSE) and [`docs/LICENSE.md`](docs/LICENSE.md).
 
-## CORE PRINCIPLES
+## Contact
 
-Every feature must satisfy:
-
-- Fast
-- Secure
-- Scalable
-- Fault Tolerant
-- Offline Friendly
-- Cloud Native
-- Multi Region
-- Highly Available
-- Production Ready
-
-No placeholder implementations.
-No demo logic.
-No fake APIs.
-No mock data.
-Everything must function.
-
----
-
-## TARGET SCALE
-
-| Metric                | Target          |
-| --------------------- | --------------- |
-| Countries             | 54+             |
-| Cities                | Unlimited       |
-| Drivers               | 10 Million+     |
-| Passengers            | 100 Million+    |
-| Concurrent Requests   | Millions        |
-| Trips                 | Billions        |
-
----
-
-## TECH STACK
-
-### Frontend
-
-- Next.js
-- React
-- TypeScript
-- Tailwind
-
-### Mobile
-
-- Flutter
-
-### Backend
-
-- NestJS
-
-### Database
-
-- PostgreSQL
-- Redis
-
-### Search
-
-- OpenSearch
-
-### Realtime
-
-- WebSockets
-
-### Push
-
-- Firebase
-
-### Maps
-
-- Google Maps
-- OpenStreetMap
-- Mapbox abstraction layer
-
-### Payments
-
-- Modular
-
-### Identity
-
-- OAuth
-- OIDC
-- JWT
-- RBAC
-- ABAC
-
-### Infrastructure
-
-- Docker
-- Kubernetes
-- Terraform
-- GitHub Actions
-- Cloudflare
-- CDN
-- Object Storage
-
-### Monitoring
-
-- Prometheus
-- Grafana
-- OpenTelemetry
-- Sentry
-
-### Logging
-
-- ELK
+- General: `hello@cheetaxi.africa`
+- Support: `support@cheetaxi.africa`
+- Drivers: `drivers@cheetaxi.africa`
+- Sales: `sales@cheetaxi.africa`
+- Security: `security@cheetaxi.africa`
+- Press: `press@cheetaxi.africa`
+- Legal: `legal@cheetaxi.africa`
 
 ---
 
-## SYSTEM MODULES
-
-- Authentication
-- Identity
-- Passenger Management
-- Driver Management
-- Fleet Management
-- Vehicle Management
-- Trip Management
-- Dispatch Engine
-- Pricing Engine
-- Geo Engine
-- Maps
-- Navigation
-- ETA
-- Subscriptions
-- Payments
-- Wallet
-- Invoices
-- Receipts
-- Promotions
-- Coupons
-- Rewards
-- Referral
-- Support
-- CRM
-- Notifications
-- Messaging
-- Chat
-- Voice Calls
-- SOS
-- Emergency
-- Fraud Detection
-- Compliance
-- Tax
-- Accounting
-- Reporting
-- Business Intelligence
-- CMS
-- Marketing Automation
-- Localization
-- Feature Flags
-- Experimentation
-- Audit Logs
-- Developer APIs
-- SDKs
-- Integrations
-
----
-
-## DELIVERY FEATURES
-
-- Multi Stop
-- Scheduled
-- Express
-- Live Tracking
-- Proof of Delivery
-- Signature
-- Photo Confirmation
-- OTP
-- Returns
-- Business Deliveries
-- Fleet Routing
-- Batch Deliveries
-
----
-
-## DRIVER FEATURES
-
-- Driver Onboarding
-- KYC
-- Vehicle Verification
-- Background Checks
-- License Validation
-- Subscription Purchase
-- Trip Requests
-- Navigation
-- Heat Maps
-- Income Analytics
-- Wallet
-- Withdrawal
-- Ratings
-- Bonuses
-- Promotions
-- Support
-- Training
-- Leaderboard
-- Achievements
-- Offline Mode
-
----
-
-## PASSENGER FEATURES
-
-- Registration
-- Guest Booking
-- Saved Places
-- Family Profiles
-- Favorite Drivers
-- Ride Scheduling
-- Multiple Stops
-- Ride Sharing
-- Price Estimates
-- SOS
-- Trip Sharing
-- Live Tracking
-- Wallet
-- Cards
-- Cash
-- Invoices
-- Ratings
-- Complaints
-- Lost and Found
-- Subscriptions (Future)
-
----
-
-## ADMIN ROLES
-
-- Super Admin
-- Platform Admin
-- Operations
-- Finance
-- Support
-- Dispatcher
-- Compliance
-- Safety
-- Fraud
-- Marketing
-- Fleet Manager
-- Regional Manager
-- City Manager
-- Regulator
-- Driver
-- Passenger
-- Developer
-- Auditor
-- Read Only
-
-Every role must be RBAC protected.
-Every permission must be individually configurable.
-
----
-
-## AFRICA FIRST
-
-### Languages
-
-- English
-- Amharic
-- Oromo
-- Tigrinya
-- Somali
-- Arabic
-- French
-- Swahili
-- Portuguese
-
-### Currencies
-
-- Every African currency.
-
-### Localization
-
-- Timezone aware.
-- Country aware.
-- Tax aware.
-- Regulation aware.
-
----
-
-## SECURITY
-
-- Zero Trust
-- Encryption Everywhere
-- OWASP Top 10 Compliance
-- SOC2 Ready
-- GDPR Ready
-- Audit Logs
-- Rate Limiting
-- Secrets Vault
-- MFA
-- Device Trust
-- Fraud Detection
-- Anomaly Detection
-- Bot Detection
-- DDoS Protection
-- Secure APIs
-- Data Privacy
-
----
-
-## USER EXPERIENCE
-
-- Modern
-- Minimal
-- Accessible
-- Responsive
-- Beautiful
-- Animated
-- Premium
-- Dark Mode
-- Light Mode
-- Offline Support
-- Fast Loading
-- Native Performance
-
----
-
-## DESIGN SYSTEM
-
-- Complete Design Tokens
-- Component Library
-- Typography
-- Spacing
-- Motion
-- Illustrations
-- Icons
-- Brand Assets
-- Logo
-- Mascot
-- Marketing Graphics
-- Social Templates
-- Presentation Templates
-- Pitch Deck
-- Brand Guidelines
-
----
-
-## BUSINESS INTELLIGENCE
-
-- Revenue
-- Subscriptions
-- Driver Growth
-- Passenger Growth
-- Trip Analytics
-- Heat Maps
-- Operational KPIs
-- Financial Dashboards
-- Forecasting
-- Predictive Analytics
-- Executive Dashboard
-
----
-
-## MARKETING
-
-- SEO Optimized Website
-- Landing Pages
-- Blog
-- Referral Engine
-- Email Automation
-- Push Notifications
-- SMS Campaigns
-- Social Media Assets
-- Affiliate Program
-- Influencer Portal
-- Community Platform
-
----
-
-## DOCUMENTATION
-
-- Architecture
-- PRD
-- System Design
-- Database
-- API Docs
-- SDK Docs
-- Deployment Guides
-- Runbooks
-- Operations Manual
-- Developer Guide
-- Administrator Guide
-- User Guide
-- Disaster Recovery
-- Security Handbook
-- Compliance Handbook
-
----
-
-## QUALITY REQUIREMENTS
-
-- Unit Tests
-- Integration Tests
-- End-to-End Tests
-- Performance Tests
-- Security Tests
-- Accessibility Tests
-- Chaos Engineering
-- Load Testing
-- Stress Testing
-- Penetration Testing
-
----
-
-## DEPLOYMENT
-
-- Production Ready
-- One Command Deployment
-- Blue Green Deployment
-- Zero Downtime
-- Automatic Rollback
-- Infrastructure as Code
-- Continuous Deployment
-
----
-
-## SUCCESS CRITERIA
-
-The project shall not be considered complete until:
-
-- Every application builds successfully.
-- Every automated test passes.
-- Every API is documented.
-- No placeholder exists.
-- No demo code exists.
-- No TODO remains.
-- Security review passes.
-- Performance targets pass.
-- Accessibility passes.
-- Production deployment succeeds.
-- Monitoring is operational.
-- Backups are configured.
-- Recovery procedures are verified.
-- All applications are launch-ready.
-
----
-
-## AI AUTONOMY
-
-The AI organization is explicitly authorized to make all engineering, architectural, UX, branding, infrastructure, deployment, testing, documentation, marketing, optimization, and operational decisions required to fulfill this Executive Order.
-
-When multiple valid solutions exist, the AI shall select the option that maximizes scalability, maintainability, performance, developer experience, security, business value, and long-term competitiveness.
-
-No phase shall be considered complete until it meets enterprise-grade production standards.
-
-This Executive Order supersedes all lower-level specifications and serves as the governing constitution for the CheeTaxi platform.
+*CheeTaxi Technologies · Bole, Addis Ababa, Ethiopia · © 2026*

@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Headers, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -20,7 +20,12 @@ export class PaymentsController {
   // Webhooks are PUBLIC — no auth, signature verified by adapter
   @Post('webhooks/:provider')
   @ApiOperation({ summary: 'Payment provider webhook (no auth — signature verified)' })
-  webhook(@Param('provider') provider: string, @Body() body: unknown) {
-    return this.payments.handleWebhook(provider, body);
+  webhook(
+    @Param('provider') provider: string,
+    @Body() body: unknown,
+    @Headers('stripe-signature') stripeSignature?: string,
+  ) {
+    const signature = provider === 'stripe' ? stripeSignature : undefined;
+    return this.payments.handleWebhook(provider, body, signature);
   }
 }

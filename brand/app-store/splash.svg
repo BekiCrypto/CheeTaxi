@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 2712" fill="none">
+  <!-- iPhone splash screen (6.7") -->
+  <defs>
+    <linearGradient id="splash-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFA800"/>
+      <stop offset="100%" stop-color="#F08C00"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="2712" fill="url(#splash-bg)"/>
+
+  <!-- Logo mark -->
+  <rect x="490" y="1056" width="300" height="300" rx="70" fill="#FFFFFF"/>
+  <path d="M825 1213 a130 130 0 1 0 0 158" stroke="#F08C00" stroke-width="42" fill="none" stroke-linecap="round"/>
+  <circle cx="825" cy="1213" r="30" fill="#F08C00"/>
+
+  <!-- Wordmark -->
+  <text x="640" y="1500" font-family="Plus Jakarta Sans, Inter, system-ui, sans-serif" font-size="100" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-3">CheeTaxi</text>
+  <text x="640" y="1590" font-family="Inter, system-ui, sans-serif" font-size="44" font-weight="500" fill="#FFFFFFCC" text-anchor="middle">Fast. Reliable. African.</text>
+
+  <!-- Bottom tagline -->
+  <text x="640" y="2480" font-family="Inter, system-ui, sans-serif" font-size="32" fill="#FFFFFF99" text-anchor="middle">The most modern mobility platform designed for Africa.</text>
+</svg>

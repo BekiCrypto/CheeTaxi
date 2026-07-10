@@ -18,39 +18,30 @@ export function Navbar() {
           </span>
         </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
-          <Link href="#drivers" className="text-sm font-medium text-ink-600 hover:text-brand-600">
-            For Drivers
-          </Link>
-          <Link href="#passengers" className="text-sm font-medium text-ink-600 hover:text-brand-600">
-            For Passengers
-          </Link>
-          <Link href="#plans" className="text-sm font-medium text-ink-600 hover:text-brand-600">
-            Pricing
-          </Link>
-          <Link href="#modes" className="text-sm font-medium text-ink-600 hover:text-brand-600">
-            Services
-          </Link>
-          <Link href="#safety" className="text-sm font-medium text-ink-600 hover:text-brand-600">
-            Safety
-          </Link>
+        <div className="hidden items-center gap-6 lg:flex">
+          <Link href="/drivers" className="text-sm font-medium text-ink-600 hover:text-brand-600">Drive</Link>
+          <Link href="/corporate" className="text-sm font-medium text-ink-600 hover:text-brand-600">Business</Link>
+          <Link href="/fleet" className="text-sm font-medium text-ink-600 hover:text-brand-600">Fleet</Link>
+          <Link href="/developers" className="text-sm font-medium text-ink-600 hover:text-brand-600">Developers</Link>
+          <Link href="/help" className="text-sm font-medium text-ink-600 hover:text-brand-600">Help</Link>
+          <Link href="/status" className="text-sm font-medium text-ink-600 hover:text-brand-600">Status</Link>
         </div>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-3 lg:flex">
           <Link
             href={`${process.env.NEXT_PUBLIC_ADMIN_URL ?? 'http://localhost:3001'}/login`}
             className="btn-ghost"
           >
             Sign in
           </Link>
-          <Link href="#download" className="btn-primary">
+          <Link href="/drivers#download" className="btn-primary">
             Get the app
           </Link>
         </div>
 
         <button
           aria-label="Toggle menu"
-          className="rounded-lg p-2 md:hidden"
+          className="rounded-lg p-2 lg:hidden"
           onClick={() => setOpen((v) => !v)}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -60,26 +51,17 @@ export function Navbar() {
       </nav>
 
       {open && (
-        <div className="border-t border-ink-100 bg-white md:hidden">
+        <div className="border-t border-ink-100 bg-white lg:hidden">
           <div className="container-px mx-auto flex max-w-7xl flex-col gap-3 py-4">
-            <Link href="#drivers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">
-              For Drivers
-            </Link>
-            <Link href="#passengers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">
-              For Passengers
-            </Link>
-            <Link href="#plans" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">
-              Pricing
-            </Link>
-            <Link href="#modes" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">
-              Services
-            </Link>
-            <Link href="#safety" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">
-              Safety
-            </Link>
-            <Link href="#download" onClick={() => setOpen(false)} className="btn-primary mt-2">
-              Get the app
-            </Link>
+            <Link href="/drivers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Drive</Link>
+            <Link href="/corporate" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Business</Link>
+            <Link href="/fleet" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Fleet</Link>
+            <Link href="/developers" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Developers</Link>
+            <Link href="/help" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Help</Link>
+            <Link href="/status" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Status</Link>
+            <Link href="/blog" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Blog</Link>
+            <Link href="/contact" onClick={() => setOpen(false)} className="text-sm font-medium text-ink-700">Contact</Link>
+            <Link href="/drivers#download" onClick={() => setOpen(false)} className="btn-primary mt-2">Get the app</Link>
           </div>
         </div>
       )}
