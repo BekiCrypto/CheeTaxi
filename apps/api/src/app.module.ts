@@ -34,6 +34,11 @@ import { SuperAppModule } from './superapp/superapp.module';
 import { AiModule } from './ai/ai.module';
 import { AvModule } from './av/av.module';
 import { ComplianceModule } from './compliance/compliance.module';
+import { DeliveryModule } from './delivery/delivery.module';
+import { CarbonModule } from './carbon/carbon.module';
+import { AssistantModule } from './assistant/assistant.module';
+import { CryptoModule } from './crypto/crypto.module';
+import { BlockchainModule } from './blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -74,6 +79,11 @@ import { ComplianceModule } from './compliance/compliance.module';
     AiModule,
     AvModule,
     ComplianceModule,
+    DeliveryModule,
+    CarbonModule,
+    AssistantModule,
+    CryptoModule,
+    BlockchainModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

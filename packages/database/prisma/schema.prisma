@@ -1482,3 +1482,155 @@ model DataResidencyRule {
 
   @@unique([country, dataType])
 }
+
+// ─── DELIVERY PLATFORM ─────────────────────────────────────────────────────
+
+model Merchant {
+  id              String   @id @default(cuid())
+  name            String
+  type            String   // restaurant | pharmacy | grocery | retail
+  ownerId         String
+  phone           String
+  email           String?
+  country         Country
+  city            String
+  address         String
+  latitude        Float
+  longitude       Float
+  geohash         String
+  ratingAverage   Float    @default(5.0)
+  ratingCount     Int      @default(0)
+  isActive        Boolean  @default(true)
+  isVerified      Boolean  @default(false)
+  verifiedAt      DateTime?
+  openingHours    Json?    // { mon: {open: "08:00", close: "22:00"}, ... }
+  deliveryRadiusM Int      @default(5000)
+  prepTimeMinutes Int      @default(20)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  menuCategories  MenuCategory[]
+  menuItems       MenuItem[]
+  orders          DeliveryOrder[]
+
+  @@index([country, city, isActive])
+  @@index([geohash])
+}
+
+model MenuCategory {
+  id              String   @id @default(cuid())
+  merchantId      String
+  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name            String
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+
+  items           MenuItem[]
+
+  @@index([merchantId, sortOrder])
+}
+
+model MenuItem {
+  id              String   @id @default(cuid())
+  merchantId      String
+  merchant        Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  categoryId      String?
+  category        MenuCategory? @relation(fields: [categoryId], references: [id])
+  name            String
+  description     String?
+  price           Decimal  @db.Decimal(10, 2)
+  currency        String   @default("ETB")
+  imageUrl        String?
+  isAvailable     Boolean  @default(true)
+  prepTimeMinutes Int?
+  calories        Int?
+  allergens       String[]
+  isVegetarian    Boolean  @default(false)
+  isVegan         Boolean  @default(false)
+  isHalal         Boolean  @default(true)
+  spiceLevel      Int      @default(0) // 0-3
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orderItems      OrderItem[]
+
+  @@index([merchantId, isAvailable])
+  @@index([categoryId])
+}
+
+model DeliveryOrder {
+  id              String   @id @default(cuid())
+  publicId        String   @unique @default(cuid())
+  merchantId      String
+  merchant        Merchant @relation(fields: [merchantId], references: [id])
+  customerId      String   // userId of the customer
+  driverId        String?
+  tripId          String?  // linked Trip for delivery
+  status          String   @default("placed") // placed | confirmed | preparing | ready | picked_up | delivered | cancelled
+  items           OrderItem[]
+  subtotal        Decimal  @db.Decimal(12, 2)
+  deliveryFee     Decimal  @db.Decimal(10, 2)
+  serviceFee      Decimal  @default(0) @db.Decimal(10, 2)
+  tax             Decimal  @db.Decimal(10, 2)
+  total           Decimal  @db.Decimal(12, 2)
+  currency        String   @default("ETB")
+  paymentMethod   String   @default("WALLET")
+  paymentStatus   String   @default("pending")
+  // Delivery details
+  deliveryAddress String
+  deliveryLatitude Float
+  deliveryLongitude Float
+  deliveryInstructions String?
+  // OTP for proof of delivery
+  deliveryOtp     String?
+  // Timestamps
+  placedAt        DateTime @default(now())
+  confirmedAt     DateTime?
+  readyAt         DateTime?
+  pickedUpAt      DateTime?
+  deliveredAt     DateTime?
+  cancelledAt     DateTime?
+  cancellationReason String?
+  // Rating
+  customerRating  Int?
+  driverRating    Int?
+
+  @@index([merchantId, status])
+  @@index([customerId, placedAt])
+  @@index([driverId, status])
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           DeliveryOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId      String
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity        Int
+  unitPrice       Decimal  @db.Decimal(10, 2)
+  totalPrice      Decimal  @db.Decimal(10, 2)
+  specialInstructions String?
+
+  @@index([orderId])
+}
+
+// ─── CARBON TRACKING ───────────────────────────────────────────────────────
+
+model CarbonOffset {
+  id              String   @id @default(cuid())
+  tripId          String?  @unique
+  userId          String
+  distanceKm      Float
+  vehicleType     String
+  co2Kg           Float    // kg of CO2 emitted
+  offsetCost      Decimal  @db.Decimal(10, 2) // cost to offset in ETB
+  currency        String   @default("ETB")
+  isOffset        Boolean  @default(false)
+  offsetProvider  String?
+  offsetRef       String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, isOffset])
+}
