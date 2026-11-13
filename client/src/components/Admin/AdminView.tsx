@@ -25,7 +25,7 @@ import {
 import { AddisMap } from '../Map/AddisMap';
 import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory, SupportTicket } from '@shared/types';
 import { translations, Language } from '../../i18n/translations';
-import { ADDIS_LANDMARKS } from '../../../../server/src/services/geoService';
+import { ADDIS_LANDMARKS, AddisLandmark } from '@shared/landmarks';
 import { AdminSubscriptionLedgerTab } from './AdminSubscriptionLedgerTab';
 import { AdminCorporateTab } from './AdminCorporateTab';
 import { AdminProviderTab } from './AdminProviderTab';
@@ -171,8 +171,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
   // Handle Manual Call-Center Dispatch
   const handleManualDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const pLandmark = ADDIS_LANDMARKS.find((l) => l.name === pickupLandmark)!;
-    const dLandmark = ADDIS_LANDMARKS.find((l) => l.name === destLandmark)!;
+    const pLandmark = ADDIS_LANDMARKS.find((l: AddisLandmark) => l.name === pickupLandmark)!;
+    const dLandmark = ADDIS_LANDMARKS.find((l: AddisLandmark) => l.name === destLandmark)!;
 
     try {
       const res = await fetch('/api/admin/manual-dispatch', {
@@ -504,7 +504,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
                       onChange={(e) => setPickupLandmark(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none"
                     >
-                      {ADDIS_LANDMARKS.map((l) => (
+                      {ADDIS_LANDMARKS.map((l: AddisLandmark) => (
                         <option key={l.id} value={l.name}>
                           {l.name} ({l.nameAm})
                         </option>
@@ -519,7 +519,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
                       onChange={(e) => setDestLandmark(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none"
                     >
-                      {ADDIS_LANDMARKS.map((l) => (
+                      {ADDIS_LANDMARKS.map((l: AddisLandmark) => (
                         <option key={l.id} value={l.name}>
                           {l.name} ({l.nameAm})
                         </option>

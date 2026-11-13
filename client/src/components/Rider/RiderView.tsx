@@ -26,7 +26,7 @@ import { AddisMap } from '../Map/AddisMap';
 import { TelebirrModal } from '../Payment/TelebirrModal';
 import { VatReceiptModal } from '../Payment/VatReceiptModal';
 import { RiderDeliveryPanel } from './RiderDeliveryPanel';
-import { ADDIS_LANDMARKS } from '../../../../server/src/services/geoService';
+import { ADDIS_LANDMARKS, AddisLandmark } from '@shared/landmarks';
 import {
   Driver,
   FareEstimate,
@@ -339,7 +339,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
             <select
               value={pickup.address}
               onChange={(e) => {
-                const landmark = ADDIS_LANDMARKS.find((l) => l.name === e.target.value);
+                const landmark = ADDIS_LANDMARKS.find((l: AddisLandmark) => l.name === e.target.value);
                 if (landmark) {
                   setPickup({
                     address: landmark.name,
@@ -351,7 +351,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
               }}
               className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
             >
-              {ADDIS_LANDMARKS.map((l) => (
+              {ADDIS_LANDMARKS.map((l: AddisLandmark) => (
                 <option key={l.id} value={l.name}>
                   {language === 'am' ? l.nameAm : l.name}
                 </option>
@@ -367,7 +367,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
             <select
               value={destination.address}
               onChange={(e) => {
-                const landmark = ADDIS_LANDMARKS.find((l) => l.name === e.target.value);
+                const landmark = ADDIS_LANDMARKS.find((l: AddisLandmark) => l.name === e.target.value);
                 if (landmark) {
                   setDestination({
                     address: landmark.name,
@@ -379,7 +379,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
               }}
               className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
             >
-              {ADDIS_LANDMARKS.map((l) => (
+              {ADDIS_LANDMARKS.map((l: AddisLandmark) => (
                 <option key={l.id} value={l.name}>
                   {language === 'am' ? l.nameAm : l.name}
                 </option>
