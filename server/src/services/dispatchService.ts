@@ -27,10 +27,11 @@ export class DispatchService {
     category: VehicleCategory,
     maxRadiusKm: number = 8.0
   ): (Driver & { distanceToPickupKm: number; etaMinutes: number })[] {
-    // Select all online, non-busy, approved drivers
+    // Select all online, non-busy, approved drivers with active or grace-period subscription
     const rows = db.prepare(`
       SELECT * FROM drivers
       WHERE is_online = 1 AND is_busy = 0 AND kyc_status = 'approved'
+        AND (subscription_status IN ('active', 'grace_period') OR subscription_status IS NULL)
     `).all() as any[];
 
     const matches: (Driver & { distanceToPickupKm: number; etaMinutes: number })[] = [];
@@ -69,7 +70,14 @@ export class DispatchService {
           rating: row.rating,
           totalRides: row.total_rides,
           walletBalanceEtb: row.wallet_balance_etb,
-          activeRideId: row.active_ride_id,
+          subscriptionStatus: row.subscription_status || 'active',
+          activeSubscriptionId: row.active_subscription_id || undefined,
+          subscriptionExpiresAt: row.subscription_expires_at || undefined,
+          activeRideId: row.active_ride_id || undefined,
+          activeDeliveryId: row.active_delivery_id || undefined,
+          fleetId: row.fleet_id || undefined,
+          countryCode: row.country_code || 'ET',
+          cityCode: row.city_code || 'ADDIS_ABABA',
           distanceToPickupKm: Number(dist.toFixed(2)),
           etaMinutes: eta,
         });
@@ -214,7 +222,14 @@ export class DispatchService {
           rating: d.rating,
           totalRides: d.total_rides,
           walletBalanceEtb: d.wallet_balance_etb,
-          activeRideId: d.active_ride_id,
+          subscriptionStatus: d.subscription_status || 'active',
+          activeSubscriptionId: d.active_subscription_id || undefined,
+          subscriptionExpiresAt: d.subscription_expires_at || undefined,
+          activeRideId: d.active_ride_id || undefined,
+          activeDeliveryId: d.active_delivery_id || undefined,
+          fleetId: d.fleet_id || undefined,
+          countryCode: d.country_code || 'ET',
+          cityCode: d.city_code || 'ADDIS_ABABA',
         };
       }
     }
@@ -249,6 +264,7 @@ export class DispatchService {
           : undefined,
       isManualDispatch: Boolean(row.is_manual_dispatch),
       operatorNotes: row.operator_notes,
+      countryCode: row.country_code || 'ET',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

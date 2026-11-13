@@ -3,7 +3,12 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-const dbPath = process.env.DATABASE_PATH || path.resolve(process.cwd(), 'chebelew.db');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serverDir = path.resolve(__dirname, '../../');
+const defaultDbPath = path.resolve(serverDir, 'chebelew.db');
+
+const dbPath = process.env.DATABASE_PATH || defaultDbPath;
 export const db = new Database(dbPath);
 
 // Enable WAL mode for high-concurrency read/write performance
@@ -19,7 +24,11 @@ export function initDatabase() {
       email TEXT,
       role TEXT NOT NULL DEFAULT 'rider',
       language TEXT NOT NULL DEFAULT 'am',
+      country_code TEXT NOT NULL DEFAULT 'ET',
       avatar_url TEXT,
+      is_verified INTEGER NOT NULL DEFAULT 1,
+      corporate_id TEXT,
+      fleet_id TEXT,
       created_at TEXT NOT NULL
     );
 
@@ -46,9 +55,167 @@ export function initDatabase() {
       rating REAL NOT NULL DEFAULT 4.9,
       total_rides INTEGER NOT NULL DEFAULT 0,
       wallet_balance_etb REAL NOT NULL DEFAULT 0,
+      subscription_status TEXT NOT NULL DEFAULT 'active',
+      subscription_expires_at TEXT,
+      active_subscription_id TEXT,
       active_ride_id TEXT,
+      active_delivery_id TEXT,
+      fleet_id TEXT,
+      country_code TEXT NOT NULL DEFAULT 'ET',
+      city_code TEXT NOT NULL DEFAULT 'ADDIS_ABABA',
       created_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS subscription_plans (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      name_am TEXT NOT NULL,
+      billing_period TEXT NOT NULL,
+      duration_days INTEGER NOT NULL,
+      price_amount REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'ETB',
+      country_code TEXT NOT NULL DEFAULT 'ET',
+      city_code TEXT NOT NULL DEFAULT 'ADDIS_ABABA',
+      vehicle_category TEXT NOT NULL DEFAULT 'sedan',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      features_json TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS driver_subscriptions (
+      id TEXT PRIMARY KEY,
+      driver_id TEXT NOT NULL,
+      plan_id TEXT NOT NULL,
+      plan_name TEXT NOT NULL,
+      billing_period TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      grace_period_ends_at TEXT,
+      auto_renew INTEGER NOT NULL DEFAULT 0,
+      amount_paid REAL NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'ETB',
+      payment_method TEXT NOT NULL,
+      payment_reference TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (driver_id) REFERENCES drivers(id),
+      FOREIGN KEY (plan_id) REFERENCES subscription_plans(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS delivery_orders (
+      id TEXT PRIMARY KEY,
+      sender_id TEXT NOT NULL,
+      sender_name TEXT NOT NULL,
+      sender_phone TEXT NOT NULL,
+      recipient_name TEXT NOT NULL,
+      recipient_phone TEXT NOT NULL,
+      pickup_json TEXT NOT NULL,
+      dropoff_json TEXT NOT NULL,
+      category TEXT NOT NULL,
+      package_description TEXT NOT NULL,
+      weight_kg REAL DEFAULT 1.0,
+      delivery_speed TEXT NOT NULL DEFAULT 'standard',
+      price_etb REAL NOT NULL,
+      vat_etb REAL NOT NULL,
+      total_etb REAL NOT NULL,
+      payment_method TEXT NOT NULL,
+      payment_status TEXT NOT NULL DEFAULT 'PENDING',
+      courier_id TEXT,
+      status TEXT NOT NULL DEFAULT 'REQUESTED',
+      pickup_otp TEXT NOT NULL,
+      dropoff_otp TEXT NOT NULL,
+      proof_photo_url TEXT,
+      recipient_signature_url TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS corporate_accounts (
+      id TEXT PRIMARY KEY,
+      company_name TEXT NOT NULL,
+      registration_number TEXT NOT NULL,
+      tin_number TEXT NOT NULL,
+      contact_person TEXT NOT NULL,
+      contact_email TEXT NOT NULL,
+      contact_phone TEXT NOT NULL,
+      credit_limit_etb REAL NOT NULL,
+      spent_this_month_etb REAL NOT NULL DEFAULT 0,
+      billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+      status TEXT NOT NULL DEFAULT 'active',
+      country_code TEXT NOT NULL DEFAULT 'ET',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS corporate_employees (
+      id TEXT PRIMARY KEY,
+      corporate_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      email TEXT NOT NULL,
+      department TEXT NOT NULL,
+      monthly_allowance_etb REAL NOT NULL,
+      spent_this_month_etb REAL NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (corporate_id) REFERENCES corporate_accounts(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS fleets (
+      id TEXT PRIMARY KEY,
+      owner_user_id TEXT NOT NULL,
+      fleet_name TEXT NOT NULL,
+      registration_number TEXT NOT NULL,
+      contact_phone TEXT NOT NULL,
+      total_vehicles INTEGER NOT NULL DEFAULT 0,
+      total_drivers INTEGER NOT NULL DEFAULT 0,
+      country_code TEXT NOT NULL DEFAULT 'ET',
+      city_code TEXT NOT NULL DEFAULT 'ADDIS_ABABA',
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sos_incidents (
+      id TEXT PRIMARY KEY,
+      ride_id TEXT,
+      delivery_id TEXT,
+      reporter_user_id TEXT NOT NULL,
+      reporter_name TEXT NOT NULL,
+      reporter_phone TEXT NOT NULL,
+      reporter_role TEXT NOT NULL,
+      current_lat REAL NOT NULL,
+      current_lng REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      safety_notes TEXT,
+      created_at TEXT NOT NULL,
+      resolved_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS developer_api_keys (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      key_prefix TEXT NOT NULL,
+      hashed_secret TEXT NOT NULL,
+      environment TEXT NOT NULL DEFAULT 'test',
+      rate_limit_per_min INTEGER NOT NULL DEFAULT 60,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      last_used_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS country_configs (
+      country_code TEXT PRIMARY KEY,
+      country_name TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      currency_symbol TEXT NOT NULL,
+      phone_prefix TEXT NOT NULL,
+      default_language TEXT NOT NULL,
+      supported_languages_json TEXT NOT NULL,
+      vat_rate REAL NOT NULL,
+      tax_authority_name TEXT NOT NULL,
+      emergency_police_number TEXT NOT NULL,
+      emergency_support_number TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS rides (
@@ -78,6 +245,8 @@ export function initDatabase() {
       current_driver_lng REAL,
       is_manual_dispatch INTEGER NOT NULL DEFAULT 0,
       operator_notes TEXT,
+      corporate_id TEXT,
+      country_code TEXT NOT NULL DEFAULT 'ET',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (rider_id) REFERENCES users(id),
@@ -133,6 +302,31 @@ export function initDatabase() {
     );
   `);
 
+  // Run safe schema migrations for existing database columns
+  const migrateColumn = (table: string, col: string, definition: string) => {
+    try {
+      const cols = (db.pragma(`table_info(${table})`) as any[]).map((c) => c.name);
+      if (!cols.includes(col)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${definition};`);
+      }
+    } catch (err) {
+      console.error(`Migration error for ${table}.${col}:`, err);
+    }
+  };
+
+  migrateColumn('drivers', 'active_delivery_id', 'TEXT');
+  migrateColumn('drivers', 'fleet_id', 'TEXT');
+  migrateColumn('drivers', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
+  migrateColumn('drivers', 'city_code', "TEXT NOT NULL DEFAULT 'ADDIS_ABABA'");
+
+  migrateColumn('rides', 'corporate_id', 'TEXT');
+  migrateColumn('rides', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
+
+  migrateColumn('users', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
+  migrateColumn('users', 'is_verified', 'INTEGER NOT NULL DEFAULT 1');
+  migrateColumn('users', 'corporate_id', 'TEXT');
+  migrateColumn('users', 'fleet_id', 'TEXT');
+
   seedInitialData();
 }
 
@@ -154,12 +348,12 @@ function seedInitialData() {
       id, user_id, full_name, phone, avatar_url, vehicle_make, vehicle_model,
       vehicle_year, vehicle_plate, vehicle_color, vehicle_category, license_number,
       kyc_status, is_online, is_busy, current_lat, current_lng, heading,
-      rating, total_rides, wallet_balance_etb, created_at
+      rating, total_rides, wallet_balance_etb, subscription_status, subscription_expires_at, active_subscription_id, created_at
     ) VALUES (
       @id, @user_id, @full_name, @phone, @avatar_url, @vehicle_make, @vehicle_model,
       @vehicle_year, @vehicle_plate, @vehicle_color, @vehicle_category, @license_number,
       @kyc_status, @is_online, @is_busy, @current_lat, @current_lng, @heading,
-      @rating, @total_rides, @wallet_balance_etb, @created_at
+      @rating, @total_rides, @wallet_balance_etb, @subscription_status, @subscription_expires_at, @active_subscription_id, @created_at
     )
   `);
 
@@ -233,6 +427,9 @@ function seedInitialData() {
     rating: 4.92,
     total_rides: 482,
     wallet_balance_etb: 3850.50,
+    subscription_status: 'active',
+    subscription_expires_at: '2027-11-13T00:00:00.000Z',
+    active_subscription_id: 'sub_ahmed_01',
     created_at: now,
   });
 
@@ -270,6 +467,9 @@ function seedInitialData() {
     rating: 4.88,
     total_rides: 615,
     wallet_balance_etb: 5420.00,
+    subscription_status: 'active',
+    subscription_expires_at: '2027-11-13T00:00:00.000Z',
+    active_subscription_id: 'sub_dawit_02',
     created_at: now,
   });
 
@@ -307,6 +507,9 @@ function seedInitialData() {
     rating: 4.96,
     total_rides: 340,
     wallet_balance_etb: 2910.00,
+    subscription_status: 'active',
+    subscription_expires_at: '2027-11-13T00:00:00.000Z',
+    active_subscription_id: 'sub_bethlehem_03',
     created_at: now,
   });
 
@@ -344,6 +547,9 @@ function seedInitialData() {
     rating: 4.95,
     total_rides: 520,
     wallet_balance_etb: 6150.00,
+    subscription_status: 'active',
+    subscription_expires_at: '2027-11-13T00:00:00.000Z',
+    active_subscription_id: 'sub_henok_04',
     created_at: now,
   });
 
@@ -381,6 +587,9 @@ function seedInitialData() {
     rating: 5.0,
     total_rides: 0,
     wallet_balance_etb: 0,
+    subscription_status: 'expired',
+    subscription_expires_at: null,
+    active_subscription_id: null,
     created_at: now,
   });
 
@@ -540,6 +749,295 @@ function seedInitialData() {
     created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
     updated_at: new Date(Date.now() - 3600000 * 3).toISOString(),
   });
+
+  // --------------------------------------------------------------------------
+  // Seed Multi-Country Configurations (Ethiopia Primary, Kenya Expansion)
+  // --------------------------------------------------------------------------
+  const insertCountry = db.prepare(`
+    INSERT INTO country_configs (
+      country_code, country_name, currency, currency_symbol, phone_prefix,
+      default_language, supported_languages_json, vat_rate, tax_authority_name,
+      emergency_police_number, emergency_support_number, is_active
+    ) VALUES (
+      @country_code, @country_name, @currency, @currency_symbol, @phone_prefix,
+      @default_language, @supported_languages_json, @vat_rate, @tax_authority_name,
+      @emergency_police_number, @emergency_support_number, @is_active
+    )
+  `);
+
+  insertCountry.run({
+    country_code: 'ET',
+    country_name: 'Ethiopia',
+    currency: 'ETB',
+    currency_symbol: 'Br',
+    phone_prefix: '+251',
+    default_language: 'am',
+    supported_languages_json: JSON.stringify(['am', 'en', 'om', 'ti']),
+    vat_rate: 0.15,
+    tax_authority_name: 'FDRE Ministry of Revenues',
+    emergency_police_number: '991',
+    emergency_support_number: '9922',
+    is_active: 1,
+  });
+
+  insertCountry.run({
+    country_code: 'KE',
+    country_name: 'Kenya (Expansion Ready)',
+    currency: 'KES',
+    currency_symbol: 'KSh',
+    phone_prefix: '+254',
+    default_language: 'en',
+    supported_languages_json: JSON.stringify(['en', 'sw']),
+    vat_rate: 0.16,
+    tax_authority_name: 'Kenya Revenue Authority',
+    emergency_police_number: '999',
+    emergency_support_number: '0800722222',
+    is_active: 1,
+  });
+
+  // --------------------------------------------------------------------------
+  // Seed Subscription Plans (Founder Mandate: Driver Subscription Model)
+  // --------------------------------------------------------------------------
+  const insertPlan = db.prepare(`
+    INSERT INTO subscription_plans (
+      id, name, name_am, billing_period, duration_days, price_amount,
+      currency, country_code, city_code, vehicle_category, is_active, features_json, created_at
+    ) VALUES (
+      @id, @name, @name_am, @billing_period, @duration_days, @price_amount,
+      @currency, @country_code, @city_code, @vehicle_category, @is_active, @features_json, @created_at
+    )
+  `);
+
+  const plans = [
+    {
+      id: 'plan_daily_et',
+      name: 'Chebelew 24-Hour Pass',
+      name_am: 'ከበለው የ24-ሰዓት ፓስ',
+      billing_period: 'daily',
+      duration_days: 1,
+      price_amount: 50.0,
+      features: ['Unlimited Ride Access', '0% Trip Commission', '24/7 Dispatch', 'Telebirr Payout'],
+    },
+    {
+      id: 'plan_weekly_et',
+      name: 'Chebelew 7-Day Flex',
+      name_am: 'ከበለው የ7-ቀን ፍሌክስ',
+      billing_period: 'weekly',
+      duration_days: 7,
+      price_amount: 300.0,
+      features: ['Unlimited Ride Access', '0% Trip Commission', 'Standard SOS Response', 'Priority Dispatch'],
+    },
+    {
+      id: 'plan_monthly_et',
+      name: 'Chebelew Monthly Pro',
+      name_am: 'ከበለው የወር ፕሮ ፓስ',
+      billing_period: 'monthly',
+      duration_days: 30,
+      price_amount: 1000.0,
+      features: ['Unlimited Ride Access', '0% Trip Commission', 'Exclusive Airport Queue', 'Instant Telebirr Payouts'],
+    },
+    {
+      id: 'plan_quarterly_et',
+      name: 'Chebelew Quarterly Star',
+      name_am: 'ከበለው የ3-ወር ስታር ፓስ',
+      billing_period: 'quarterly',
+      duration_days: 90,
+      price_amount: 2700.0,
+      features: ['10% Savings', 'Unlimited Ride Access', '0% Trip Commission', 'Dedicated Fleet Officer'],
+    },
+    {
+      id: 'plan_yearly_et',
+      name: 'Chebelew Annual Champion',
+      name_am: 'ከበለው የዓመት ቻምፒዮን',
+      billing_period: 'yearly',
+      duration_days: 365,
+      price_amount: 9600.0,
+      features: ['20% Savings', 'Unlimited Ride & Delivery Access', '0% Trip Commission', 'Free Vehicle Branding'],
+    },
+  ];
+
+  for (const p of plans) {
+    insertPlan.run({
+      id: p.id,
+      name: p.name,
+      name_am: p.name_am,
+      billing_period: p.billing_period,
+      duration_days: p.duration_days,
+      price_amount: p.price_amount,
+      currency: 'ETB',
+      country_code: 'ET',
+      city_code: 'ADDIS_ABABA',
+      vehicle_category: 'sedan',
+      is_active: 1,
+      features_json: JSON.stringify(p.features),
+      created_at: now,
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Seed Active Driver Subscriptions
+  // --------------------------------------------------------------------------
+  const insertSub = db.prepare(`
+    INSERT INTO driver_subscriptions (
+      id, driver_id, plan_id, plan_name, billing_period, status,
+      start_date, end_date, auto_renew, amount_paid, currency, payment_method, payment_reference, created_at, updated_at
+    ) VALUES (
+      @id, @driver_id, @plan_id, @plan_name, @billing_period, @status,
+      @start_date, @end_date, @auto_renew, @amount_paid, @currency, @payment_method, @payment_reference, @created_at, @updated_at
+    )
+  `);
+
+  insertSub.run({
+    id: 'sub_ahmed_01',
+    driver_id: 'driver_ahmed_01',
+    plan_id: 'plan_monthly_et',
+    plan_name: 'Chebelew Monthly Pro',
+    billing_period: 'monthly',
+    status: 'active',
+    start_date: new Date(Date.now() - 86400000 * 5).toISOString(),
+    end_date: new Date(Date.now() + 86400000 * 25).toISOString(),
+    auto_renew: 1,
+    amount_paid: 1000.0,
+    currency: 'ETB',
+    payment_method: 'TELEBIRR',
+    payment_reference: 'TB_SUB_99011',
+    created_at: now,
+    updated_at: now,
+  });
+
+  insertSub.run({
+    id: 'sub_dawit_02',
+    driver_id: 'driver_dawit_02',
+    plan_id: 'plan_monthly_et',
+    plan_name: 'Chebelew Monthly Pro',
+    billing_period: 'monthly',
+    status: 'active',
+    start_date: new Date(Date.now() - 86400000 * 10).toISOString(),
+    end_date: new Date(Date.now() + 86400000 * 20).toISOString(),
+    auto_renew: 1,
+    amount_paid: 1000.0,
+    currency: 'ETB',
+    payment_method: 'TELEBIRR',
+    payment_reference: 'TB_SUB_99012',
+    created_at: now,
+    updated_at: now,
+  });
+
+  // --------------------------------------------------------------------------
+  // Seed Corporate Platform & Fleet
+  // --------------------------------------------------------------------------
+  db.prepare(`
+    INSERT INTO corporate_accounts (
+      id, company_name, registration_number, tin_number, contact_person,
+      contact_email, contact_phone, credit_limit_etb, spent_this_month_etb,
+      billing_cycle, status, country_code, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'corp_ethio_air',
+    'Ethiopian Airlines Commercial Group',
+    'REG-ET-2024-991',
+    '0098231299',
+    'Yonas T. (Travel Manager)',
+    'corporate@ethiopianairlines.com',
+    '+251911440011',
+    250000.0,
+    18500.0,
+    'monthly',
+    'active',
+    'ET',
+    now
+  );
+
+  db.prepare(`
+    INSERT INTO corporate_employees (
+      id, corporate_id, name, phone, email, department,
+      monthly_allowance_etb, spent_this_month_etb, is_active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'emp_leila_01',
+    'corp_ethio_air',
+    'Leila Haile',
+    '+251911223344',
+    'leila@ethiopianairlines.com',
+    'Flight Operations & Crew Transit',
+    15000.0,
+    212.98,
+    1
+  );
+
+  db.prepare(`
+    INSERT INTO fleets (
+      id, owner_user_id, fleet_name, registration_number, contact_phone,
+      total_vehicles, total_drivers, country_code, city_code, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'fleet_addis_ltd',
+    'user_almaz_admin',
+    'Addis Luxury Cab Cooperative',
+    'FLT-AA-0982',
+    '+251911880022',
+    12,
+    14,
+    'ET',
+    'ADDIS_ABABA',
+    'active',
+    now
+  );
+
+  // --------------------------------------------------------------------------
+  // Seed Delivery & Logistics Platform Order
+  // --------------------------------------------------------------------------
+  db.prepare(`
+    INSERT INTO delivery_orders (
+      id, sender_id, sender_name, sender_phone, recipient_name, recipient_phone,
+      pickup_json, dropoff_json, category, package_description, weight_kg,
+      delivery_speed, price_etb, vat_etb, total_etb, payment_method, payment_status,
+      courier_id, status, pickup_otp, dropoff_otp, proof_photo_url, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'del_sample_01',
+    'user_leila_01',
+    'Leila Haile',
+    '+251911223344',
+    'Solomon Tefera',
+    '+251912993344',
+    JSON.stringify({ address: 'Kazanchis UNECA HQ', lat: 9.0185, lng: 38.7705 }),
+    JSON.stringify({ address: 'Bole Airport Cargo', lat: 8.9778, lng: 38.7993 }),
+    'document',
+    'Urgent Embassy Visa Documents & Contracts',
+    0.5,
+    'express',
+    180.0,
+    27.0,
+    207.0,
+    'TELEBIRR',
+    'PAID',
+    'driver_ahmed_01',
+    'DELIVERED',
+    '7741',
+    '8892',
+    'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=300',
+    now,
+    now
+  );
+
+  // --------------------------------------------------------------------------
+  // Seed Developer API Key
+  // --------------------------------------------------------------------------
+  db.prepare(`
+    INSERT INTO developer_api_keys (
+      id, name, key_prefix, hashed_secret, environment, rate_limit_per_min, is_active, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'key_sandbox_01',
+    'Chebelew Public Sandbox API Key',
+    'chb_test',
+    'sha256_e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    'test',
+    120,
+    1,
+    now
+  );
 
   console.log('Database initialized and seeded successfully.');
 }

@@ -35,6 +35,18 @@ export function createAdminRouter(io: SocketIOServer) {
       } catch (e) {}
     }
 
+    const subRev = db.prepare(`
+      SELECT COALESCE(SUM(amount_paid), 0) as total FROM driver_subscriptions WHERE status = 'active'
+    `).get() as { total: number };
+
+    const activeDeliveries = db.prepare(`
+      SELECT count(*) as count FROM delivery_orders WHERE status IN ('REQUESTED', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT')
+    `).get() as { count: number };
+
+    const openSos = db.prepare(`
+      SELECT count(*) as count FROM sos_incidents WHERE status IN ('OPEN', 'INVESTIGATING')
+    `).get() as { count: number };
+
     const metrics: SystemMetrics = {
       activeDriversCount: totalDrivers.count,
       onlineDriversCount: onlineDrivers.count,
@@ -42,6 +54,9 @@ export function createAdminRouter(io: SocketIOServer) {
       todayCompletedTrips: completedTrips.length,
       todayGmvEtb: Number(todayGmv.toFixed(2)),
       todayVatCollectedEtb: Number(todayVat.toFixed(2)),
+      todaySubscriptionRevenueEtb: Number(subRev.total.toFixed(2)),
+      activeDeliveriesCount: activeDeliveries.count,
+      openSosCount: openSos.count,
       averageEtaMinutes: 4.2,
       acceptanceRatePercent: 96.5,
     };
@@ -199,6 +214,10 @@ export function createAdminRouter(io: SocketIOServer) {
       };
     });
 
+    const subRevAll = db.prepare(`
+      SELECT COALESCE(SUM(amount_paid), 0) as total FROM driver_subscriptions
+    `).get() as { total: number };
+
     const summary: VatReportSummary = {
       period: 'Fiscal Year 2026/2027 (Quarter 1)',
       totalTripsCompleted: completedTrips.length,
@@ -206,6 +225,7 @@ export function createAdminRouter(io: SocketIOServer) {
       totalVatRemittableEtb: Number(totalVat.toFixed(2)),
       totalPlatformCommissionEtb: Number(totalCommission.toFixed(2)),
       totalDriverNetPayoutEtb: Number(totalDriverNet.toFixed(2)),
+      totalSubscriptionRevenueEtb: Number(subRevAll.total.toFixed(2)),
       vatRegulationReference:
         'FDRE Ministry of Revenues - Value Added Tax Regulation No. 570/2025 (15% on Platform Ride Fares)',
     };

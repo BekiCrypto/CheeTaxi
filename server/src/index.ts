@@ -12,6 +12,12 @@ import { createDriverRouter } from './routes/driverRoutes.js';
 import { createTelebirrRouter } from './routes/telebirrRoutes.js';
 import { createAdminRouter } from './routes/adminRoutes.js';
 import { geoRouter } from './routes/geoRoutes.js';
+import { createSubscriptionRouter } from './routes/subscriptionRoutes.js';
+import { createDeliveryRouter } from './routes/deliveryRoutes.js';
+import { providerRouter } from './routes/providerRoutes.js';
+import { createSafetyRouter } from './routes/safetyRoutes.js';
+import { corporateRouter } from './routes/corporateRoutes.js';
+import { developerRouter } from './routes/developerRoutes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -51,6 +57,12 @@ app.use('/api/drivers', createDriverRouter(io));
 app.use('/api/telebirr', createTelebirrRouter(io));
 app.use('/api/admin', createAdminRouter(io));
 app.use('/api/geo', geoRouter);
+app.use('/api/subscriptions', createSubscriptionRouter(io));
+app.use('/api/deliveries', createDeliveryRouter(io));
+app.use('/api/providers', providerRouter);
+app.use('/api/safety', createSafetyRouter(io));
+app.use('/api/corporate', corporateRouter);
+app.use('/api/developer', developerRouter);
 
 // Serve frontend static build if available (production mode / unified server)
 const possiblePaths = [
@@ -73,13 +85,15 @@ if (foundDist) {
 
 const PORT = process.env.PORT || 4000;
 
-server.listen(PORT, () => {
-  console.log(`=======================================================`);
-  console.log(`🚕 Chebelew Ethiopia Ride-Hailing Backend Server`);
-  console.log(`   Running at: http://localhost:${PORT}`);
-  console.log(`   Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`   WebSockets ready for live GPS & dispatch events`);
-  console.log(`=======================================================`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  server.listen(PORT, () => {
+    console.log(`=======================================================`);
+    console.log(`🚕 Chebelew Ethiopia Ride-Hailing Backend Server`);
+    console.log(`   Running at: http://localhost:${PORT}`);
+    console.log(`   Health Check: http://localhost:${PORT}/api/health`);
+    console.log(`   WebSockets ready for live GPS & dispatch events`);
+    console.log(`=======================================================`);
+  });
+}
 
 export { app, server, io };

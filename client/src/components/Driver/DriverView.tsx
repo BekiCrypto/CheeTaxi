@@ -17,11 +17,16 @@ import {
   Award,
   WifiOff,
   RefreshCw,
+  Zap,
+  Package,
+  AlertTriangle,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Driver, Ride, VehicleCategory } from '@shared/types';
 import { translations, Language } from '../../i18n/translations';
 import { sounds } from '../../utils/audio';
+import { DriverSubscriptionTab } from './DriverSubscriptionTab';
+import { DriverDeliveryTab } from './DriverDeliveryTab';
 
 interface DriverViewProps {
   currentDriverId: string;
@@ -42,7 +47,39 @@ export const DriverView: React.FC<DriverViewProps> = ({
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [incomingRide, setIncomingRide] = useState<Ride | null>(null);
   const [countdown, setCountdown] = useState<number>(30);
-  const [activeTab, setActiveTab] = useState<'trip' | 'earnings' | 'kyc'>('trip');
+  const [activeTab, setActiveTab] = useState<'trip' | 'subscription' | 'deliveries' | 'earnings' | 'kyc'>('trip');
+  const [sosActive, setSosActive] = useState(false);
+  const [sosMessage, setSosMessage] = useState<string | null>(null);
+
+  const handleTriggerDriverSos = async () => {
+    if (!driver) return;
+    if (!window.confirm('Trigger Police 991 & Chebelew Emergency Response?')) return;
+    sounds.playBeep(900, 'sawtooth', 0.5);
+    try {
+      const res = await fetch('/api/safety/sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rideId: activeRide?.id,
+          reporterUserId: driver.userId,
+          reporterName: driver.fullName,
+          reporterPhone: driver.phone,
+          reporterRole: 'driver',
+          currentLat: driver.currentLat,
+          currentLng: driver.currentLng,
+          notes: 'Driver SOS Panic Button triggered from in-cab dashboard.',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSosActive(true);
+        setSosMessage('SOS Dispatched! Police 991 & Chebelew Operations alerted.');
+        setTimeout(() => setSosMessage(null), 8000);
+      }
+    } catch (e: any) {
+      alert('Failed to send SOS: ' + e.message);
+    }
+  };
   const [isSimulatingMove, setIsSimulatingMove] = useState(false);
   const simIntervalRef = useRef<any>(null);
 
@@ -149,6 +186,9 @@ export const DriverView: React.FC<DriverViewProps> = ({
       if (data.success) {
         setDriver({ ...driver, isOnline: newStatus });
         sounds.playBeep(newStatus ? 800 : 400, 'sine', 0.15);
+      } else {
+        alert(data.error || 'Cannot go online without an active driver subscription.');
+        setActiveTab('subscription');
       }
     } catch (err) {
       console.error('Failed to toggle status:', err);
@@ -326,39 +366,94 @@ export const DriverView: React.FC<DriverViewProps> = ({
               <span className="text-sm font-bold text-amber-400">★ {driver.rating}</span>
             </div>
           </div>
+
+          {/* Subscription Status & Driver SOS */}
+          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800">
+            <div className="flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[11px] font-medium text-slate-300">0% Commission:</span>
+              <button
+                onClick={() => setActiveTab('subscription')}
+                className={`px-2 py-0.5 rounded-full font-black text-[10px] uppercase transition ${
+                  driver.subscriptionStatus === 'active'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}
+              >
+                {driver.subscriptionStatus === 'active' ? 'Active' : 'Subscribe'}
+              </button>
+            </div>
+
+            <button
+              onClick={handleTriggerDriverSos}
+              className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[10px] font-black flex items-center gap-1 shadow-sm transition"
+              title="Trigger Emergency SOS (Police 991)"
+            >
+              <AlertTriangle className="w-3 h-3" />
+              <span>SOS (991)</span>
+            </button>
+          </div>
         </div>
 
+        {sosMessage && (
+          <div className="bg-rose-50 border-b border-rose-200 text-rose-800 p-2 text-xs font-bold text-center">
+            {sosMessage}
+          </div>
+        )}
+
         {/* Tab Selector */}
-        <div className="flex border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+        <div className="flex border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-600 overflow-x-auto">
           <button
             onClick={() => setActiveTab('trip')}
-            className={`flex-1 py-3 text-center border-b-2 transition ${
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition ${
               activeTab === 'trip'
                 ? 'border-brand-500 text-brand-600 bg-white'
                 : 'border-transparent hover:text-slate-900'
             }`}
           >
-            Active Trip
+            Rides
+          </button>
+          <button
+            onClick={() => setActiveTab('deliveries')}
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition flex items-center gap-1 ${
+              activeTab === 'deliveries'
+                ? 'border-brand-500 text-brand-600 bg-white'
+                : 'border-transparent hover:text-slate-900'
+            }`}
+          >
+            <Package className="w-3 h-3" />
+            <span>Deliveries</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('subscription')}
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition flex items-center gap-1 ${
+              activeTab === 'subscription'
+                ? 'border-brand-500 text-brand-600 bg-white'
+                : 'border-transparent hover:text-slate-900'
+            }`}
+          >
+            <Zap className="w-3 h-3 text-amber-500" />
+            <span>Subscription</span>
           </button>
           <button
             onClick={() => setActiveTab('earnings')}
-            className={`flex-1 py-3 text-center border-b-2 transition ${
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition ${
               activeTab === 'earnings'
                 ? 'border-brand-500 text-brand-600 bg-white'
                 : 'border-transparent hover:text-slate-900'
             }`}
           >
-            Wallet & Telebirr
+            Wallet
           </button>
           <button
             onClick={() => setActiveTab('kyc')}
-            className={`flex-1 py-3 text-center border-b-2 transition ${
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition ${
               activeTab === 'kyc'
                 ? 'border-brand-500 text-brand-600 bg-white'
                 : 'border-transparent hover:text-slate-900'
             }`}
           >
-            Documents (KYC)
+            KYC
           </button>
         </div>
 
@@ -499,6 +594,24 @@ export const DriverView: React.FC<DriverViewProps> = ({
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Tab: Deliveries */}
+        {activeTab === 'deliveries' && (
+          <div className="flex-1 overflow-y-auto">
+            <DriverDeliveryTab driver={driver} language={language} />
+          </div>
+        )}
+
+        {/* Tab: 0% Driver Subscription */}
+        {activeTab === 'subscription' && (
+          <div className="flex-1 overflow-y-auto">
+            <DriverSubscriptionTab
+              driver={driver}
+              language={language}
+              onRefreshDriver={fetchDriverProfile}
+            />
           </div>
         )}
 

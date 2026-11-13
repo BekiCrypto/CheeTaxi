@@ -20,10 +20,12 @@ import {
   HelpCircle,
   Send,
   X,
+  Package,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { TelebirrModal } from '../Payment/TelebirrModal';
 import { VatReceiptModal } from '../Payment/VatReceiptModal';
+import { RiderDeliveryPanel } from './RiderDeliveryPanel';
 import { ADDIS_LANDMARKS } from '../../../../server/src/services/geoService';
 import {
   Driver,
@@ -74,6 +76,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
   const [estimates, setEstimates] = useState<FareEstimate[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<VehicleCategory>('sedan');
+  const [riderMode, setRiderMode] = useState<'rides' | 'deliveries'>('rides');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TELEBIRR');
   const [isCalculating, setIsCalculating] = useState(false);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
@@ -383,10 +386,49 @@ export const RiderView: React.FC<RiderViewProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Ride vs Delivery Mode Switcher */}
+          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+            <button
+              type="button"
+              onClick={() => setRiderMode('rides')}
+              className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                riderMode === 'rides'
+                  ? 'bg-white text-brand-600 shadow-xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              <Car className="w-3.5 h-3.5" />
+              <span>Ride Hailing</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRiderMode('deliveries')}
+              className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition ${
+                riderMode === 'deliveries'
+                  ? 'bg-white text-brand-600 shadow-xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>Delivery & Courier</span>
+            </button>
+          </div>
         </div>
 
-        {/* Content based on Active Ride status */}
-        {!activeRide ? (
+        {/* Content based on Active Ride status or Delivery Mode */}
+        {riderMode === 'deliveries' ? (
+          <div className="p-5 flex-1">
+            <RiderDeliveryPanel
+              currentRiderId={currentRiderId}
+              currentRiderName={currentRiderName}
+              currentRiderPhone={currentRiderPhone}
+              pickup={pickup}
+              destination={destination}
+              language={language}
+            />
+          </div>
+        ) : !activeRide ? (
           <div className="p-5 space-y-5 flex-1">
             {/* Vehicle Options */}
             <div className="space-y-2">
@@ -651,13 +693,36 @@ export const RiderView: React.FC<RiderViewProps> = ({
 
               {/* Safety & SOS Bar */}
               <div className="flex gap-2">
-                <a
-                  href="tel:991"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm('Trigger SOS to Police 991 and Chebelew Emergency Safety Response?')) {
+                      try {
+                        await fetch('/api/safety/sos', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            rideId: activeRide.id,
+                            reporterUserId: currentRiderId,
+                            reporterName: currentRiderName,
+                            reporterPhone: currentRiderPhone,
+                            reporterRole: 'rider',
+                            currentLat: pickup.lat,
+                            currentLng: pickup.lng,
+                            notes: 'Passenger SOS Panic Button pressed during live trip.',
+                          }),
+                        });
+                        alert('Emergency SOS dispatched! Police 991 & Chebelew Operations Team notified.');
+                      } catch (err: any) {
+                        alert('SOS failed: ' + err.message);
+                      }
+                    }
+                  }}
                   className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition"
                 >
                   <AlertTriangle className="w-4 h-4 text-rose-600" />
                   <span>{t.sosEmergency}</span>
-                </a>
+                </button>
                 <button
                   onClick={() => alert(`Chebelew Trip Link: https://chebelew.et/track/${activeRide.id}`)}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition"

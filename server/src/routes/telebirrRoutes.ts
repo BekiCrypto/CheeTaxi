@@ -40,12 +40,13 @@ export function createTelebirrRouter(io: SocketIOServer) {
 
     try {
       const order = TelebirrService.processPayment(orderId, Boolean(success));
-      const ride = DispatchService.getRideById(order.rideId);
-
-      // Notify clients
-      if (ride) {
-        io.to(`ride:${order.rideId}`).emit('ride:status_changed', ride);
-        io.to('admin:dispatch').emit('admin:trip_updated', ride);
+      if (order.rideId) {
+        const ride = DispatchService.getRideById(order.rideId);
+        // Notify clients
+        if (ride) {
+          io.to(`ride:${order.rideId}`).emit('ride:status_changed', ride);
+          io.to('admin:dispatch').emit('admin:trip_updated', ride);
+        }
       }
 
       return res.json({ success: true, order });

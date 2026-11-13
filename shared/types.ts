@@ -1,9 +1,37 @@
-export type UserRole = 'rider' | 'driver' | 'admin' | 'dispatcher';
-export type Language = 'am' | 'en';
+// ============================================================================
+// CHEBELEW MULTI-COUNTRY MOBILITY & DELIVERY ECOSYSTEM - SHARED DOMAIN TYPES
+// Specification: Version 2.0 (Master Development Execution Order)
+// ============================================================================
 
-export type VehicleCategory = 'sedan' | 'minivan' | 'comfort' | 'partner_ride' | 'partner_feres';
+export type UserRole =
+  | 'super_admin'
+  | 'platform_admin'
+  | 'country_admin'
+  | 'city_manager'
+  | 'dispatcher'
+  | 'finance_officer'
+  | 'compliance_officer'
+  | 'safety_officer'
+  | 'support_agent'
+  | 'fleet_manager'
+  | 'corporate_admin'
+  | 'regulator'
+  | 'driver'
+  | 'courier'
+  | 'rider';
 
-export type KycStatus = 'pending' | 'approved' | 'rejected';
+export type Language = 'en' | 'am' | 'om' | 'ti' | 'so' | 'sw';
+
+export type VehicleCategory =
+  | 'sedan'
+  | 'minivan'
+  | 'comfort'
+  | 'partner_ride'
+  | 'partner_feres'
+  | 'delivery_moto'
+  | 'delivery_van';
+
+export type KycStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
 export type RideStatus =
   | 'REQUESTED'
@@ -13,9 +41,24 @@ export type RideStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
-export type PaymentMethod = 'CASH' | 'TELEBIRR';
-export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED';
+export type DeliveryStatus =
+  | 'REQUESTED'
+  | 'ASSIGNED'
+  | 'PICKED_UP'
+  | 'IN_TRANSIT'
+  | 'DELIVERED'
+  | 'FAILED'
+  | 'CANCELLED';
 
+export type PaymentMethod = 'CASH' | 'TELEBIRR' | 'BANK_TRANSFER' | 'CORPORATE_BILLING' | 'CARD';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
+
+export type SubscriptionBillingPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type SubscriptionStatus = 'active' | 'expired' | 'grace_period' | 'cancelled';
+
+// ----------------------------------------------------------------------------
+// Core User & Identity
+// ----------------------------------------------------------------------------
 export interface User {
   id: string;
   phone: string;
@@ -23,8 +66,69 @@ export interface User {
   email?: string;
   role: UserRole;
   language: Language;
+  countryCode: string;
   avatarUrl?: string;
+  isVerified: boolean;
+  corporateId?: string;
+  fleetId?: string;
   createdAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Country & Multi-Tenant Configuration
+// ----------------------------------------------------------------------------
+export interface CountryConfig {
+  countryCode: string; // e.g. "ET", "KE"
+  countryName: string; // "Ethiopia", "Kenya"
+  currency: string; // "ETB", "KES"
+  currencySymbol: string; // "Br", "KSh"
+  phonePrefix: string; // "+251", "+254"
+  defaultLanguage: Language;
+  supportedLanguages: Language[];
+  vatRate: number; // 0.15 for Ethiopia (Reg. No. 570/2025)
+  taxAuthorityName: string; // "FDRE Ministry of Revenues"
+  emergencyPoliceNumber: string; // "991"
+  emergencySupportNumber: string; // "9922"
+  isActive: boolean;
+}
+
+// ----------------------------------------------------------------------------
+// Driver & Subscription Model (Founder Mandate: 0% Trip Commission)
+// ----------------------------------------------------------------------------
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  nameAm: string;
+  nameOm?: string;
+  nameTi?: string;
+  billingPeriod: SubscriptionBillingPeriod;
+  durationDays: number;
+  priceAmount: number;
+  currency: string;
+  countryCode: string;
+  cityCode: string;
+  vehicleCategory: VehicleCategory;
+  isActive: boolean;
+  features: string[];
+}
+
+export interface DriverSubscription {
+  id: string;
+  driverId: string;
+  planId: string;
+  planName: string;
+  billingPeriod: SubscriptionBillingPeriod;
+  status: SubscriptionStatus;
+  startDate: string;
+  endDate: string;
+  gracePeriodEndsAt?: string;
+  autoRenew: boolean;
+  amountPaid: number;
+  currency: string;
+  paymentMethod: PaymentMethod;
+  paymentReference?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Driver {
@@ -36,7 +140,7 @@ export interface Driver {
   vehicleMake: string;
   vehicleModel: string;
   vehicleYear: number;
-  vehiclePlate: string; // e.g., "ET-3-A12345"
+  vehiclePlate: string;
   vehicleColor: string;
   vehicleCategory: VehicleCategory;
   licenseNumber: string;
@@ -49,10 +153,20 @@ export interface Driver {
   heading?: number;
   rating: number;
   totalRides: number;
-  walletBalanceEtb: number;
+  walletBalanceEtb: number; // Gross fares accumulated
+  subscriptionStatus: SubscriptionStatus;
+  activeSubscriptionId?: string;
+  subscriptionExpiresAt?: string;
   activeRideId?: string;
+  activeDeliveryId?: string;
+  fleetId?: string;
+  countryCode: string;
+  cityCode: string;
 }
 
+// ----------------------------------------------------------------------------
+// Fare & Pricing Engine (100% Net Earnings Retention to Subscribed Driver)
+// ----------------------------------------------------------------------------
 export interface FareCalculation {
   baseFare: number;
   distanceKm: number;
@@ -60,13 +174,13 @@ export interface FareCalculation {
   durationMinutes: number;
   timeFare: number;
   subtotal: number;
-  vatRate: number; // e.g. 0.15 for 15% VAT per Ethiopian Regulation No. 570/2025
+  vatRate: number; // 0.15 per Ethiopian Regulation No. 570/2025
   vatAmount: number;
   totalFare: number;
-  platformTakeRate: number; // 0.15 for 15% platform commission
-  platformCommission: number;
+  platformTakeRate: number; // 0.00 for Subscribed Chebelew Independent Drivers!
+  platformCommission: number; // 0.00 ETB
   telebirrFee: number;
-  driverNetPayout: number;
+  driverNetPayout: number; // Subtotal (100% fare retention to driver)
 }
 
 export interface FareEstimate {
@@ -90,6 +204,9 @@ export interface LocationPoint {
   landmark?: string;
 }
 
+// ----------------------------------------------------------------------------
+// Rides & Trips
+// ----------------------------------------------------------------------------
 export interface Ride {
   id: string;
   riderId: string;
@@ -113,17 +230,192 @@ export interface Ride {
   rating?: number;
   review?: string;
   tipAmount?: number;
-  routeCoordinates?: [number, number][]; // [lat, lng][]
+  routeCoordinates?: [number, number][];
   currentDriverLocation?: [number, number];
   isManualDispatch?: boolean;
   operatorNotes?: string;
+  corporateId?: string;
+  countryCode: string;
   createdAt: string;
   updatedAt: string;
 }
 
+// ----------------------------------------------------------------------------
+// Delivery & Logistics Subsystem
+// ----------------------------------------------------------------------------
+export type DeliveryPackageCategory = 'parcel' | 'document' | 'food' | 'grocery' | 'b2b';
+
+export interface DeliveryOrder {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderPhone: string;
+  recipientName: string;
+  recipientPhone: string;
+  pickup: LocationPoint;
+  dropoff: LocationPoint;
+  category: DeliveryPackageCategory;
+  packageDescription: string;
+  weightKg?: number;
+  deliverySpeed: 'express' | 'standard' | 'scheduled';
+  scheduledTime?: string;
+  priceEtb: number;
+  vatEtb: number;
+  totalEtb: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  courierId?: string;
+  courier?: Driver;
+  status: DeliveryStatus;
+  pickupOtp: string;
+  dropoffOtp: string;
+  proofOfDeliveryPhotoUrl?: string;
+  recipientSignatureUrl?: string;
+  trackingCoordinates?: [number, number][];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Corporate Transportation Platform
+// ----------------------------------------------------------------------------
+export interface CorporateAccount {
+  id: string;
+  companyName: string;
+  registrationNumber: string;
+  tinNumber: string;
+  contactPerson: string;
+  contactEmail: string;
+  contactPhone: string;
+  creditLimitEtb: number;
+  spentThisMonthEtb: number;
+  billingCycle: 'monthly' | 'bi-weekly';
+  status: 'active' | 'suspended';
+  countryCode: string;
+  createdAt: string;
+}
+
+export interface CorporateEmployee {
+  id: string;
+  corporateId: string;
+  name: string;
+  phone: string;
+  email: string;
+  department: string;
+  monthlyAllowanceEtb: number;
+  spentThisMonthEtb: number;
+  isActive: boolean;
+}
+
+// ----------------------------------------------------------------------------
+// Fleet Management Platform
+// ----------------------------------------------------------------------------
+export interface Fleet {
+  id: string;
+  ownerUserId: string;
+  fleetName: string;
+  registrationNumber: string;
+  contactPhone: string;
+  totalVehicles: number;
+  totalDrivers: number;
+  countryCode: string;
+  cityCode: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Aggregator Provider Integrations
+// ----------------------------------------------------------------------------
+export type AggregatorProviderId = 'chebelew' | 'ride' | 'feres' | 'zayride' | 'yango';
+export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
+export interface ProviderAdapterConfig {
+  id: AggregatorProviderId;
+  name: string;
+  apiUrl: string;
+  circuitState: CircuitBreakerState;
+  failureCount: number;
+  lastFailureTime?: string;
+  isAuthorized: boolean;
+  integrationReadinessStatus: 'live_api' | 'sandbox_adapter' | 'onboarding_readiness';
+}
+
+export interface AggregatedTransportOffer {
+  providerId: AggregatorProviderId;
+  providerName: string;
+  category: VehicleCategory;
+  estimatedFare: number;
+  currency: string;
+  estimatedArrivalMins: number;
+  journeyDurationMins: number;
+  vehicleDetails: string;
+  reliabilityScore: number;
+  isAvailable: boolean;
+  circuitStatus: CircuitBreakerState;
+}
+
+// ----------------------------------------------------------------------------
+// Safety, Emergency & SOS Incident Management
+// ----------------------------------------------------------------------------
+export interface SosIncident {
+  id: string;
+  rideId?: string;
+  deliveryId?: string;
+  reporterUserId: string;
+  reporterName: string;
+  reporterPhone: string;
+  reporterRole: 'rider' | 'driver' | 'courier';
+  currentLat: number;
+  currentLng: number;
+  status: 'OPEN' | 'INVESTIGATING' | 'ESCALATED_POLICE' | 'RESOLVED';
+  safetyNotes?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+// ----------------------------------------------------------------------------
+// Support, Tickets & Disputes
+// ----------------------------------------------------------------------------
+export interface SupportTicket {
+  id: string;
+  ride_id?: string;
+  user_id: string;
+  user_name: string;
+  user_phone: string;
+  user_role: 'rider' | 'driver' | 'courier';
+  category: 'lost_item' | 'fare_dispute' | 'driver_behavior' | 'app_issue' | 'payment';
+  subject: string;
+  message: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  resolution_notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ----------------------------------------------------------------------------
+// Developer Ecosystem & API Keys
+// ----------------------------------------------------------------------------
+export interface DeveloperApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  hashedSecret: string;
+  environment: 'live' | 'test';
+  rateLimitPerMinute: number;
+  isActive: boolean;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+// ----------------------------------------------------------------------------
+// Telebirr Digital Payment Integration
+// ----------------------------------------------------------------------------
 export interface TelebirrOrder {
   orderId: string;
-  rideId: string;
+  rideId?: string;
+  subscriptionId?: string;
+  deliveryId?: string;
   amountEtb: number;
   payerPhone: string;
   receiverTitle: string;
@@ -138,14 +430,18 @@ export interface TelebirrOrder {
   completedAt?: string;
 }
 
+// ----------------------------------------------------------------------------
+// Reporting & Platform Metrics
+// ----------------------------------------------------------------------------
 export interface VatReportSummary {
   period: string;
   totalTripsCompleted: number;
   totalGrossGmvEtb: number;
   totalVatRemittableEtb: number; // 15% of gross fare
-  totalPlatformCommissionEtb: number; // 15% of gross fare
+  totalSubscriptionRevenueEtb: number;
+  totalPlatformCommissionEtb: number; // 0 for independent subscribed drivers
   totalDriverNetPayoutEtb: number;
-  vatRegulationReference: string; // "Federal Democratic Republic of Ethiopia Regulation No. 570/2025"
+  vatRegulationReference: string;
 }
 
 export interface SystemMetrics {
@@ -155,22 +451,9 @@ export interface SystemMetrics {
   todayCompletedTrips: number;
   todayGmvEtb: number;
   todayVatCollectedEtb: number;
+  todaySubscriptionRevenueEtb: number;
+  activeDeliveriesCount: number;
+  openSosCount: number;
   averageEtaMinutes: number;
   acceptanceRatePercent: number;
-}
-
-export interface SupportTicket {
-  id: string;
-  ride_id?: string;
-  user_id: string;
-  user_name: string;
-  user_phone: string;
-  user_role: 'rider' | 'driver';
-  category: 'lost_item' | 'fare_dispute' | 'driver_behavior' | 'app_issue' | 'payment';
-  subject: string;
-  message: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
-  resolution_notes?: string;
-  created_at: string;
-  updated_at: string;
 }

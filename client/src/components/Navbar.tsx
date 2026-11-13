@@ -13,8 +13,8 @@ import { Language, translations } from '../i18n/translations';
 import { UserRole } from '@shared/types';
 
 interface NavbarProps {
-  currentRole: 'rider' | 'driver' | 'admin' | 'split';
-  onRoleChange: (role: 'rider' | 'driver' | 'admin' | 'split') => void;
+  currentRole: 'rider' | 'driver' | 'admin' | 'split' | 'website';
+  onRoleChange: (role: 'rider' | 'driver' | 'admin' | 'split' | 'website') => void;
   language: Language;
   onLanguageChange: (lang: Language) => void;
   onRunFastDemo: () => void;
@@ -106,6 +106,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Layers className="w-3.5 h-3.5" />
           <span>{t.splitMode}</span>
+        </button>
+
+        <button
+          onClick={() => onRoleChange('website')}
+          className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+            currentRole === 'website'
+              ? 'bg-brand-600 text-white shadow-sm'
+              : 'hover:text-slate-900 text-brand-700'
+          }`}
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span>Public Portal (22 Pages)</span>
         </button>
       </div>
 

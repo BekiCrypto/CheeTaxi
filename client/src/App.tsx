@@ -4,12 +4,13 @@ import { RiderView } from './components/Rider/RiderView';
 import { DriverView } from './components/Driver/DriverView';
 import { AdminView } from './components/Admin/AdminView';
 import { SplitView } from './components/Split/SplitView';
+import { PublicWebsite } from './components/Public/PublicWebsite';
 import { Language } from './i18n/translations';
 import { useSocket } from './hooks/useSocket';
 import { sounds } from './utils/audio';
 
 export function App() {
-  const [role, setRole] = useState<'rider' | 'driver' | 'admin' | 'split'>('rider');
+  const [role, setRole] = useState<'rider' | 'driver' | 'admin' | 'split' | 'website'>('rider');
   const [language, setLanguage] = useState<Language>('en');
 
   // Active Demo Users
@@ -148,6 +149,8 @@ export function App() {
             ? 'Ahmed Mohammed (Driver)'
             : role === 'admin'
             ? 'Almaz Tefera (Dispatcher)'
+            : role === 'website'
+            ? 'Public Visitor'
             : 'Leila Haile (Rider)'
         }
       />
@@ -181,6 +184,13 @@ export function App() {
             currentRiderName={currentRider.name}
             currentRiderPhone={currentRider.phone}
             currentDriverId={currentDriverId}
+          />
+        )}
+
+        {role === 'website' && (
+          <PublicWebsite
+            language={language}
+            onNavigateToApp={(r) => setRole(r)}
           />
         )}
       </main>

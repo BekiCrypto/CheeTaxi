@@ -68,6 +68,28 @@ export const TARIFFS: Record<VehicleCategory, TariffRate> = {
     description: 'Partner fleet with Feres Miles loyalty eligible dispatch',
     descriptionAm: 'ከፈረስ ማይልስ ጋር የተገናኘ የአጋር ታክሲ',
   },
+  delivery_moto: {
+    baseFare: 40,
+    perKm: 10,
+    perMinute: 2,
+    minFare: 60,
+    capacity: 1,
+    displayName: 'Chebelew Moto Express Delivery',
+    displayNameAm: 'ከበለው ሞተር ፈጣን መልእክት',
+    description: 'Motorcycle courier for documents, food, and small parcels',
+    descriptionAm: 'ለሰነዶች እና አነስተኛ እቃዎች ፈጣን የሞተር መልእክተኛ',
+  },
+  delivery_van: {
+    baseFare: 120,
+    perKm: 20,
+    perMinute: 4,
+    minFare: 180,
+    capacity: 2,
+    displayName: 'Chebelew Cargo Logistics Van',
+    displayNameAm: 'ከበለው የጭነት ቫን',
+    description: 'Cargo van for bulk retail, furniture, and heavy boxes',
+    descriptionAm: 'ለትላልቅ እቃዎች እና የንግድ ጭነቶች',
+  },
 };
 
 /**
@@ -98,15 +120,19 @@ export function calculateFare(
   const vatAmount = Number((subtotal * vatRate).toFixed(2));
   const totalFare = Number((subtotal + vatAmount).toFixed(2));
 
-  // Platform 15% commission on the fare
-  const platformTakeRate = 0.15;
-  const platformCommission = Number((subtotal * platformTakeRate).toFixed(2));
+  // Founder Mandate Version 2.0: DRIVER SUBSCRIPTION MODEL
+  // 0% per-trip commission charged to subscribed independent drivers!
+  const isPartner = category.startsWith('partner_');
+  const platformTakeRate = isPartner ? 0.15 : 0.00;
+  const platformCommission = isPartner ? Number((subtotal * platformTakeRate).toFixed(2)) : 0.00;
 
   // Telebirr digital payment handling fee (~1%)
   const telebirrFee = Number((totalFare * 0.01).toFixed(2));
 
-  // Driver net earnings: (Subtotal - Platform Commission)
-  const driverNetPayout = Number((subtotal - platformCommission).toFixed(2));
+  // Driver net earnings: 100% of ride fare goes to subscribed driver!
+  const driverNetPayout = isPartner
+    ? Number((subtotal - platformCommission).toFixed(2))
+    : subtotal;
 
   return {
     baseFare: tariff.baseFare,

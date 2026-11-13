@@ -17,11 +17,19 @@ import {
   LifeBuoy,
   Settings,
   MessageSquare,
+  Zap,
+  Briefcase,
+  Radio,
+  AlertTriangle,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory, SupportTicket } from '@shared/types';
 import { translations, Language } from '../../i18n/translations';
 import { ADDIS_LANDMARKS } from '../../../../server/src/services/geoService';
+import { AdminSubscriptionLedgerTab } from './AdminSubscriptionLedgerTab';
+import { AdminCorporateTab } from './AdminCorporateTab';
+import { AdminProviderTab } from './AdminProviderTab';
+import { AdminSosTab } from './AdminSosTab';
 
 interface AdminViewProps {
   language: Language;
@@ -31,7 +39,18 @@ interface AdminViewProps {
 export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
   const t = translations[language];
 
-  const [activeTab, setActiveTab] = useState<'fleet' | 'callcenter' | 'kyc' | 'vat' | 'tickets' | 'tariffs'>('fleet');
+  const [activeTab, setActiveTab] = useState<
+    | 'fleet'
+    | 'callcenter'
+    | 'subscriptions'
+    | 'corporate'
+    | 'providers'
+    | 'sos'
+    | 'kyc'
+    | 'vat'
+    | 'tickets'
+    | 'tariffs'
+  >('fleet');
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [activeRides, setActiveRides] = useState<Ride[]>([]);
@@ -291,61 +310,95 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-2 mt-4 text-xs font-bold">
+        <div className="flex gap-1.5 mt-4 text-xs font-bold overflow-x-auto pb-1">
           <button
             onClick={() => setActiveTab('fleet')}
-            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'fleet' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Car className="w-4 h-4" />
+            <Car className="w-3.5 h-3.5" />
             <span>{t.liveFleetMap}</span>
           </button>
           <button
             onClick={() => setActiveTab('callcenter')}
-            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'callcenter' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <PhoneCall className="w-4 h-4" />
-            <span>{t.callCenterBooking}</span>
+            <PhoneCall className="w-3.5 h-3.5" />
+            <span>9922 Dispatch</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('subscriptions')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'subscriptions' ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" />
+            <span>0% Subscriptions</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('corporate')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'corporate' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Corporate & Fleets</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('providers')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'providers' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>Aggregators (RIDE/Feres)</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('sos')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'sos' ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-800 text-rose-300 hover:bg-slate-700'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+            <span>Safety SOS (991)</span>
           </button>
           <button
             onClick={() => setActiveTab('kyc')}
-            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'kyc' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <ShieldCheck className="w-4 h-4" />
-            <span>
-              {t.driverKycQueue} ({kycQueue.length})
-            </span>
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>KYC ({kycQueue.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('vat')}
-            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'vat' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <FileText className="w-4 h-4" />
-            <span>VAT Regulation 570/2025</span>
+            <FileText className="w-3.5 h-3.5" />
+            <span>VAT 570/2025</span>
           </button>
           <button
             onClick={() => setActiveTab('tickets')}
-            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'tickets' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <LifeBuoy className="w-4 h-4" />
-            <span>Support Tickets ({tickets.filter(t => t.status === 'OPEN').length})</span>
+            <LifeBuoy className="w-3.5 h-3.5" />
+            <span>Tickets ({tickets.filter(t => t.status === 'OPEN').length})</span>
           </button>
           <button
             onClick={() => setActiveTab('tariffs')}
-            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
               activeTab === 'tariffs' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-3.5 h-3.5" />
             <span>Tariff Rules</span>
           </button>
         </div>
@@ -842,14 +895,26 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
               </div>
 
               <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1">
-                <div className="font-bold">Taxation & Commission Policy:</div>
-                <p>• <strong>15% VAT:</strong> Automatically added to gross ride fare and remitted to Ministry of Revenues.</p>
-                <p>• <strong>15% Platform Take Rate:</strong> Deducted from driver's fare share to fund ops, maps, and support.</p>
-                <p>• <strong>1% Telebirr Fee:</strong> Processing fee for digital wallet cash-in / cash-out integration.</p>
+                <div className="font-bold">Taxation & Commercial Policy (Founder Mandate 2.0):</div>
+                <p>• <strong>15% VAT:</strong> Automatically added to gross ride fare and remitted to FDRE Ministry of Revenues per Regulation No. 570/2025.</p>
+                <p>• <strong>0% Platform Take Rate:</strong> Subscribed independent drivers keep 100% of their trip earnings! No per-trip commission deductions.</p>
+                <p>• <strong>1% Telebirr Fee:</strong> Processing fee for Ethio Telecom payment gateway settlements.</p>
               </div>
             </div>
           </div>
         )}
+
+        {/* Tab 7: Subscriptions Ledger */}
+        {activeTab === 'subscriptions' && <AdminSubscriptionLedgerTab />}
+
+        {/* Tab 8: Corporate & Fleets */}
+        {activeTab === 'corporate' && <AdminCorporateTab />}
+
+        {/* Tab 9: Aggregator Providers & Circuit Breakers */}
+        {activeTab === 'providers' && <AdminProviderTab />}
+
+        {/* Tab 10: Safety & SOS Emergency Console */}
+        {activeTab === 'sos' && <AdminSosTab />}
       </div>
     </div>
   );
