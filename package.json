@@ -11,6 +11,7 @@
     "client:build": "npm --prefix client run build",
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "build": "npm run server:build && npm run client:build",
+    "start": "node server/dist/server/src/index.js",
     "test": "npm run server:test"
   },
   "devDependencies": {

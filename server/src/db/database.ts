@@ -111,6 +111,22 @@ export function initDatabase() {
       timestamp TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id TEXT PRIMARY KEY,
+      ride_id TEXT,
+      user_id TEXT NOT NULL,
+      user_name TEXT NOT NULL,
+      user_phone TEXT NOT NULL,
+      user_role TEXT NOT NULL DEFAULT 'rider',
+      category TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'OPEN',
+      resolution_notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS configs (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -480,6 +496,49 @@ function seedInitialData() {
     is_manual_dispatch: 1,
     created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
     updated_at: new Date(Date.now() - 3600000 * 4.2).toISOString(),
+  });
+
+  // Seed sample support tickets for Call Center / Customer Support resolution
+  const insertTicket = db.prepare(`
+    INSERT INTO support_tickets (
+      id, ride_id, user_id, user_name, user_phone, user_role,
+      category, subject, message, status, resolution_notes, created_at, updated_at
+    ) VALUES (
+      @id, @ride_id, @user_id, @user_name, @user_phone, @user_role,
+      @category, @subject, @message, @status, @resolution_notes, @created_at, @updated_at
+    )
+  `);
+
+  insertTicket.run({
+    id: 'tkt_01',
+    ride_id: 'ride_hist_01',
+    user_id: 'user_leila_01',
+    user_name: 'Leila Haile',
+    user_phone: '+251911223344',
+    user_role: 'rider',
+    category: 'lost_item',
+    subject: 'Forgotten Umbrella in Back Seat',
+    message: 'Left my black umbrella in Ahmed’s Toyota Corolla after arriving at UNECA.',
+    status: 'RESOLVED',
+    resolution_notes: 'Driver Ahmed contacted; umbrella handed back at Kazanchis security desk.',
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 1).toISOString(),
+  });
+
+  insertTicket.run({
+    id: 'tkt_02',
+    ride_id: 'ride_hist_02',
+    user_id: 'user_tsegaye_02',
+    user_name: 'Tsegaye Wolde',
+    user_phone: '+251915667788',
+    user_role: 'rider',
+    category: 'payment',
+    subject: 'VAT Invoice Receipt Request for Corporate Expense',
+    message: 'Require stamped Ethiopian Ministry of Revenues official VAT receipt for airport trip reimbursement.',
+    status: 'OPEN',
+    resolution_notes: null,
+    created_at: new Date(Date.now() - 3600000 * 3).toISOString(),
+    updated_at: new Date(Date.now() - 3600000 * 3).toISOString(),
   });
 
   console.log('Database initialized and seeded successfully.');

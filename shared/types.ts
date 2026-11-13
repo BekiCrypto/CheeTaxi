@@ -158,3 +158,19 @@ export interface SystemMetrics {
   averageEtaMinutes: number;
   acceptanceRatePercent: number;
 }
+
+export interface SupportTicket {
+  id: string;
+  ride_id?: string;
+  user_id: string;
+  user_name: string;
+  user_phone: string;
+  user_role: 'rider' | 'driver';
+  category: 'lost_item' | 'fare_dispute' | 'driver_behavior' | 'app_issue' | 'payment';
+  subject: string;
+  message: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  resolution_notes?: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/database.js';
 import { DispatchService } from '../services/dispatchService.js';
+import { TARIFFS } from '../services/fareService.js';
 import { Server as SocketIOServer } from 'socket.io';
 import { SystemMetrics, VatReportSummary } from '../../../shared/types.js';
 
@@ -209,6 +211,72 @@ export function createAdminRouter(io: SocketIOServer) {
     };
 
     return res.json({ summary, items });
+  });
+
+  /**
+   * Support Tickets List
+   */
+  router.get('/tickets', (req, res) => {
+    const tickets = db.prepare('SELECT * FROM support_tickets ORDER BY created_at DESC').all() as any[];
+    return res.json({ tickets });
+  });
+
+  /**
+   * Create Support / Incident Ticket
+   */
+  router.post('/tickets', (req, res) => {
+    const { rideId, userId, userName, userPhone, userRole = 'rider', category, subject, message } = req.body;
+    if (!userId || !subject || !message) {
+      return res.status(400).json({ error: 'Missing ticket parameters' });
+    }
+
+    const ticketId = `tkt_${uuidv4().substring(0, 8)}`;
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO support_tickets (
+        id, ride_id, user_id, user_name, user_phone, user_role,
+        category, subject, message, status, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?
+      )
+    `).run(
+      ticketId,
+      rideId || null,
+      userId,
+      userName || 'Customer',
+      userPhone || '+251...',
+      userRole,
+      category || 'app_issue',
+      subject,
+      message,
+      now,
+      now
+    );
+
+    const ticket = db.prepare('SELECT * FROM support_tickets WHERE id = ?').get(ticketId);
+    return res.status(201).json({ success: true, ticket });
+  });
+
+  /**
+   * Resolve Support Ticket
+   */
+  router.post('/tickets/:id/resolve', (req, res) => {
+    const { notes } = req.body;
+    db.prepare(`
+      UPDATE support_tickets
+      SET status = 'RESOLVED', resolution_notes = ?, updated_at = ?
+      WHERE id = ?
+    `).run(notes || 'Issue resolved by support officer', new Date().toISOString(), req.params.id);
+
+    return res.json({ success: true, message: 'Ticket marked as resolved' });
+  });
+
+  /**
+   * Get Active Tariffs
+   */
+  router.get('/tariffs', (req, res) => {
+    return res.json({ tariffs: TARIFFS });
   });
 
   return router;

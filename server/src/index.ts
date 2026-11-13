@@ -53,24 +53,21 @@ app.use('/api/admin', createAdminRouter(io));
 app.use('/api/geo', geoRouter);
 
 // Serve frontend static build if available (production mode / unified server)
-const clientDistPath = path.resolve(process.cwd(), '../client/dist');
-const altPublicPath = path.resolve(process.cwd(), 'public');
+const possiblePaths = [
+  path.resolve(process.cwd(), 'client/dist'),
+  path.resolve(process.cwd(), '../client/dist'),
+  path.resolve(process.cwd(), 'public'),
+];
 
-if (fs.existsSync(clientDistPath)) {
-  app.use(express.static(clientDistPath));
+const foundDist = possiblePaths.find((p) => fs.existsSync(p));
+
+if (foundDist) {
+  app.use(express.static(foundDist));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
       return next();
     }
-    res.sendFile(path.join(clientDistPath, 'index.html'));
-  });
-} else if (fs.existsSync(altPublicPath)) {
-  app.use(express.static(altPublicPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) {
-      return next();
-    }
-    res.sendFile(path.join(altPublicPath, 'index.html'));
+    res.sendFile(path.join(foundDist, 'index.html'));
   });
 }
 

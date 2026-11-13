@@ -16,6 +16,10 @@ import {
   DollarSign,
   Smartphone,
   Sparkles,
+  History,
+  HelpCircle,
+  Send,
+  X,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { TelebirrModal } from '../Payment/TelebirrModal';
@@ -85,6 +89,58 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [tipValue, setTipValue] = useState(0);
+
+  // History & Support Modals
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyRides, setHistoryRides] = useState<Ride[]>([]);
+  const [selectedReceiptRide, setSelectedReceiptRide] = useState<Ride | null>(null);
+
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [ticketCategory, setTicketCategory] = useState<'lost_item' | 'fare_dispute' | 'payment' | 'driver_behavior' | 'app_issue'>('lost_item');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [ticketSuccess, setTicketSuccess] = useState(false);
+
+  const loadHistory = () => {
+    fetch(`/api/rides/user/${currentRiderId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.rides) setHistoryRides(data.rides);
+        setShowHistoryModal(true);
+      })
+      .catch(console.error);
+  };
+
+  const handleSendTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/admin/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rideId: activeRide?.id,
+          userId: currentRiderId,
+          userName: currentRiderName,
+          userPhone: currentRiderPhone,
+          userRole: 'rider',
+          category: ticketCategory,
+          subject: ticketSubject,
+          message: ticketMessage,
+        }),
+      });
+      if (res.ok) {
+        setTicketSuccess(true);
+        setTimeout(() => {
+          setTicketSuccess(false);
+          setShowSupportModal(false);
+          setTicketSubject('');
+          setTicketMessage('');
+        }, 2500);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Fetch online drivers
   useEffect(() => {
@@ -250,9 +306,26 @@ export const RiderView: React.FC<RiderViewProps> = ({
               <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse" />
               {t.whereTo}
             </h2>
-            <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
-              Addis Ababa (አዲስ አበባ)
-            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={loadHistory}
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                title={t.tripHistory}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{t.tripHistory}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSupportModal(true)}
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                title={t.supportHelp}
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Support</span>
+              </button>
+            </div>
           </div>
 
           {/* Pickup Input */}
@@ -741,6 +814,152 @@ export const RiderView: React.FC<RiderViewProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Trip History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
+            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5 text-brand-400" />
+                <h3 className="font-bold text-sm">{t.tripHistory}</h3>
+              </div>
+              <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3 flex-1 text-xs">
+              {historyRides.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">No past trips found.</div>
+              ) : (
+                historyRides.map((r) => (
+                  <div key={r.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono font-bold text-slate-800">#{r.id}</span>
+                      <span className="text-[10px] text-slate-500">
+                        {new Date(r.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="text-slate-600 space-y-0.5">
+                      <div className="truncate"><strong>From:</strong> {r.pickup.address}</div>
+                      <div className="truncate"><strong>To:</strong> {r.destination.address}</div>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                      <span className="font-mono font-bold text-slate-900">
+                        {r.fare.totalFare.toFixed(2)} ETB ({r.paymentMethod})
+                      </span>
+                      <button
+                        onClick={() => {
+                          setSelectedReceiptRide(r);
+                          setShowReceiptModal(true);
+                        }}
+                        className="bg-brand-500 hover:bg-brand-600 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] transition"
+                      >
+                        {t.viewReceipt}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Support & Dispute Ticket Modal */}
+      {showSupportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-brand-400" />
+                <h3 className="font-bold text-sm">{t.supportHelp}</h3>
+              </div>
+              <button onClick={() => setShowSupportModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendTicket} className="p-5 space-y-3.5 text-xs">
+              {ticketSuccess && (
+                <div className="bg-emerald-50 text-emerald-800 p-2.5 rounded-lg border border-emerald-200 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span>Ticket received! Support officer will follow up shortly.</span>
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Issue Category</label>
+                <select
+                  value={ticketCategory}
+                  onChange={(e) => setTicketCategory(e.target.value as any)}
+                  className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                >
+                  <option value="lost_item">Lost Item in Taxi</option>
+                  <option value="fare_dispute">Fare / Tariff Dispute</option>
+                  <option value="payment">Telebirr / Payment Query</option>
+                  <option value="driver_behavior">Driver Conduct</option>
+                  <option value="app_issue">Technical / App Issue</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Subject</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Left phone in backseat of Corolla"
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Detailed Description</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Provide details to assist the Addis Ababa operations center..."
+                  value={ticketMessage}
+                  onChange={(e) => setTicketMessage(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSupportModal(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-brand-500 hover:bg-brand-600 text-white font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Submit Ticket</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tax receipt for selected historic ride if opened */}
+      {selectedReceiptRide && (
+        <VatReceiptModal
+          ride={selectedReceiptRide}
+          isOpen={showReceiptModal}
+          onClose={() => {
+            setShowReceiptModal(false);
+            setSelectedReceiptRide(null);
+          }}
+        />
       )}
     </div>
   );

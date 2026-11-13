@@ -15,6 +15,8 @@ import {
   Play,
   Pause,
   Award,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Driver, Ride, VehicleCategory } from '@shared/types';
@@ -47,6 +49,19 @@ export const DriverView: React.FC<DriverViewProps> = ({
   // Payout state
   const [payoutAmount, setPayoutAmount] = useState<string>('500');
   const [payoutSuccessMsg, setPayoutSuccessMsg] = useState<string | null>(null);
+
+  // Offline Fallback Queue
+  const [offlineQueueCount, setOfflineQueueCount] = useState<number>(0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const handleSyncOfflineData = () => {
+    setIsSyncing(true);
+    setTimeout(() => {
+      setOfflineQueueCount(0);
+      setIsSyncing(false);
+      sounds.playPaymentSuccess();
+    }, 1200);
+  };
 
   // Fetch driver data
   const fetchDriverProfile = () => {
@@ -581,6 +596,39 @@ export const DriverView: React.FC<DriverViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* Offline Fallback & Sync Footer */}
+        <div className="p-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+          <div className="flex items-center gap-1.5">
+            <WifiOff className="w-3.5 h-3.5 text-slate-500" />
+            <span>
+              Offline Queue:{' '}
+              <strong className={offlineQueueCount > 0 ? 'text-amber-600' : 'text-slate-700'}>
+                {offlineQueueCount} logs
+              </strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setOfflineQueueCount((c) => c + 1)}
+              className="text-slate-400 hover:text-slate-600 text-[10px]"
+              title="Simulate offline drop"
+            >
+              +Simulate Drop
+            </button>
+            {offlineQueueCount > 0 && (
+              <button
+                onClick={handleSyncOfflineData}
+                disabled={isSyncing}
+                className="bg-brand-500 hover:bg-brand-600 text-white font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1 transition"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Syncing...' : 'Sync'}</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Right Map Canvas */}

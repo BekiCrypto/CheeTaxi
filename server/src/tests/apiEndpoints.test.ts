@@ -108,4 +108,38 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(reverseRes.status).toBe(200);
     expect(reverseRes.body.location.address).toContain('Bole');
   });
+
+  it('GET and POST /api/admin/tickets should manage customer support and incident resolution', async () => {
+    const listRes = await request(app).get('/api/admin/tickets');
+    expect(listRes.status).toBe(200);
+    expect(Array.isArray(listRes.body.tickets)).toBe(true);
+
+    const createRes = await request(app)
+      .post('/api/admin/tickets')
+      .send({
+        userId: 'user_leila_01',
+        userName: 'Leila Haile',
+        userPhone: '+251911223344',
+        userRole: 'rider',
+        category: 'fare_dispute',
+        subject: 'Fare meter discrepancy inquiry',
+        message: 'Checked route fare vs estimated quote on Bole road.',
+      });
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.ticket.id).toBeDefined();
+
+    const resolveRes = await request(app)
+      .post(`/api/admin/tickets/${createRes.body.ticket.id}/resolve`)
+      .send({ notes: 'Explained distance and time breakdown per VAT Reg 570/2025.' });
+    expect(resolveRes.status).toBe(200);
+    expect(resolveRes.body.success).toBe(true);
+  });
+
+  it('GET /api/admin/tariffs should return rates for Sedan, Minivan, and Comfort', async () => {
+    const res = await request(app).get('/api/admin/tariffs');
+    expect(res.status).toBe(200);
+    expect(res.body.tariffs.sedan).toBeDefined();
+    expect(res.body.tariffs.minivan).toBeDefined();
+    expect(res.body.tariffs.sedan.baseFare).toBe(70);
+  });
 });

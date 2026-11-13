@@ -74,6 +74,13 @@ export interface Translations {
   reject: string;
   fastDemo: string;
   simulateMove: string;
+  tripHistory: string;
+  supportHelp: string;
+  reportIssue: string;
+  supportTickets: string;
+  tariffs: string;
+  offlineQueue: string;
+  syncNow: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -151,6 +158,13 @@ export const translations: Record<Language, Translations> = {
     reject: 'Reject',
     fastDemo: '⚡ 1-Click Ride Demo',
     simulateMove: 'Auto-Simulate Vehicle Movement',
+    tripHistory: 'Trip History',
+    supportHelp: 'Support & Help Desk (9922)',
+    reportIssue: 'Report an Issue / Dispute',
+    supportTickets: 'Support Tickets & Disputes',
+    tariffs: 'Tariffs & Regulations',
+    offlineQueue: 'Offline Queued Logs',
+    syncNow: 'Sync Queued Data',
   },
   am: {
     appName: 'ከበለው (Chebelew)',
@@ -226,5 +240,12 @@ export const translations: Record<Language, Translations> = {
     reject: 'ውድቅ አድርግ',
     fastDemo: '⚡ የ1-ጠቅታ የጉዞ ማሳያ (Demo)',
     simulateMove: 'የመኪና እንቅስቃሴን አስመስል',
+    tripHistory: 'የቀድሞ ጉዞዎች ታሪክ',
+    supportHelp: 'የደንበኞች ድጋፍ መስጫ (9922)',
+    reportIssue: 'ቅሬታ ወይም ችግር ያመልክቱ',
+    supportTickets: 'የደንበኞች ቅሬታዎች መፍቻ',
+    tariffs: 'የክፍያ ተመን እና ህጎች',
+    offlineQueue: 'ከመስመር ውጭ የተቀመጡ መረጃዎች',
+    syncNow: 'መረጃዎችን አመሳስል',
   },
 };

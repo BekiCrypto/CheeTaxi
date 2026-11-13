@@ -14,9 +14,12 @@ import {
   DollarSign,
   TrendingUp,
   AlertCircle,
+  LifeBuoy,
+  Settings,
+  MessageSquare,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
-import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory } from '@shared/types';
+import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory, SupportTicket } from '@shared/types';
 import { translations, Language } from '../../i18n/translations';
 import { ADDIS_LANDMARKS } from '../../../../server/src/services/geoService';
 
@@ -28,11 +31,17 @@ interface AdminViewProps {
 export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
   const t = translations[language];
 
-  const [activeTab, setActiveTab] = useState<'fleet' | 'callcenter' | 'kyc' | 'vat'>('fleet');
+  const [activeTab, setActiveTab] = useState<'fleet' | 'callcenter' | 'kyc' | 'vat' | 'tickets' | 'tariffs'>('fleet');
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [activeRides, setActiveRides] = useState<Ride[]>([]);
   const [kycQueue, setKycQueue] = useState<any[]>([]);
+
+  // Tickets & Tariffs
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [tariffs, setTariffs] = useState<any>(null);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
 
   // VAT Report
   const [vatSummary, setVatSummary] = useState<VatReportSummary | null>(null);
@@ -78,6 +87,35 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
         if (data.items) setVatItems(data.items);
       })
       .catch(console.error);
+
+    fetch('/api/admin/tickets')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.tickets) setTickets(data.tickets);
+      })
+      .catch(console.error);
+
+    fetch('/api/admin/tariffs')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.tariffs) setTariffs(data.tariffs);
+      })
+      .catch(console.error);
+  };
+
+  const handleResolveTicket = async (ticketId: string) => {
+    try {
+      await fetch(`/api/admin/tickets/${ticketId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: resolutionNotes || 'Resolved by Call Center supervisor.' }),
+      });
+      setSelectedTicket(null);
+      setResolutionNotes('');
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -290,7 +328,25 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>VAT Regulation No. 570/2025 Ledger</span>
+            <span>VAT Regulation 570/2025</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('tickets')}
+            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+              activeTab === 'tickets' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <LifeBuoy className="w-4 h-4" />
+            <span>Support Tickets ({tickets.filter(t => t.status === 'OPEN').length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('tariffs')}
+            className={`px-4 py-2 rounded-lg flex items-center gap-1.5 transition ${
+              activeTab === 'tariffs' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Tariff Rules</span>
           </button>
         </div>
       </div>
@@ -625,6 +681,171 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 5: Support Tickets & Dispute Resolution */}
+        {activeTab === 'tickets' && (
+          <div className="max-w-5xl mx-auto p-8 overflow-y-auto h-full space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+              <div className="border-b pb-3 flex justify-between items-center">
+                <div>
+                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <LifeBuoy className="w-5 h-5 text-brand-500" />
+                    Customer Support & Incident Resolution
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Manage lost item reports, fare disputes, and Telebirr payment inquiries.
+                  </p>
+                </div>
+                <span className="text-xs bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-bold">
+                  {tickets.length} Total Tickets
+                </span>
+              </div>
+
+              {tickets.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 text-xs">No support tickets reported.</div>
+              ) : (
+                <div className="space-y-3">
+                  {tickets.map((t) => (
+                    <div
+                      key={t.id}
+                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2 hover:border-brand-300 transition"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-800">#{t.id}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            t.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {t.status}
+                          </span>
+                          <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded text-[10px] font-medium uppercase">
+                            {t.category.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-sans">
+                          {new Date(t.created_at).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="font-bold text-slate-800 text-sm">{t.subject}</div>
+                      <p className="text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100">
+                        "{t.message}"
+                      </p>
+
+                      <div className="flex justify-between items-center pt-2 text-[11px] text-slate-500">
+                        <div>
+                          <strong>User:</strong> {t.user_name} ({t.user_phone}) • Role: {t.user_role}
+                          {t.ride_id && <span> • Linked Trip: <code className="bg-slate-100 px-1 py-0.5 rounded">{t.ride_id}</code></span>}
+                        </div>
+
+                        {t.status === 'OPEN' ? (
+                          <button
+                            onClick={() => setSelectedTicket(t)}
+                            className="bg-brand-500 hover:bg-brand-600 text-white font-bold px-3 py-1.5 rounded-lg transition"
+                          >
+                            Resolve Ticket
+                          </button>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Resolved: {t.resolution_notes || 'Closed'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Ticket Resolution Modal */}
+            {selectedTicket && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+                  <h4 className="font-bold text-sm text-slate-800">
+                    Resolve Ticket #{selectedTicket.id}
+                  </h4>
+                  <p className="text-xs text-slate-500">{selectedTicket.subject}</p>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Resolution Summary / Notes</label>
+                    <textarea
+                      rows={3}
+                      value={resolutionNotes}
+                      onChange={(e) => setResolutionNotes(e.target.value)}
+                      placeholder="e.g., Driver contacted; item returned; fare difference refunded via Telebirr."
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setSelectedTicket(null)}
+                      className="px-3 py-1.5 rounded-lg border text-xs font-semibold text-slate-600"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleResolveTicket(selectedTicket.id)}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+                    >
+                      Confirm Resolution
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 6: Tariffs & Regulatory Configuration */}
+        {activeTab === 'tariffs' && tariffs && (
+          <div className="max-w-4xl mx-auto p-8 overflow-y-auto h-full space-y-5">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+              <div className="border-b pb-3">
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-brand-500" />
+                  Active Tariff Engine & Regulatory Parameters
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  City of Addis Ababa Transport Bureau rates & FDRE VAT Regulation No. 570/2025.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                {Object.entries(tariffs).map(([key, t]: [string, any]) => (
+                  <div key={key} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <div className="font-bold text-slate-800 text-sm">{t.displayName}</div>
+                    <div className="text-[11px] text-slate-500">{t.description}</div>
+                    <div className="pt-2 border-t border-slate-200 space-y-1 font-mono text-[11px]">
+                      <div className="flex justify-between">
+                        <span>Base Fare:</span>
+                        <strong className="text-slate-800">{t.baseFare} ETB</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Per Kilometer:</span>
+                        <strong className="text-slate-800">{t.perKm} ETB/km</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Per Minute:</span>
+                        <strong className="text-slate-800">{t.perMinute} ETB/min</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Minimum Fare:</span>
+                        <strong className="text-slate-800">{t.minFare} ETB</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1">
+                <div className="font-bold">Taxation & Commission Policy:</div>
+                <p>• <strong>15% VAT:</strong> Automatically added to gross ride fare and remitted to Ministry of Revenues.</p>
+                <p>• <strong>15% Platform Take Rate:</strong> Deducted from driver's fare share to fund ops, maps, and support.</p>
+                <p>• <strong>1% Telebirr Fee:</strong> Processing fee for digital wallet cash-in / cash-out integration.</p>
               </div>
             </div>
           </div>
