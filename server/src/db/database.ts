@@ -11,9 +11,12 @@ const defaultDbPath = path.resolve(serverDir, 'chebelew.db');
 const dbPath = process.env.DATABASE_PATH || defaultDbPath;
 export const db = new Database(dbPath);
 
-// Enable WAL mode for high-concurrency read/write performance
+// Production SQLite configuration: WAL mode, busy timeout, and memory temp store
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
 db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
+db.pragma('temp_store = MEMORY');
 
 export function initDatabase() {
   db.exec(`
