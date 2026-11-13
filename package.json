@@ -1,0 +1,19 @@
+{
+  "name": "chebelew-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chebelew: Ethiopia Ride-Hailing Aggregator & Dispatch Platform",
+  "scripts": {
+    "server:dev": "npm --prefix server run dev",
+    "server:build": "npm --prefix server run build",
+    "server:test": "npm --prefix server run test",
+    "client:dev": "npm --prefix client run dev",
+    "client:build": "npm --prefix client run build",
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "build": "npm run server:build && npm run client:build",
+    "test": "npm run server:test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
+}

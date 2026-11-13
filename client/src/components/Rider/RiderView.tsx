@@ -1,0 +1,747 @@
+import React, { useState, useEffect } from 'react';
+import {
+  MapPin,
+  Navigation,
+  Clock,
+  Shield,
+  Phone,
+  Share2,
+  AlertTriangle,
+  Star,
+  CheckCircle,
+  Car,
+  Users,
+  ChevronRight,
+  Info,
+  DollarSign,
+  Smartphone,
+  Sparkles,
+} from 'lucide-react';
+import { AddisMap } from '../Map/AddisMap';
+import { TelebirrModal } from '../Payment/TelebirrModal';
+import { VatReceiptModal } from '../Payment/VatReceiptModal';
+import { ADDIS_LANDMARKS } from '../../../../server/src/services/geoService';
+import {
+  Driver,
+  FareEstimate,
+  LocationPoint,
+  PaymentMethod,
+  Ride,
+  TelebirrOrder,
+  VehicleCategory,
+} from '@shared/types';
+import { translations, Language } from '../../i18n/translations';
+import { sounds } from '../../utils/audio';
+
+interface RiderViewProps {
+  currentRiderId: string;
+  currentRiderName: string;
+  currentRiderPhone: string;
+  language: Language;
+  socket: any;
+  onRideActive?: (ride: Ride | null) => void;
+}
+
+export const RiderView: React.FC<RiderViewProps> = ({
+  currentRiderId,
+  currentRiderName,
+  currentRiderPhone,
+  language,
+  socket,
+  onRideActive,
+}) => {
+  const t = translations[language];
+
+  // Locations
+  const [pickup, setPickup] = useState<LocationPoint>({
+    address: 'Bole Medhanialem Mall, Addis Ababa',
+    addressAm: 'ቦሌ መድኃኔዓለም እና ኤድና ሞል',
+    lat: 8.995,
+    lng: 38.788,
+  });
+
+  const [destination, setDestination] = useState<LocationPoint>({
+    address: 'UNECA Conference Centre (Kazanchis)',
+    addressAm: 'የተመድ ኢኮኖሚክ ኮሚሽን (ካዛንቺስ)',
+    lat: 9.0185,
+    lng: 38.7705,
+  });
+
+  const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
+  const [estimates, setEstimates] = useState<FareEstimate[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<VehicleCategory>('sedan');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TELEBIRR');
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [activeRide, setActiveRide] = useState<Ride | null>(null);
+
+  // Live driver position for active ride
+  const [activeDriverPos, setActiveDriverPos] = useState<[number, number] | undefined>(undefined);
+  const [activeDriverHeading, setActiveDriverHeading] = useState<number>(0);
+
+  // Modals
+  const [telebirrOrder, setTelebirrOrder] = useState<TelebirrOrder | null>(null);
+  const [showTelebirrModal, setShowTelebirrModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [tipValue, setTipValue] = useState(0);
+
+  // Fetch online drivers
+  useEffect(() => {
+    fetch('/api/drivers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.drivers) setAvailableDrivers(data.drivers);
+      })
+      .catch(console.error);
+  }, []);
+
+  // Fetch fare estimates whenever pickup or destination changes
+  useEffect(() => {
+    if (!pickup || !destination) return;
+    setIsCalculating(true);
+
+    fetch('/api/rides/estimate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pickup, destination }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.estimates) {
+          setEstimates(data.estimates);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsCalculating(false));
+  }, [pickup, destination]);
+
+  // Socket listener for ride status updates & location ticks
+  useEffect(() => {
+    if (!socket || !activeRide) return;
+
+    socket.emit('join:ride', activeRide.id);
+
+    const onStatusChanged = (updatedRide: Ride) => {
+      setActiveRide(updatedRide);
+      if (onRideActive) onRideActive(updatedRide);
+
+      if (updatedRide.status === 'ASSIGNED') {
+        sounds.playRideAccepted();
+      } else if (updatedRide.status === 'ARRIVED') {
+        sounds.playIncomingRideAlert();
+      } else if (updatedRide.status === 'COMPLETED') {
+        sounds.playPaymentSuccess();
+        setShowRatingModal(true);
+      }
+    };
+
+    const onLocationTick = (data: { driverLocation: [number, number]; heading: number }) => {
+      setActiveDriverPos(data.driverLocation);
+      setActiveDriverHeading(data.heading);
+    };
+
+    socket.on('ride:status_changed', onStatusChanged);
+    socket.on('ride:location_tick', onLocationTick);
+
+    return () => {
+      socket.off('ride:status_changed', onStatusChanged);
+      socket.off('ride:location_tick', onLocationTick);
+    };
+  }, [socket, activeRide?.id]);
+
+  // Request a ride
+  const handleRequestRide = async () => {
+    try {
+      const res = await fetch('/api/rides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          riderId: currentRiderId,
+          riderName: currentRiderName,
+          riderPhone: currentRiderPhone,
+          pickup,
+          destination,
+          vehicleCategory: selectedCategory,
+          paymentMethod,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.ride) {
+        setActiveRide(data.ride);
+        if (onRideActive) onRideActive(data.ride);
+        sounds.playIncomingRideAlert();
+      }
+    } catch (err) {
+      console.error('Failed to book ride:', err);
+    }
+  };
+
+  // Cancel ride
+  const handleCancelRide = async () => {
+    if (!activeRide) return;
+    try {
+      await fetch(`/api/rides/${activeRide.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Passenger cancelled', cancelledBy: 'rider' }),
+      });
+      setActiveRide(null);
+      if (onRideActive) onRideActive(null);
+    } catch (err) {
+      console.error('Failed to cancel ride:', err);
+    }
+  };
+
+  // Open Telebirr payment
+  const handleOpenTelebirrPayment = async () => {
+    if (!activeRide) return;
+    try {
+      const res = await fetch('/api/telebirr/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rideId: activeRide.id,
+          amountEtb: activeRide.fare.totalFare,
+          payerPhone: currentRiderPhone,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setTelebirrOrder(data.order);
+        setShowTelebirrModal(true);
+      }
+    } catch (err) {
+      console.error('Failed to initiate Telebirr:', err);
+    }
+  };
+
+  // Submit Rating
+  const handleSubmitRating = async () => {
+    if (!activeRide) return;
+    try {
+      await fetch(`/api/rides/${activeRide.id}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: ratingValue,
+          review: 'Great ride with Chebelew!',
+          tipAmount: tipValue,
+        }),
+      });
+      setShowRatingModal(false);
+      setShowReceiptModal(true);
+    } catch (err) {
+      console.error('Failed to rate:', err);
+    }
+  };
+
+  const selectedEstimate = estimates.find((e) => e.category === selectedCategory);
+
+  return (
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-68px)] w-full overflow-hidden bg-slate-50">
+      {/* Left Control Panel / Booking Sheet */}
+      <div className="w-full lg:w-[440px] xl:w-[480px] bg-white border-r border-slate-200 flex flex-col h-full shadow-lg z-20 overflow-y-auto">
+        {/* Top Destination Selector */}
+        <div className="p-5 border-b border-slate-100 space-y-3.5 bg-gradient-to-b from-slate-50 to-white">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse" />
+              {t.whereTo}
+            </h2>
+            <span className="text-[11px] font-bold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+              Addis Ababa (አዲስ አበባ)
+            </span>
+          </div>
+
+          {/* Pickup Input */}
+          <div className="relative">
+            <div className="absolute left-3 top-3 text-emerald-600">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <select
+              value={pickup.address}
+              onChange={(e) => {
+                const landmark = ADDIS_LANDMARKS.find((l) => l.name === e.target.value);
+                if (landmark) {
+                  setPickup({
+                    address: landmark.name,
+                    addressAm: landmark.nameAm,
+                    lat: landmark.lat,
+                    lng: landmark.lng,
+                  });
+                }
+              }}
+              className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            >
+              {ADDIS_LANDMARKS.map((l) => (
+                <option key={l.id} value={l.name}>
+                  {language === 'am' ? l.nameAm : l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Destination Input */}
+          <div className="relative">
+            <div className="absolute left-3 top-3 text-rose-600">
+              <Navigation className="w-4 h-4" />
+            </div>
+            <select
+              value={destination.address}
+              onChange={(e) => {
+                const landmark = ADDIS_LANDMARKS.find((l) => l.name === e.target.value);
+                if (landmark) {
+                  setDestination({
+                    address: landmark.name,
+                    addressAm: landmark.nameAm,
+                    lat: landmark.lat,
+                    lng: landmark.lng,
+                  });
+                }
+              }}
+              className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+            >
+              {ADDIS_LANDMARKS.map((l) => (
+                <option key={l.id} value={l.name}>
+                  {language === 'am' ? l.nameAm : l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Content based on Active Ride status */}
+        {!activeRide ? (
+          <div className="p-5 space-y-5 flex-1">
+            {/* Vehicle Options */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                {language === 'am' ? 'የመኪና ምርጫ' : 'Select Ride Category'}
+              </label>
+
+              <div className="space-y-2.5">
+                {estimates
+                  .filter((e) => !e.isAggregatedPartner)
+                  .map((est) => {
+                    const isSelected = selectedCategory === est.category;
+                    return (
+                      <div
+                        key={est.category}
+                        onClick={() => setSelectedCategory(est.category)}
+                        className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex items-center justify-between ${
+                          isSelected
+                            ? 'border-brand-500 bg-brand-50/40 shadow-sm'
+                            : 'border-slate-100 hover:border-slate-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-lg flex items-center justify-center font-bold text-sm ${
+                              isSelected ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            <Car className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                              {language === 'am' ? est.displayNameAm : est.displayName}
+                              <span className="text-[10px] text-slate-500 font-normal flex items-center gap-0.5">
+                                <Users className="w-3 h-3" /> {est.capacity}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                              {language === 'am' ? est.descriptionAm : est.description}
+                            </div>
+                            <div className="text-[10px] text-brand-700 font-semibold mt-0.5">
+                              ETA ~{est.etaMinutes} mins away
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-sm font-extrabold text-slate-900">
+                            {est.fare.totalFare.toFixed(0)} <span className="text-[10px]">ETB</span>
+                          </div>
+                          <span className="text-[10px] text-emerald-600 font-medium block">
+                            Inc. 15% VAT
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Aggregator Comparison Drawer */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  {t.partnerComparison}
+                </span>
+                <span className="text-[10px] text-slate-500">Live Comparison</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                {/* Chebelew */}
+                <div className="bg-white p-2.5 rounded-lg border-2 border-brand-500 shadow-sm relative">
+                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-brand-500 text-white text-[9px] font-black px-1.5 rounded-full">
+                    BEST
+                  </div>
+                  <div className="font-bold text-brand-700 text-[11px] mt-1">Chebelew</div>
+                  <div className="text-sm font-extrabold text-slate-900 mt-0.5">
+                    {selectedEstimate?.fare.totalFare.toFixed(0)} <span className="text-[9px]">ETB</span>
+                  </div>
+                  <div className="text-[10px] text-emerald-600 font-bold mt-1">Direct Match</div>
+                </div>
+
+                {/* RIDE */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-slate-600">
+                  <div className="font-bold text-slate-800 text-[11px]">RIDE Taxi</div>
+                  <div className="text-sm font-bold text-slate-700 mt-0.5">
+                    {estimates.find((e) => e.category === 'partner_ride')?.fare.totalFare.toFixed(0) || '245'}{' '}
+                    <span className="text-[9px]">ETB</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1">~30k standby</div>
+                </div>
+
+                {/* Feres */}
+                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-slate-600">
+                  <div className="font-bold text-slate-800 text-[11px]">Feres</div>
+                  <div className="text-sm font-bold text-slate-700 mt-0.5">
+                    {estimates.find((e) => e.category === 'partner_feres')?.fare.totalFare.toFixed(0) || '230'}{' '}
+                    <span className="text-[9px]">ETB</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1">+ Miles Cashback</div>
+                </div>
+              </div>
+            </div>
+
+            {/* VAT Regulation 570/2025 Breakdown Notice */}
+            {selectedEstimate && (
+              <div className="bg-blue-50/60 rounded-xl p-3.5 border border-blue-100 text-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-blue-900">
+                  <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span>{t.vatRegulation}</span>
+                </div>
+                <div className="text-blue-800 text-[11px] leading-relaxed">
+                  {t.vatNotice}
+                </div>
+                <div className="flex justify-between pt-1 border-t border-blue-200/60 font-mono text-[11px] text-blue-950">
+                  <span>Fare: {selectedEstimate.fare.subtotal.toFixed(2)} ETB</span>
+                  <span className="font-bold text-emerald-700">
+                    +15% VAT: {selectedEstimate.fare.vatAmount.toFixed(2)} ETB
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Method Selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                {t.paymentMethod}
+              </label>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('TELEBIRR')}
+                  className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 text-xs font-bold transition ${
+                    paymentMethod === 'TELEBIRR'
+                      ? 'border-[#0070ba] bg-blue-50/50 text-[#0070ba]'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Smartphone className="w-4 h-4 text-[#0070ba]" />
+                  <span>{t.telebirr}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CASH')}
+                  className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 text-xs font-bold transition ${
+                    paymentMethod === 'CASH'
+                      ? 'border-emerald-600 bg-emerald-50/50 text-emerald-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  <span>{t.cash}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Book Now Button */}
+            <button
+              onClick={handleRequestRide}
+              disabled={isCalculating}
+              className="w-full bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand-500/30 transition disabled:opacity-60"
+            >
+              <span>{t.bookNow}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          /* Live Ride Status Card */
+          <div className="p-5 space-y-5 flex-1 flex flex-col justify-between">
+            <div className="space-y-4">
+              {/* Status Header */}
+              <div className="bg-slate-900 text-white p-4 rounded-xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-brand-300">TRIP ID: {activeRide.id}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-brand-500 text-white">
+                    {activeRide.status}
+                  </span>
+                </div>
+                <div className="text-base font-bold text-white pt-1">
+                  {activeRide.status === 'REQUESTED' && t.searchingDriver}
+                  {activeRide.status === 'ASSIGNED' && t.driverAssigned}
+                  {activeRide.status === 'ARRIVED' && t.driverArrived}
+                  {activeRide.status === 'IN_PROGRESS' && t.tripInProgress}
+                  {activeRide.status === 'COMPLETED' && t.tripCompleted}
+                </div>
+              </div>
+
+              {/* Driver & Vehicle Details */}
+              {activeRide.driver && (
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={activeRide.driver.avatarUrl}
+                        alt={activeRide.driver.fullName}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
+                      />
+                      <div>
+                        <div className="font-bold text-sm text-slate-800">
+                          {activeRide.driver.fullName}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                          <span>{activeRide.driver.rating}</span>
+                          <span>• {activeRide.driver.totalRides} trips</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <a
+                      href={`tel:${activeRide.driver.phone}`}
+                      className="p-2.5 bg-emerald-100 text-emerald-800 rounded-full hover:bg-emerald-200 transition"
+                      title={t.callDriver}
+                    >
+                      <Phone className="w-4 h-4" />
+                    </a>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-slate-100 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Vehicle</span>
+                      <span className="font-semibold text-slate-700">
+                        {activeRide.driver.vehicleMake} {activeRide.driver.vehicleModel}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">License Plate</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {activeRide.driver.vehiclePlate}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Live Fare & Payment Status */}
+              <div className="p-3.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Total Fare</span>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {activeRide.fare.totalFare.toFixed(2)} ETB
+                  </span>
+                  <span className="text-[10px] text-emerald-600 block">Inc. 15% VAT</span>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-slate-400 block text-[10px]">Payment</span>
+                  <span className="font-bold text-slate-800 uppercase">
+                    {activeRide.paymentMethod}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold block ${
+                      activeRide.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-600'
+                    }`}
+                  >
+                    {activeRide.paymentStatus === 'PAID' ? '✓ PAID' : 'PENDING'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Safety & SOS Bar */}
+              <div className="flex gap-2">
+                <a
+                  href="tel:991"
+                  className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition"
+                >
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>{t.sosEmergency}</span>
+                </a>
+                <button
+                  onClick={() => alert(`Chebelew Trip Link: https://chebelew.et/track/${activeRide.id}`)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition"
+                >
+                  <Share2 className="w-4 h-4 text-slate-600" />
+                  <span>{t.shareTrip}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Action buttons */}
+            <div className="space-y-2 pt-4 border-t border-slate-100">
+              {activeRide.paymentMethod === 'TELEBIRR' && activeRide.paymentStatus !== 'PAID' && (
+                <button
+                  onClick={handleOpenTelebirrPayment}
+                  className="w-full bg-[#0070ba] hover:bg-[#004c82] text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Pay Now via Telebirr ({activeRide.fare.totalFare.toFixed(2)} ETB)</span>
+                </button>
+              )}
+
+              {activeRide.status === 'COMPLETED' && (
+                <button
+                  onClick={() => setShowReceiptModal(true)}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition"
+                >
+                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                  <span>{t.viewReceipt}</span>
+                </button>
+              )}
+
+              {activeRide.status !== 'COMPLETED' && activeRide.status !== 'CANCELLED' && (
+                <button
+                  onClick={handleCancelRide}
+                  className="w-full bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-semibold py-2.5 px-4 rounded-xl text-xs transition"
+                >
+                  Cancel Ride
+                </button>
+              )}
+
+              {activeRide.status === 'COMPLETED' && (
+                <button
+                  onClick={() => {
+                    setActiveRide(null);
+                    if (onRideActive) onRideActive(null);
+                  }}
+                  className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition"
+                >
+                  Book Another Ride
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right Map Canvas */}
+      <div className="flex-1 h-full relative">
+        <AddisMap
+          pickup={pickup}
+          destination={destination}
+          drivers={availableDrivers}
+          activeDriverLocation={activeDriverPos || (activeRide?.driver ? [activeRide.driver.currentLat, activeRide.driver.currentLng] : undefined)}
+          activeDriverHeading={activeDriverHeading || (activeRide?.driver?.heading || 0)}
+          activeDriverPlate={activeRide?.driver?.vehiclePlate}
+          routeCoordinates={activeRide?.routeCoordinates}
+        />
+      </div>
+
+      {/* Telebirr Payment Modal */}
+      {telebirrOrder && (
+        <TelebirrModal
+          order={telebirrOrder}
+          isOpen={showTelebirrModal}
+          onSuccess={(updatedOrder) => {
+            setShowTelebirrModal(false);
+            if (activeRide) {
+              setActiveRide({
+                ...activeRide,
+                paymentStatus: 'PAID',
+                telebirrOrderId: updatedOrder.orderId,
+                telebirrTransactionNo: updatedOrder.transactionNo,
+              });
+            }
+          }}
+          onClose={() => setShowTelebirrModal(false)}
+        />
+      )}
+
+      {/* Electronic VAT Tax Receipt Modal */}
+      {activeRide && (
+        <VatReceiptModal
+          ride={activeRide}
+          isOpen={showReceiptModal}
+          onClose={() => setShowReceiptModal(false)}
+        />
+      )}
+
+      {/* Post Trip Rating Modal */}
+      {showRatingModal && activeRide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+              <CheckCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800">{t.rateDriver}</h3>
+            <p className="text-xs text-slate-500">
+              How was your trip with {activeRide.driver?.fullName || 'the driver'}?
+            </p>
+
+            {/* Stars */}
+            <div className="flex justify-center gap-2 py-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRatingValue(star)}
+                  className="p-1 transition transform hover:scale-110"
+                >
+                  <Star
+                    className={`w-7 h-7 ${
+                      star <= ratingValue ? 'text-amber-400 fill-amber-400' : 'text-slate-300'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+
+            {/* Tip Option */}
+            <div className="text-left space-y-1.5">
+              <span className="text-xs font-semibold text-slate-700">{t.tipDriver}</span>
+              <div className="grid grid-cols-4 gap-2">
+                {[0, 20, 50, 100].map((tip) => (
+                  <button
+                    key={tip}
+                    onClick={() => setTipValue(tip)}
+                    className={`py-1.5 rounded-lg text-xs font-bold border ${
+                      tipValue === tip
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {tip === 0 ? 'No tip' : `+${tip}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleSubmitRating}
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition"
+            >
+              {t.submitRating}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

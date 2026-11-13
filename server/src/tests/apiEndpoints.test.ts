@@ -1,0 +1,111 @@
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import request from 'supertest';
+import { app } from '../index.js';
+import { initDatabase, db } from '../db/database.js';
+
+describe('Chebelew REST API Endpoints & Operational Flows', () => {
+  beforeAll(() => {
+    initDatabase();
+  });
+
+  beforeEach(() => {
+    db.prepare('UPDATE drivers SET is_busy = 0, is_online = 1, active_ride_id = NULL').run();
+  });
+
+  it('GET /api/health should return ok with Addis Ababa timezone', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.addisTimezone).toBe('Africa/Addis_Ababa');
+  });
+
+  it('GET /api/auth/users should return seed users for quick switching', async () => {
+    const res = await request(app).get('/api/auth/users');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body.users.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('POST /api/auth/otp/request and /verify should simulate SMS OTP login', async () => {
+    const reqRes = await request(app)
+      .post('/api/auth/otp/request')
+      .send({ phone: '+251911998877' });
+    expect(reqRes.status).toBe(200);
+    expect(reqRes.body.success).toBe(true);
+    expect(reqRes.body.demoCode).toBeDefined();
+
+    const verifyRes = await request(app)
+      .post('/api/auth/otp/verify')
+      .send({ phone: '+251911998877', code: reqRes.body.demoCode, name: 'Abebe Bikila' });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.user.phone).toBe('+251911998877');
+  });
+
+  it('POST /api/rides/estimate should return estimates and aggregator comparisons', async () => {
+    const res = await request(app)
+      .post('/api/rides/estimate')
+      .send({
+        pickup: { lat: 8.9950, lng: 38.7880 }, // Bole Medhanialem
+        destination: { lat: 9.0105, lng: 38.7615 }, // Meskel Square
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.distanceKm).toBeGreaterThan(0);
+    expect(res.body.estimates.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('GET /api/drivers and POST status toggle', async () => {
+    const listRes = await request(app).get('/api/drivers');
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.drivers.length).toBeGreaterThan(0);
+
+    const driverId = listRes.body.drivers[0].id;
+    const toggleRes = await request(app)
+      .post(`/api/drivers/${driverId}/status`)
+      .send({ isOnline: true });
+    expect(toggleRes.status).toBe(200);
+    expect(toggleRes.body.isOnline).toBe(true);
+  });
+
+  it('POST /api/admin/manual-dispatch should create call-in phone ride', async () => {
+    const res = await request(app)
+      .post('/api/admin/manual-dispatch')
+      .send({
+        callerPhone: '+251922334455',
+        callerName: 'Eleni Gebre',
+        pickup: {
+          address: 'Meskel Square',
+          lat: 9.0105,
+          lng: 38.7615,
+        },
+        destination: {
+          address: 'Bole Airport',
+          lat: 8.9778,
+          lng: 38.7993,
+        },
+        vehicleCategory: 'sedan',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.ride.isManualDispatch).toBe(true);
+    expect(res.body.ride.riderPhone).toBe('+251922334455');
+  });
+
+  it('GET /api/admin/vat-report should report Regulation No. 570/2025 compliance ledger', async () => {
+    const res = await request(app).get('/api/admin/vat-report');
+    expect(res.status).toBe(200);
+    expect(res.body.summary).toBeDefined();
+    expect(res.body.summary.vatRegulationReference).toContain('Regulation No. 570/2025');
+    expect(Array.isArray(res.body.items)).toBe(true);
+  });
+
+  it('GET /api/geo/places and /reverse should return Addis Ababa landmarks', async () => {
+    const placesRes = await request(app).get('/api/geo/places?q=Bole');
+    expect(placesRes.status).toBe(200);
+    expect(placesRes.body.places.length).toBeGreaterThan(0);
+
+    const reverseRes = await request(app).get('/api/geo/reverse?lat=8.9778&lng=38.7993');
+    expect(reverseRes.status).toBe(200);
+    expect(reverseRes.body.location.address).toContain('Bole');
+  });
+});

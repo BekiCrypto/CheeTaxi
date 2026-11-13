@@ -1,0 +1,215 @@
+import { Router } from 'express';
+import { db } from '../db/database.js';
+import { DispatchService } from '../services/dispatchService.js';
+import { Server as SocketIOServer } from 'socket.io';
+import { SystemMetrics, VatReportSummary } from '../../../shared/types.js';
+
+export function createAdminRouter(io: SocketIOServer) {
+  const router = Router();
+
+  /**
+   * Operations Dashboard KPIs & Metrics
+   */
+  router.get('/metrics', (req, res) => {
+    const totalDrivers = db.prepare('SELECT count(*) as count FROM drivers').get() as { count: number };
+    const onlineDrivers = db.prepare('SELECT count(*) as count FROM drivers WHERE is_online = 1').get() as { count: number };
+    const activeTrips = db.prepare(`
+      SELECT count(*) as count FROM rides
+      WHERE status IN ('REQUESTED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
+    `).get() as { count: number };
+
+    const completedTrips = db.prepare(`
+      SELECT * FROM rides WHERE status = 'COMPLETED'
+    `).all() as any[];
+
+    let todayGmv = 0;
+    let todayVat = 0;
+
+    for (const trip of completedTrips) {
+      try {
+        const fare = JSON.parse(trip.fare_json);
+        todayGmv += fare.totalFare || 0;
+        todayVat += fare.vatAmount || 0;
+      } catch (e) {}
+    }
+
+    const metrics: SystemMetrics = {
+      activeDriversCount: totalDrivers.count,
+      onlineDriversCount: onlineDrivers.count,
+      activeTripsCount: activeTrips.count,
+      todayCompletedTrips: completedTrips.length,
+      todayGmvEtb: Number(todayGmv.toFixed(2)),
+      todayVatCollectedEtb: Number(todayVat.toFixed(2)),
+      averageEtaMinutes: 4.2,
+      acceptanceRatePercent: 96.5,
+    };
+
+    return res.json({ metrics });
+  });
+
+  /**
+   * Live Map Fleet & Trips
+   */
+  router.get('/live-map', (req, res) => {
+    const drivers = db.prepare('SELECT * FROM drivers').all() as any[];
+    const activeRides = db.prepare(`
+      SELECT id FROM rides WHERE status IN ('REQUESTED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
+    `).all() as any[];
+
+    const rides = activeRides.map((r) => DispatchService.getRideById(r.id)).filter(Boolean);
+
+    return res.json({
+      drivers: drivers.map((d) => ({
+        id: d.id,
+        fullName: d.full_name,
+        phone: d.phone,
+        vehiclePlate: d.vehicle_plate,
+        vehicleCategory: d.vehicle_category,
+        isOnline: Boolean(d.is_online),
+        isBusy: Boolean(d.is_busy),
+        currentLat: d.current_lat,
+        currentLng: d.current_lng,
+        heading: d.heading,
+        rating: d.rating,
+      })),
+      activeRides: rides,
+    });
+  });
+
+  /**
+   * Call Center Manual Phone Booking Dispatch
+   */
+  router.post('/manual-dispatch', (req, res) => {
+    const {
+      callerPhone,
+      callerName,
+      pickup,
+      destination,
+      vehicleCategory = 'sedan',
+      assignedDriverId,
+      operatorNotes,
+    } = req.body;
+
+    if (!callerPhone || !pickup || !destination) {
+      return res.status(400).json({ error: 'Caller phone, pickup, and destination are required' });
+    }
+
+    // Find or create passenger profile for caller
+    let user = db.prepare('SELECT id FROM users WHERE phone = ?').get(callerPhone) as any;
+    let userId = user ? user.id : null;
+
+    if (!userId) {
+      userId = `user_callin_${Date.now()}`;
+      db.prepare(`
+        INSERT INTO users (id, phone, name, role, language, created_at)
+        VALUES (?, ?, ?, 'rider', 'am', ?)
+      `).run(userId, callerPhone, callerName || 'Phone Caller', new Date().toISOString());
+    }
+
+    const ride = DispatchService.createRide({
+      riderId: userId,
+      riderName: callerName || 'Phone Caller',
+      riderPhone: callerPhone,
+      pickup,
+      destination,
+      vehicleCategory,
+      paymentMethod: 'CASH', // Call-in default is cash on arrival
+      isManualDispatch: true,
+      operatorNotes: operatorNotes || 'Dispatched via Addis Ababa Call Center 9922',
+      driverId: assignedDriverId || undefined,
+    });
+
+    if (ride.driverId) {
+      io.to(`driver:${ride.driverId}`).emit('driver:incoming_ride', ride);
+    }
+    io.to('admin:dispatch').emit('admin:new_trip', ride);
+
+    return res.status(201).json({ success: true, ride });
+  });
+
+  /**
+   * KYC Verification Queue
+   */
+  router.get('/kyc-queue', (req, res) => {
+    const rows = db.prepare('SELECT * FROM drivers WHERE kyc_status = ?').all('pending') as any[];
+    return res.json({ pendingDrivers: rows });
+  });
+
+  /**
+   * KYC Decision (Approve / Reject)
+   */
+  router.post('/kyc/:driverId/decide', (req, res) => {
+    const { approved, notes } = req.body;
+    const status = approved ? 'approved' : 'rejected';
+
+    db.prepare(`
+      UPDATE drivers
+      SET kyc_status = ?, kyc_notes = ?
+      WHERE id = ?
+    `).run(status, notes || null, req.params.driverId);
+
+    return res.json({
+      success: true,
+      status,
+      message: `Driver KYC has been marked as ${status}`,
+    });
+  });
+
+  /**
+   * Ethiopian Value Added Tax Regulation No. 570/2025 Remittance Report
+   */
+  router.get('/vat-report', (req, res) => {
+    const completedTrips = db.prepare(`
+      SELECT * FROM rides WHERE status = 'COMPLETED' ORDER BY created_at DESC
+    `).all() as any[];
+
+    let totalGmv = 0;
+    let totalVat = 0;
+    let totalCommission = 0;
+    let totalDriverNet = 0;
+
+    const items = completedTrips.map((trip) => {
+      let fareObj: any = {};
+      try {
+        fareObj = JSON.parse(trip.fare_json);
+      } catch (e) {}
+
+      const gmv = fareObj.totalFare || 0;
+      const vat = fareObj.vatAmount || 0;
+      const commission = fareObj.platformCommission || 0;
+      const driverNet = fareObj.driverNetPayout || 0;
+
+      totalGmv += gmv;
+      totalVat += vat;
+      totalCommission += commission;
+      totalDriverNet += driverNet;
+
+      return {
+        rideId: trip.id,
+        createdAt: trip.created_at,
+        riderName: trip.rider_name,
+        paymentMethod: trip.payment_method,
+        grossFareEtb: gmv,
+        vat15PercentEtb: vat,
+        platformCommission15PercentEtb: commission,
+        driverNetPayoutEtb: driverNet,
+        telebirrTxNo: trip.telebirr_tx_no || 'N/A (Cash)',
+      };
+    });
+
+    const summary: VatReportSummary = {
+      period: 'Fiscal Year 2026/2027 (Quarter 1)',
+      totalTripsCompleted: completedTrips.length,
+      totalGrossGmvEtb: Number(totalGmv.toFixed(2)),
+      totalVatRemittableEtb: Number(totalVat.toFixed(2)),
+      totalPlatformCommissionEtb: Number(totalCommission.toFixed(2)),
+      totalDriverNetPayoutEtb: Number(totalDriverNet.toFixed(2)),
+      vatRegulationReference:
+        'FDRE Ministry of Revenues - Value Added Tax Regulation No. 570/2025 (15% on Platform Ride Fares)',
+    };
+
+    return res.json({ summary, items });
+  });
+
+  return router;
+}

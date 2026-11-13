@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production outputs
+dist/
+build/
+*.tsbuildinfo
+
+# SQLite databases & logs
+*.db
+*.db-wal
+*.db-shm
+chebelew.db
+logs/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
