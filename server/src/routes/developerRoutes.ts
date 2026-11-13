@@ -43,6 +43,33 @@ developerRouter.post('/keys', (req, res) => {
 });
 
 /**
+ * Toggle active status of an API key
+ */
+developerRouter.patch('/keys/:id/toggle', (req, res) => {
+  const { id } = req.params;
+  const existing = db.prepare('SELECT is_active FROM developer_api_keys WHERE id = ?').get(id) as { is_active: number } | undefined;
+  if (!existing) {
+    return res.status(404).json({ error: 'API key not found' });
+  }
+
+  const newStatus = existing.is_active === 1 ? 0 : 1;
+  db.prepare('UPDATE developer_api_keys SET is_active = ? WHERE id = ?').run(newStatus, id);
+  return res.json({ success: true, id, isActive: newStatus === 1 });
+});
+
+/**
+ * Revoke/delete an API key
+ */
+developerRouter.delete('/keys/:id', (req, res) => {
+  const { id } = req.params;
+  const result = db.prepare('DELETE FROM developer_api_keys WHERE id = ?').run(id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: 'API key not found' });
+  }
+  return res.json({ success: true, message: `Key ${id} revoked successfully` });
+});
+
+/**
  * OpenAPI v3 specification documentation endpoint
  */
 developerRouter.get('/openapi.json', (req, res) => {

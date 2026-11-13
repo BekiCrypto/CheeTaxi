@@ -58,6 +58,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
+      {/* Mobile Role Switcher Dropdown (< md) */}
+      <div className="flex md:hidden items-center">
+        <select
+          value={currentRole}
+          onChange={(e) => onRoleChange(e.target.value as any)}
+          className="bg-slate-100 text-slate-800 text-xs font-bold py-1.5 px-2.5 rounded-lg border border-slate-200 outline-hidden focus:ring-2 focus:ring-brand-500"
+        >
+          <option value="rider">📱 {t.rider}</option>
+          <option value="driver">🚕 {t.driver}</option>
+          <option value="admin">🛡️ {t.admin}</option>
+          <option value="split">⚡ {t.splitMode}</option>
+          <option value="website">🌐 Public Portal (22 Pages)</option>
+        </select>
+      </div>
+
       {/* Role / Mode Switcher Pills */}
       <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
         <button

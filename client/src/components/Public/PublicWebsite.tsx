@@ -399,16 +399,61 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* PAGE 12: DEVELOPERS */}
         {currentPage === 'developers' && (
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <h2 className="text-2xl font-black text-slate-900">Developer API & Webhooks</h2>
-            <div className="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-[11px] space-y-2">
-              <div className="text-brand-400 font-bold"># Chebelew OpenAPI v3 Dispatch Endpoint</div>
-              <div>POST /api/v1/dispatch/rides</div>
-              <div>Authorization: Bearer chebelew_dev_test_key_001</div>
-              <div className="text-slate-500">{"{ pickup: { lat: 8.995, lng: 38.788 }, category: 'sedan' }"}</div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">Developer API & Webhooks</h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Integrate ride booking, delivery dispatching, and fare estimation directly into your e-commerce platform, corporate ERP, or mobile app.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/api/developer/openapi.json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center gap-1.5 transition border border-slate-200"
+                >
+                  <Code className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>OpenAPI Spec</span>
+                </a>
+                <button
+                  onClick={() => onNavigateToApp('admin')}
+                  className="px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>API Keys Console</span>
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-slate-600">
-              Integrate ride booking, delivery dispatching, and fare estimation directly into your e-commerce platform, corporate ERP, or mobile app.
-            </p>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-[11px] space-y-2">
+                <div className="text-amber-400 font-bold flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>POST /api/rides/estimate</span>
+                </div>
+                <div className="text-slate-400">curl -X POST https://chebelew.trustlotto.app/api/rides/estimate \</div>
+                <div className="text-slate-400 pl-4">-H "Content-Type: application/json" \</div>
+                <div className="text-slate-400 pl-4">-d '{"{"}"pickup":{"{"}"lat":8.995,"lng":38.788{"}"},"destination":{"{"}"lat":9.010,"lng":38.761{"}"}{"}"}'</div>
+              </div>
+
+              <div className="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-[11px] space-y-2">
+                <div className="text-emerald-400 font-bold flex items-center gap-1">
+                  <Package className="w-3.5 h-3.5" />
+                  <span>POST /api/deliveries</span>
+                </div>
+                <div className="text-slate-400">curl -X POST https://chebelew.trustlotto.app/api/deliveries \</div>
+                <div className="text-slate-400 pl-4">-H "Content-Type: application/json" \</div>
+                <div className="text-slate-400 pl-4">-d '{"{"}"senderName":"Store","recipientPhone":"+251911...","packageType":"document"{"}"}'</div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-900 flex items-start gap-3">
+              <Code className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Official REST SDK & Webhook Notifications:</span> Chebelew provides real-time event webhooks for ride status (`ride.assigned`, `ride.started`, `ride.completed`), driver subscriptions, and parcel pickup/dropoff OTP confirmations.
+              </div>
+            </div>
           </div>
         )}
 

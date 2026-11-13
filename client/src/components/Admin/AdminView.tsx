@@ -30,6 +30,7 @@ import { AdminSubscriptionLedgerTab } from './AdminSubscriptionLedgerTab';
 import { AdminCorporateTab } from './AdminCorporateTab';
 import { AdminProviderTab } from './AdminProviderTab';
 import { AdminSosTab } from './AdminSosTab';
+import { AdminDeveloperTab } from './AdminDeveloperTab';
 
 interface AdminViewProps {
   language: Language;
@@ -46,6 +47,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
     | 'corporate'
     | 'providers'
     | 'sos'
+    | 'developer'
     | 'kyc'
     | 'vat'
     | 'tickets'
@@ -364,6 +366,15 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
           >
             <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
             <span>Safety SOS (991)</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('developer')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+              activeTab === 'developer' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>Developer API</span>
           </button>
           <button
             onClick={() => setActiveTab('kyc')}
@@ -915,6 +926,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
 
         {/* Tab 10: Safety & SOS Emergency Console */}
         {activeTab === 'sos' && <AdminSosTab />}
+
+        {/* Tab 11: Developer API Keys & Webhooks */}
+        {activeTab === 'developer' && <AdminDeveloperTab />}
       </div>
     </div>
   );

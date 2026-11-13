@@ -142,4 +142,34 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(res.body.tariffs.minivan).toBeDefined();
     expect(res.body.tariffs.sedan.baseFare).toBe(70);
   });
+
+  it('Developer API keys: CRUD and OpenAPI spec endpoint', async () => {
+    // 1. Fetch OpenAPI spec
+    const specRes = await request(app).get('/api/developer/openapi.json');
+    expect(specRes.status).toBe(200);
+    expect(specRes.body.openapi).toBe('3.0.3');
+
+    // 2. List keys
+    const listRes = await request(app).get('/api/developer/keys');
+    expect(listRes.status).toBe(200);
+    expect(Array.isArray(listRes.body.keys)).toBe(true);
+
+    // 3. Create a key
+    const createRes = await request(app)
+      .post('/api/developer/keys')
+      .send({ name: 'Integration Test Key', environment: 'test' });
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.key.apiKey).toBeDefined();
+    const createdId = createRes.body.key.id;
+
+    // 4. Toggle key active status
+    const toggleRes = await request(app).patch(`/api/developer/keys/${createdId}/toggle`);
+    expect(toggleRes.status).toBe(200);
+    expect(toggleRes.body.isActive).toBe(false);
+
+    // 5. Revoke/delete key
+    const deleteRes = await request(app).delete(`/api/developer/keys/${createdId}`);
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body.success).toBe(true);
+  });
 });
