@@ -3,23 +3,14 @@ import { Navbar } from './components/Navbar';
 import { Language } from './i18n/translations';
 import { useSocket } from './hooks/useSocket';
 import { sounds } from './utils/audio';
+import { useRoute, AppModuleId } from './modules/routing/router';
 
-// Lazy-loaded functional modules for optimal code-splitting and performance
-const RiderView = lazy(() =>
-  import('./components/Rider/RiderView').then((m) => ({ default: m.RiderView }))
-);
-const DriverView = lazy(() =>
-  import('./components/Driver/DriverView').then((m) => ({ default: m.DriverView }))
-);
-const AdminView = lazy(() =>
-  import('./components/Admin/AdminView').then((m) => ({ default: m.AdminView }))
-);
-const SplitView = lazy(() =>
-  import('./components/Split/SplitView').then((m) => ({ default: m.SplitView }))
-);
-const PublicWebsite = lazy(() =>
-  import('./components/Public/PublicWebsite').then((m) => ({ default: m.PublicWebsite }))
-);
+// Modular decoupled imports with code-splitting
+const RiderModule = lazy(() => import('./modules/rider'));
+const DriverModule = lazy(() => import('./modules/driver'));
+const AdminModule = lazy(() => import('./modules/admin'));
+const SimulatorModule = lazy(() => import('./modules/simulator'));
+const PublicPortalModule = lazy(() => import('./modules/portal'));
 
 function ModuleLoadingFallback({ label }: { label: string }) {
   return (
@@ -41,7 +32,7 @@ function ModuleLoadingFallback({ label }: { label: string }) {
 }
 
 export function App() {
-  const [role, setRole] = useState<'rider' | 'driver' | 'admin' | 'split' | 'website'>('rider');
+  const { currentModule, subPath, setModule } = useRoute();
   const [language, setLanguage] = useState<Language>('en');
 
   // Active Demo Users
@@ -57,7 +48,7 @@ export function App() {
 
   // Autonomous 1-Click Fast Demo Walkthrough
   const handleRunFastDemo = async () => {
-    setRole('split');
+    setModule('split');
     sounds.playBeep(440, 'triangle', 0.2);
 
     try {
@@ -170,26 +161,26 @@ export function App() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 font-sans antialiased text-slate-900">
       <Navbar
-        currentRole={role}
-        onRoleChange={setRole}
+        currentRole={currentModule}
+        onRoleChange={(m) => setModule(m)}
         language={language}
         onLanguageChange={setLanguage}
         onRunFastDemo={handleRunFastDemo}
         activeUserName={
-          role === 'driver'
+          currentModule === 'driver'
             ? 'Ahmed Mohammed (Driver)'
-            : role === 'admin'
+            : currentModule === 'admin'
             ? 'Almaz Tefera (Dispatcher)'
-            : role === 'website'
+            : currentModule === 'website'
             ? 'Public Visitor'
             : 'Leila Haile (Rider)'
         }
       />
 
       <main className="flex-1 overflow-hidden relative">
-        <Suspense fallback={<ModuleLoadingFallback label={role.toUpperCase()} />}>
-          {role === 'rider' && (
-            <RiderView
+        <Suspense fallback={<ModuleLoadingFallback label={currentModule.toUpperCase()} />}>
+          {currentModule === 'rider' && (
+            <RiderModule
               currentRiderId={currentRider.id}
               currentRiderName={currentRider.name}
               currentRiderPhone={currentRider.phone}
@@ -198,18 +189,24 @@ export function App() {
             />
           )}
 
-          {role === 'driver' && (
-            <DriverView
+          {currentModule === 'driver' && (
+            <DriverModule
               currentDriverId={currentDriverId}
               language={language}
               socket={socket}
             />
           )}
 
-          {role === 'admin' && <AdminView language={language} socket={socket} />}
+          {currentModule === 'admin' && (
+            <AdminModule
+              language={language}
+              socket={socket}
+              initialTab={subPath}
+            />
+          )}
 
-          {role === 'split' && (
-            <SplitView
+          {currentModule === 'split' && (
+            <SimulatorModule
               language={language}
               socket={socket}
               currentRiderId={currentRider.id}
@@ -219,10 +216,11 @@ export function App() {
             />
           )}
 
-          {role === 'website' && (
-            <PublicWebsite
+          {currentModule === 'website' && (
+            <PublicPortalModule
               language={language}
-              onNavigateToApp={(r) => setRole(r)}
+              onNavigateToApp={(r) => setModule(r)}
+              initialPageId={subPath}
             />
           )}
         </Suspense>
