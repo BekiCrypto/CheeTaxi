@@ -182,7 +182,7 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
 
     const rideConfig = configRes.body.providers.find((p: any) => p.id === 'ride');
     expect(rideConfig).toBeDefined();
-    expect(rideConfig.name).toContain('RIDE');
+    expect(rideConfig.name).toContain('Meter');
 
     // 2. Patch Provider Config (markup, timeout, mode)
     const patchRes = await request(app)

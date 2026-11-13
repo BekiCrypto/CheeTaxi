@@ -512,24 +512,24 @@ export const RiderView: React.FC<RiderViewProps> = ({
                   <div className="text-[10px] text-emerald-600 font-bold mt-1">Direct Match</div>
                 </div>
 
-                {/* RIDE */}
+                {/* Partner Metered Taxi */}
                 <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-slate-600">
-                  <div className="font-bold text-slate-800 text-[11px]">RIDE Taxi</div>
+                  <div className="font-bold text-slate-800 text-[11px]">Metered Cab</div>
                   <div className="text-sm font-bold text-slate-700 mt-0.5">
                     {estimates.find((e) => e.category === 'partner_ride')?.fare.totalFare.toFixed(0) || '245'}{' '}
                     <span className="text-[9px]">ETB</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-1">~30k standby</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Partner Network</div>
                 </div>
 
-                {/* Feres */}
+                {/* Municipal Taxi Cooperative */}
                 <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-slate-600">
-                  <div className="font-bold text-slate-800 text-[11px]">Feres</div>
+                  <div className="font-bold text-slate-800 text-[11px]">Taxi Co-op</div>
                   <div className="text-sm font-bold text-slate-700 mt-0.5">
                     {estimates.find((e) => e.category === 'partner_feres')?.fare.totalFare.toFixed(0) || '230'}{' '}
                     <span className="text-[9px]">ETB</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-1">+ Miles Cashback</div>
+                  <div className="text-[10px] text-slate-400 mt-1">Municipal Association</div>
                 </div>
               </div>
             </div>

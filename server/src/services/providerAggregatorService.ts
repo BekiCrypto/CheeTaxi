@@ -415,19 +415,19 @@ export class ProviderAggregatorService {
 
       if (id === 'ride') {
         etaMins = 3;
-        vehicleText = '30,000+ Cabs Standby • Meter Tariff';
+        vehicleText = 'Licensed Meter Network • Standard Tariff';
         score = 94;
       } else if (id === 'feres') {
         etaMins = 6;
-        vehicleText = 'Feres Miles Cashback Eligible';
+        vehicleText = 'Municipal Association Meter Tariff';
         score = 89;
       } else if (id === 'zayride') {
         etaMins = 8;
-        vehicleText = 'Fixed Meter Fleet';
+        vehicleText = 'Regional Cab Fleet';
         score = 87;
       } else if (id === 'yango') {
         etaMins = 5;
-        vehicleText = 'Dynamic Surge Fleet';
+        vehicleText = 'On-Demand Urban Cab Fleet';
         score = 85;
       }
 

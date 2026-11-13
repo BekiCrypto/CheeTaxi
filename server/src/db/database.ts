@@ -853,7 +853,7 @@ function seedInitialData() {
     {
       id: 'plan_daily_et',
       name: 'Chebelew 24-Hour Pass',
-      name_am: 'ከበለው የ24-ሰዓት ፓስ',
+      name_am: 'ቼበለው የ24-ሰዓት ፓስ',
       billing_period: 'daily',
       duration_days: 1,
       price_amount: 50.0,
@@ -862,7 +862,7 @@ function seedInitialData() {
     {
       id: 'plan_weekly_et',
       name: 'Chebelew 7-Day Flex',
-      name_am: 'ከበለው የ7-ቀን ፍሌክስ',
+      name_am: 'ቼበለው የ7-ቀን ፍሌክስ',
       billing_period: 'weekly',
       duration_days: 7,
       price_amount: 300.0,
@@ -871,7 +871,7 @@ function seedInitialData() {
     {
       id: 'plan_monthly_et',
       name: 'Chebelew Monthly Pro',
-      name_am: 'ከበለው የወር ፕሮ ፓስ',
+      name_am: 'ቼበለው የወር ፕሮ ፓስ',
       billing_period: 'monthly',
       duration_days: 30,
       price_amount: 1000.0,
@@ -880,7 +880,7 @@ function seedInitialData() {
     {
       id: 'plan_quarterly_et',
       name: 'Chebelew Quarterly Star',
-      name_am: 'ከበለው የ3-ወር ስታር ፓስ',
+      name_am: 'ቼበለው የ3-ወር ስታር ፓስ',
       billing_period: 'quarterly',
       duration_days: 90,
       price_amount: 2700.0,
@@ -889,7 +889,7 @@ function seedInitialData() {
     {
       id: 'plan_yearly_et',
       name: 'Chebelew Annual Champion',
-      name_am: 'ከበለው የዓመት ቻምፒዮን',
+      name_am: 'ቼበለው የዓመት ቻምፒዮን',
       billing_period: 'yearly',
       duration_days: 365,
       price_amount: 9600.0,
@@ -1084,6 +1084,18 @@ function seedInitialData() {
 }
 
 function seedProviderConfigs() {
+  // Update any existing competitor brand names to authorized generic concepts
+  try {
+    db.exec(`
+      UPDATE provider_configs SET name = 'Licensed Meter Taxi Network' WHERE id = 'ride' AND name LIKE '%Hybrid Designs%';
+      UPDATE provider_configs SET name = 'Municipal Taxi Cooperative' WHERE id = 'feres' AND name LIKE '%Feres%';
+      UPDATE provider_configs SET name = 'Regional Cab Association' WHERE id = 'zayride' AND name LIKE '%ZayRide%';
+      UPDATE provider_configs SET name = 'On-Demand Urban Cab Fleet' WHERE id = 'yango' AND name LIKE '%Yango%';
+    `);
+  } catch (err) {
+    // Ignore if table not yet created
+  }
+
   const count = db.prepare('SELECT count(*) as count FROM provider_configs').get() as { count: number };
   if (count.count > 0) {
     return;
@@ -1127,10 +1139,10 @@ function seedProviderConfigs() {
     },
     {
       id: 'ride',
-      name: 'RIDE (Hybrid Designs PLC)',
-      api_url: 'https://api.partner.ride-ethiopia.com/v1',
-      api_key: 'rd_prod_partner_live_8923bc7a',
-      webhook_secret: 'whsec_ride_plc_99182',
+      name: 'Licensed Meter Taxi Network',
+      api_url: 'https://api.partner.meter-taxi.et/v1',
+      api_key: 'mt_prod_partner_live_8923bc7a',
+      webhook_secret: 'whsec_meter_taxi_99182',
       dispatch_mode: 'webhook_push',
       is_enabled: 1,
       is_authorized: 1,
@@ -1147,10 +1159,10 @@ function seedProviderConfigs() {
     },
     {
       id: 'feres',
-      name: 'Feres Technologies',
-      api_url: 'https://api.partner.feres.et/v1',
-      api_key: 'frs_live_fleet_77210bc',
-      webhook_secret: 'whsec_feres_miles_883',
+      name: 'Municipal Taxi Cooperative',
+      api_url: 'https://api.partner.taxicoop.et/v1',
+      api_key: 'coop_live_fleet_77210bc',
+      webhook_secret: 'whsec_taxicoop_883',
       dispatch_mode: 'polling',
       is_enabled: 1,
       is_authorized: 1,
@@ -1167,10 +1179,10 @@ function seedProviderConfigs() {
     },
     {
       id: 'zayride',
-      name: 'ZayRide Platform',
-      api_url: 'https://api.zayride.et/v2',
-      api_key: 'zay_test_key_8841a',
-      webhook_secret: 'whsec_zay_meter_441',
+      name: 'Regional Cab Association',
+      api_url: 'https://api.partner.regionalcab.et/v2',
+      api_key: 'rc_test_key_8841a',
+      webhook_secret: 'whsec_regionalcab_441',
       dispatch_mode: 'polling',
       is_enabled: 1,
       is_authorized: 1,
@@ -1187,10 +1199,10 @@ function seedProviderConfigs() {
     },
     {
       id: 'yango',
-      name: 'Yango Taxi Ethiopia',
-      api_url: 'https://api.yango.com/v1/partners/et',
-      api_key: 'yango_sandbox_tok_5518',
-      webhook_secret: 'whsec_yango_et_229',
+      name: 'On-Demand Urban Cab Fleet',
+      api_url: 'https://api.partner.urbancab.et/v1',
+      api_key: 'uc_sandbox_tok_5518',
+      webhook_secret: 'whsec_urbancab_229',
       dispatch_mode: 'webhook_push',
       is_enabled: 1,
       is_authorized: 0,
@@ -1248,7 +1260,7 @@ function seedProviderConfigs() {
         destination_address: 'Meskel Square',
         vehicle_category: 'sedan',
         provider_id: 'ride',
-        provider_name: 'RIDE (Hybrid Designs PLC)',
+        provider_name: 'Licensed Meter Taxi Network',
         estimated_fare: 373.14,
         latency_ms: 132,
         http_status: 200,
@@ -1263,13 +1275,13 @@ function seedProviderConfigs() {
         destination_address: 'Sheraton Addis Hotel',
         vehicle_category: 'comfort',
         provider_id: 'feres',
-        provider_name: 'Feres Technologies',
+        provider_name: 'Municipal Taxi Cooperative',
         estimated_fare: 485.0,
         latency_ms: 154,
         http_status: 200,
         circuit_state: 'CLOSED',
         action_status: 'OFFER_RETURNED',
-        details: 'Partner quote polled • Feres Miles cashback eligible',
+        details: 'Partner quote polled • Standard municipal association tariff',
       },
       {
         id: 'log_prov_04',

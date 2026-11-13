@@ -43,7 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Chebelew
               </span>
               <span className="font-bold text-xs text-brand-600 font-sans">
-                ከበለው
+                ቼበለው
               </span>
               <div className="flex h-3 w-4 rounded-sm overflow-hidden shadow-xs ml-1 border border-black/10">
                 <div className="w-1/3 bg-[#078930]" />
@@ -69,7 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <option value="driver">🚕 {t.driver}</option>
           <option value="admin">🛡️ {t.admin}</option>
           <option value="split">⚡ {t.splitMode}</option>
-          <option value="website">🌐 Public Portal (22 Pages)</option>
+          <option value="website">🌐 Public Portal</option>
         </select>
       </div>
 
@@ -132,7 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           }`}
         >
           <Globe className="w-3.5 h-3.5" />
-          <span>Public Portal (22 Pages)</span>
+          <span>Public Portal</span>
         </button>
       </div>
 

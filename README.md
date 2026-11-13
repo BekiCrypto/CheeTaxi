@@ -1,11 +1,11 @@
-# Chebelew (ከበለው) - Ethiopia Ride-Hailing Aggregator & Dispatch Platform
+# Chebelew (ቼበለው) - Ethiopia Ride-Hailing Aggregator & Dispatch Platform
 
 <p align="center">
   <img src="client/public/chebelew-logo.svg" alt="Chebelew Logo" width="120" height="120" />
 </p>
 
 <p align="center">
-  <strong>"Get there faster with Chebelew" • "በከበለው በፍጥነት ይድረሱ"</strong><br />
+  <strong>"Get there faster with Chebelew" • "በቼበለው በፍጥነት ይድረሱ"</strong><br />
   <em>The one-stop ride-hailing aggregator and hybrid dispatch marketplace built specifically for Addis Ababa and Ethiopia.</em>
 </p>
 

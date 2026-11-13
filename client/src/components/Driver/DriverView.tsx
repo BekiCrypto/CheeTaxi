@@ -27,6 +27,7 @@ import { translations, Language } from '../../i18n/translations';
 import { sounds } from '../../utils/audio';
 import { DriverSubscriptionTab } from './DriverSubscriptionTab';
 import { DriverDeliveryTab } from './DriverDeliveryTab';
+import { DriverKYCVerification } from './DriverKYCVerification';
 
 interface DriverViewProps {
   currentDriverId: string;
@@ -669,44 +670,12 @@ export const DriverView: React.FC<DriverViewProps> = ({
 
         {/* Tab 3: Driver KYC & Compliance */}
         {activeTab === 'kyc' && (
-          <div className="p-5 space-y-4 flex-1 text-xs text-slate-600">
-            <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 flex items-center gap-3">
-              <Shield className="w-6 h-6 text-emerald-600 flex-shrink-0" />
-              <div>
-                <div className="font-bold text-emerald-900">
-                  KYC Status: {driver.kycStatus.toUpperCase()}
-                </div>
-                <div className="text-[11px] text-emerald-700">
-                  Verified by Addis Ababa Transport Bureau & INSA
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
-              <h4 className="font-bold text-slate-800 text-xs">Vehicle & License Details</h4>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div>
-                  <span className="text-slate-400 block">Make & Model</span>
-                  <span className="font-semibold text-slate-700">
-                    {driver.vehicleMake} {driver.vehicleModel} ({driver.vehicleYear})
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Plate Code</span>
-                  <span className="font-mono font-bold text-slate-800">{driver.vehiclePlate}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Driver License #</span>
-                  <span className="font-mono font-semibold text-slate-700">{driver.licenseNumber}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Category</span>
-                  <span className="font-semibold text-slate-700 uppercase">
-                    {driver.vehicleCategory}
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="flex-1 overflow-y-auto">
+            <DriverKYCVerification
+              driver={driver}
+              language={language}
+              onKycUpdated={fetchDriverProfile}
+            />
           </div>
         )}
 

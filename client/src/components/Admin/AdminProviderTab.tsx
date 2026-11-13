@@ -387,7 +387,7 @@ export const AdminProviderTab: React.FC = () => {
             </div>
             <h2 className="text-2xl font-black tracking-tight">External Fleet Orchestration Console</h2>
             <p className="text-white/70 text-xs max-w-2xl leading-relaxed">
-              Chebelew aggregates Ethiopian ride-hailing operators (RIDE by Hybrid Designs, Feres, ZayRide, Yango) through low-latency circuit breakers. In the event of partner latency spikes or API outages, traffic automatically fails over to Chebelew’s 0% commission direct driver fleet.
+              Chebelew aggregates authorized municipal taxi fleets, licensed meter taxi networks, and regional cooperatives through low-latency circuit breakers. In the event of partner latency spikes or API outages, traffic automatically fails over to Chebelew’s 0% commission direct driver fleet.
             </p>
           </div>
 
