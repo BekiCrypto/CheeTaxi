@@ -172,4 +172,65 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(deleteRes.status).toBe(200);
     expect(deleteRes.body.success).toBe(true);
   });
+
+  it('Aggregator Provider Orchestration: Config, Circuit Breaker, Health Ping & Dispatch', async () => {
+    // 1. Get Provider Statuses & Configs
+    const configRes = await request(app).get('/api/providers/config');
+    expect(configRes.status).toBe(200);
+    expect(Array.isArray(configRes.body.providers)).toBe(true);
+    expect(configRes.body.providers.length).toBeGreaterThanOrEqual(4);
+
+    const rideConfig = configRes.body.providers.find((p: any) => p.id === 'ride');
+    expect(rideConfig).toBeDefined();
+    expect(rideConfig.name).toContain('RIDE');
+
+    // 2. Patch Provider Config (markup, timeout, mode)
+    const patchRes = await request(app)
+      .patch('/api/providers/config/ride')
+      .send({
+        markupPercent: 9.5,
+        timeoutMs: 3800,
+        dispatchMode: 'webhook_push',
+      });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.provider.markupPercent).toBe(9.5);
+    expect(patchRes.body.provider.timeoutMs).toBe(3800);
+
+    // 3. Test Handshake Ping
+    const pingRes = await request(app).post('/api/providers/test-ping/ride');
+    expect(pingRes.status).toBe(200);
+    expect(pingRes.body.success).toBe(true);
+    expect(pingRes.body.latencyMs).toBeGreaterThan(0);
+    expect(pingRes.body.httpStatus).toBe(200);
+
+    // 4. Test Mock Dispatch Simulation
+    const dispatchRes = await request(app)
+      .post('/api/providers/mock-dispatch/ride')
+      .send({
+        pickupAddress: 'Bole Medhanialem',
+        destinationAddress: 'Meskel Square',
+        vehicleCategory: 'sedan',
+        passengerName: 'Abebe Bikila',
+        fareEtb: 380.0,
+      });
+    expect(dispatchRes.status).toBe(200);
+    expect(dispatchRes.body.success).toBe(true);
+    expect(dispatchRes.body.partnerOrderId).toContain('RIDE-BK-');
+    expect(dispatchRes.body.assignedDriver).toBeDefined();
+
+    // 5. Test Circuit Breaker Set State and Reset
+    const tripRes = await request(app)
+      .post('/api/providers/circuit/set-state')
+      .send({ providerId: 'feres', state: 'HALF_OPEN' });
+    expect(tripRes.status).toBe(200);
+
+    const resetAllRes = await request(app).post('/api/providers/reset-breaker');
+    expect(resetAllRes.status).toBe(200);
+
+    // 6. Test Routing Logs
+    const logsRes = await request(app).get('/api/providers/logs?limit=10');
+    expect(logsRes.status).toBe(200);
+    expect(Array.isArray(logsRes.body.logs)).toBe(true);
+    expect(logsRes.body.logs.length).toBeGreaterThan(0);
+  });
 });

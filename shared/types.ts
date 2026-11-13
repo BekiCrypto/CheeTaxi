@@ -334,11 +334,37 @@ export interface ProviderAdapterConfig {
   id: AggregatorProviderId;
   name: string;
   apiUrl: string;
+  apiKey?: string;
+  webhookSecret?: string;
+  dispatchMode?: 'polling' | 'webhook_push' | 'bidirectional';
+  isEnabled?: boolean;
   circuitState: CircuitBreakerState;
   failureCount: number;
   lastFailureTime?: string;
+  latencyMs?: number;
+  markupPercent?: number;
+  tariffMultiplier?: number;
+  timeoutMs?: number;
+  errorThreshold?: number;
   isAuthorized: boolean;
   integrationReadinessStatus: 'live_api' | 'sandbox_adapter' | 'onboarding_readiness';
+  updatedAt?: string;
+}
+
+export interface ProviderRoutingLog {
+  id: string;
+  timestamp: string;
+  pickupAddress: string;
+  destinationAddress: string;
+  vehicleCategory: VehicleCategory;
+  providerId: AggregatorProviderId;
+  providerName: string;
+  estimatedFare: number;
+  latencyMs: number;
+  httpStatus: number;
+  circuitState: CircuitBreakerState;
+  actionStatus: 'OFFER_RETURNED' | 'CIRCUIT_TRIPPED' | 'TIMEOUT' | 'DISPATCHED' | 'HANDSHAKE_OK';
+  details?: string;
 }
 
 export interface AggregatedTransportOffer {

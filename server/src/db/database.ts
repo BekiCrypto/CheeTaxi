@@ -303,6 +303,43 @@ export function initDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS provider_configs (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      api_url TEXT NOT NULL,
+      api_key TEXT,
+      webhook_secret TEXT,
+      dispatch_mode TEXT NOT NULL DEFAULT 'polling',
+      is_enabled INTEGER NOT NULL DEFAULT 1,
+      is_authorized INTEGER NOT NULL DEFAULT 1,
+      circuit_state TEXT NOT NULL DEFAULT 'CLOSED',
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      latency_ms INTEGER NOT NULL DEFAULT 120,
+      markup_percent REAL NOT NULL DEFAULT 0.0,
+      tariff_multiplier REAL NOT NULL DEFAULT 1.0,
+      timeout_ms INTEGER NOT NULL DEFAULT 3000,
+      error_threshold INTEGER NOT NULL DEFAULT 3,
+      integration_readiness_status TEXT NOT NULL DEFAULT 'sandbox_adapter',
+      last_failure_time TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS provider_routing_logs (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL,
+      pickup_address TEXT NOT NULL,
+      destination_address TEXT NOT NULL,
+      vehicle_category TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      provider_name TEXT NOT NULL,
+      estimated_fare REAL NOT NULL,
+      latency_ms INTEGER NOT NULL,
+      http_status INTEGER NOT NULL,
+      circuit_state TEXT NOT NULL,
+      action_status TEXT NOT NULL,
+      details TEXT
+    );
   `);
 
   // Run safe schema migrations for existing database columns
@@ -331,6 +368,7 @@ export function initDatabase() {
   migrateColumn('users', 'fleet_id', 'TEXT');
 
   seedInitialData();
+  seedProviderConfigs();
 }
 
 function seedInitialData() {
@@ -1043,4 +1081,215 @@ function seedInitialData() {
   );
 
   console.log('Database initialized and seeded successfully.');
+}
+
+function seedProviderConfigs() {
+  const count = db.prepare('SELECT count(*) as count FROM provider_configs').get() as { count: number };
+  if (count.count > 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const insert = db.prepare(`
+    INSERT INTO provider_configs (
+      id, name, api_url, api_key, webhook_secret, dispatch_mode,
+      is_enabled, is_authorized, circuit_state, failure_count, latency_ms,
+      markup_percent, tariff_multiplier, timeout_ms, error_threshold,
+      integration_readiness_status, last_failure_time, updated_at
+    ) VALUES (
+      @id, @name, @api_url, @api_key, @webhook_secret, @dispatch_mode,
+      @is_enabled, @is_authorized, @circuit_state, @failure_count, @latency_ms,
+      @markup_percent, @tariff_multiplier, @timeout_ms, @error_threshold,
+      @integration_readiness_status, @last_failure_time, @updated_at
+    )
+  `);
+
+  const initialProviders = [
+    {
+      id: 'chebelew',
+      name: 'Chebelew Independent Fleet',
+      api_url: 'internal://chebelew-core-dispatch',
+      api_key: 'chb_live_sec_9942a8b34',
+      webhook_secret: 'whsec_chebelew_core_782',
+      dispatch_mode: 'bidirectional',
+      is_enabled: 1,
+      is_authorized: 1,
+      circuit_state: 'CLOSED',
+      failure_count: 0,
+      latency_ms: 38,
+      markup_percent: 0.0,
+      tariff_multiplier: 1.0,
+      timeout_ms: 2000,
+      error_threshold: 5,
+      integration_readiness_status: 'live_api',
+      last_failure_time: null,
+      updated_at: now,
+    },
+    {
+      id: 'ride',
+      name: 'RIDE (Hybrid Designs PLC)',
+      api_url: 'https://api.partner.ride-ethiopia.com/v1',
+      api_key: 'rd_prod_partner_live_8923bc7a',
+      webhook_secret: 'whsec_ride_plc_99182',
+      dispatch_mode: 'webhook_push',
+      is_enabled: 1,
+      is_authorized: 1,
+      circuit_state: 'CLOSED',
+      failure_count: 0,
+      latency_ms: 135,
+      markup_percent: 8.0,
+      tariff_multiplier: 1.08,
+      timeout_ms: 3500,
+      error_threshold: 3,
+      integration_readiness_status: 'live_api',
+      last_failure_time: null,
+      updated_at: now,
+    },
+    {
+      id: 'feres',
+      name: 'Feres Technologies',
+      api_url: 'https://api.partner.feres.et/v1',
+      api_key: 'frs_live_fleet_77210bc',
+      webhook_secret: 'whsec_feres_miles_883',
+      dispatch_mode: 'polling',
+      is_enabled: 1,
+      is_authorized: 1,
+      circuit_state: 'CLOSED',
+      failure_count: 0,
+      latency_ms: 155,
+      markup_percent: -2.0,
+      tariff_multiplier: 0.98,
+      timeout_ms: 3000,
+      error_threshold: 3,
+      integration_readiness_status: 'sandbox_adapter',
+      last_failure_time: null,
+      updated_at: now,
+    },
+    {
+      id: 'zayride',
+      name: 'ZayRide Platform',
+      api_url: 'https://api.zayride.et/v2',
+      api_key: 'zay_test_key_8841a',
+      webhook_secret: 'whsec_zay_meter_441',
+      dispatch_mode: 'polling',
+      is_enabled: 1,
+      is_authorized: 1,
+      circuit_state: 'CLOSED',
+      failure_count: 0,
+      latency_ms: 182,
+      markup_percent: 2.0,
+      tariff_multiplier: 1.02,
+      timeout_ms: 4000,
+      error_threshold: 3,
+      integration_readiness_status: 'sandbox_adapter',
+      last_failure_time: null,
+      updated_at: now,
+    },
+    {
+      id: 'yango',
+      name: 'Yango Taxi Ethiopia',
+      api_url: 'https://api.yango.com/v1/partners/et',
+      api_key: 'yango_sandbox_tok_5518',
+      webhook_secret: 'whsec_yango_et_229',
+      dispatch_mode: 'webhook_push',
+      is_enabled: 1,
+      is_authorized: 0,
+      circuit_state: 'CLOSED',
+      failure_count: 0,
+      latency_ms: 215,
+      markup_percent: 5.0,
+      tariff_multiplier: 1.05,
+      timeout_ms: 3000,
+      error_threshold: 3,
+      integration_readiness_status: 'onboarding_readiness',
+      last_failure_time: null,
+      updated_at: now,
+    },
+  ];
+
+  for (const p of initialProviders) {
+    insert.run(p);
+  }
+
+  const logCount = db.prepare('SELECT count(*) as count FROM provider_routing_logs').get() as { count: number };
+  if (logCount.count === 0) {
+    const insertLog = db.prepare(`
+      INSERT INTO provider_routing_logs (
+        id, timestamp, pickup_address, destination_address, vehicle_category,
+        provider_id, provider_name, estimated_fare, latency_ms, http_status,
+        circuit_state, action_status, details
+      ) VALUES (
+        @id, @timestamp, @pickup_address, @destination_address, @vehicle_category,
+        @provider_id, @provider_name, @estimated_fare, @latency_ms, @http_status,
+        @circuit_state, @action_status, @details
+      )
+    `);
+
+    const pastLogs = [
+      {
+        id: 'log_prov_01',
+        timestamp: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
+        pickup_address: 'Bole Medhanialem',
+        destination_address: 'Meskel Square',
+        vehicle_category: 'sedan',
+        provider_id: 'chebelew',
+        provider_name: 'Chebelew Independent Fleet',
+        estimated_fare: 345.5,
+        latency_ms: 38,
+        http_status: 200,
+        circuit_state: 'CLOSED',
+        action_status: 'OFFER_RETURNED',
+        details: 'Direct dispatch match • Driver Ahmed Mohammed located 450m away',
+      },
+      {
+        id: 'log_prov_02',
+        timestamp: new Date(Date.now() - 1000 * 60 * 11).toISOString(),
+        pickup_address: 'Bole Medhanialem',
+        destination_address: 'Meskel Square',
+        vehicle_category: 'sedan',
+        provider_id: 'ride',
+        provider_name: 'RIDE (Hybrid Designs PLC)',
+        estimated_fare: 373.14,
+        latency_ms: 132,
+        http_status: 200,
+        circuit_state: 'CLOSED',
+        action_status: 'OFFER_RETURNED',
+        details: 'Quote received from Partner API • 8% tariff markup applied',
+      },
+      {
+        id: 'log_prov_03',
+        timestamp: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
+        pickup_address: 'Addis Ababa Bole Int Airport (ADD)',
+        destination_address: 'Sheraton Addis Hotel',
+        vehicle_category: 'comfort',
+        provider_id: 'feres',
+        provider_name: 'Feres Technologies',
+        estimated_fare: 485.0,
+        latency_ms: 154,
+        http_status: 200,
+        circuit_state: 'CLOSED',
+        action_status: 'OFFER_RETURNED',
+        details: 'Partner quote polled • Feres Miles cashback eligible',
+      },
+      {
+        id: 'log_prov_04',
+        timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+        pickup_address: 'Mexico Square',
+        destination_address: 'Piazza (Arada)',
+        vehicle_category: 'sedan',
+        provider_id: 'chebelew',
+        provider_name: 'Chebelew Independent Fleet',
+        estimated_fare: 260.0,
+        latency_ms: 41,
+        http_status: 200,
+        circuit_state: 'CLOSED',
+        action_status: 'DISPATCHED',
+        details: 'Passenger accepted 0% commission offer • Assigned to Dawit Bekele',
+      },
+    ];
+
+    for (const l of pastLogs) {
+      insertLog.run(l);
+    }
+  }
 }

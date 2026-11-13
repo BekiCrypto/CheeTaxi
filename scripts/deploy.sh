@@ -17,7 +17,7 @@ echo "🚕 CHEBELEW ENTERPRISE MOBILITY PLATFORM DEPLOYMENT"
 echo "======================================================="
 
 # Step 1: Pre-deployment Local Automated Test Suite
-echo "--> [1/4] Running local automated test suite (42 tests)..."
+echo "--> [1/4] Running local automated test suite (43 tests)..."
 npm test --prefix server
 
 # Step 2: Build Verification

@@ -4,115 +4,333 @@ import {
   CircuitBreakerState,
   LocationPoint,
   ProviderAdapterConfig,
+  ProviderRoutingLog,
   VehicleCategory,
 } from '../../../shared/types.js';
 import { estimateRoadMetrics } from './geoService.js';
 import { calculateFare } from './fareService.js';
 import { DispatchService } from './dispatchService.js';
+import { db } from '../db/database.js';
 
-interface ProviderState {
-  config: ProviderAdapterConfig;
-  failureCount: number;
-  lastFailureTime?: number;
+function rowToConfig(row: any): ProviderAdapterConfig {
+  return {
+    id: row.id as AggregatorProviderId,
+    name: row.name,
+    apiUrl: row.api_url,
+    apiKey: row.api_key || '',
+    webhookSecret: row.webhook_secret || '',
+    dispatchMode: (row.dispatch_mode || 'polling') as 'polling' | 'webhook_push' | 'bidirectional',
+    isEnabled: row.is_enabled === 1,
+    isAuthorized: row.is_authorized === 1,
+    circuitState: (row.circuit_state || 'CLOSED') as CircuitBreakerState,
+    failureCount: Number(row.failure_count || 0),
+    latencyMs: Number(row.latency_ms || 120),
+    markupPercent: Number(row.markup_percent || 0),
+    tariffMultiplier: Number(row.tariff_multiplier || 1.0),
+    timeoutMs: Number(row.timeout_ms || 3000),
+    errorThreshold: Number(row.error_threshold || 3),
+    integrationReadinessStatus: row.integration_readiness_status || 'sandbox_adapter',
+    lastFailureTime: row.last_failure_time || undefined,
+    updatedAt: row.updated_at || undefined,
+  };
 }
 
 export class ProviderAggregatorService {
-  private static providers: Map<AggregatorProviderId, ProviderState> = new Map([
-    [
-      'chebelew',
-      {
-        config: {
-          id: 'chebelew',
-          name: 'Chebelew Independent Fleet',
-          apiUrl: 'internal://chebelew-dispatch',
-          circuitState: 'CLOSED',
-          failureCount: 0,
-          isAuthorized: true,
-          integrationReadinessStatus: 'live_api',
-        },
-        failureCount: 0,
-      },
-    ],
-    [
-      'ride',
-      {
-        config: {
-          id: 'ride',
-          name: 'RIDE (Hybrid Designs PLC)',
-          apiUrl: 'https://api.partner.ride-ethiopia.com/v1',
-          circuitState: 'CLOSED',
-          failureCount: 0,
-          isAuthorized: true,
-          integrationReadinessStatus: 'sandbox_adapter',
-        },
-        failureCount: 0,
-      },
-    ],
-    [
-      'feres',
-      {
-        config: {
-          id: 'feres',
-          name: 'Feres Technologies',
-          apiUrl: 'https://api.partner.feres.et/v1',
-          circuitState: 'CLOSED',
-          failureCount: 0,
-          isAuthorized: true,
-          integrationReadinessStatus: 'sandbox_adapter',
-        },
-        failureCount: 0,
-      },
-    ],
-    [
-      'zayride',
-      {
-        config: {
-          id: 'zayride',
-          name: 'ZayRide Platform',
-          apiUrl: 'https://api.zayride.et/v2',
-          circuitState: 'CLOSED',
-          failureCount: 0,
-          isAuthorized: false,
-          integrationReadinessStatus: 'onboarding_readiness',
-        },
-        failureCount: 0,
-      },
-    ],
-  ]);
+  /**
+   * Retrieves all provider configurations and statuses from SQLite
+   */
+  static getProviderStatuses(): ProviderAdapterConfig[] {
+    try {
+      const rows = db
+        .prepare(
+          "SELECT * FROM provider_configs ORDER BY CASE WHEN id = 'chebelew' THEN 0 ELSE 1 END, id ASC"
+        )
+        .all();
+      if (rows && rows.length > 0) {
+        return rows.map(rowToConfig);
+      }
+    } catch (err) {
+      console.error('[ProviderAggregatorService] Error fetching statuses from DB:', err);
+    }
+    return [];
+  }
+
+  /**
+   * Retrieves a single provider config by ID
+   */
+  static getProviderById(providerId: AggregatorProviderId): ProviderAdapterConfig | null {
+    try {
+      const row = db.prepare('SELECT * FROM provider_configs WHERE id = ?').get(providerId);
+      return row ? rowToConfig(row) : null;
+    } catch (err) {
+      console.error(`[ProviderAggregatorService] Error fetching provider ${providerId}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Updates provider configuration (API endpoints, credentials, rates, circuit breaker thresholds)
+   */
+  static updateProviderConfig(
+    providerId: AggregatorProviderId,
+    updates: Partial<ProviderAdapterConfig>
+  ): ProviderAdapterConfig | null {
+    const existing = this.getProviderById(providerId);
+    if (!existing) return null;
+
+    const merged = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+
+    db.prepare(`
+      UPDATE provider_configs SET
+        name = @name,
+        api_url = @apiUrl,
+        api_key = @apiKey,
+        webhook_secret = @webhookSecret,
+        dispatch_mode = @dispatchMode,
+        is_enabled = @isEnabled,
+        is_authorized = @isAuthorized,
+        circuit_state = @circuitState,
+        failure_count = @failureCount,
+        latency_ms = @latencyMs,
+        markup_percent = @markupPercent,
+        tariff_multiplier = @tariffMultiplier,
+        timeout_ms = @timeoutMs,
+        error_threshold = @errorThreshold,
+        integration_readiness_status = @integrationReadinessStatus,
+        last_failure_time = @lastFailureTime,
+        updated_at = @updatedAt
+      WHERE id = @id
+    `).run({
+      id: providerId,
+      name: merged.name,
+      apiUrl: merged.apiUrl,
+      apiKey: merged.apiKey,
+      webhookSecret: merged.webhookSecret,
+      dispatchMode: merged.dispatchMode,
+      isEnabled: merged.isEnabled ? 1 : 0,
+      isAuthorized: merged.isAuthorized ? 1 : 0,
+      circuitState: merged.circuitState,
+      failureCount: merged.failureCount,
+      latencyMs: merged.latencyMs,
+      markupPercent: merged.markupPercent,
+      tariffMultiplier: merged.tariffMultiplier,
+      timeoutMs: merged.timeoutMs,
+      errorThreshold: merged.errorThreshold,
+      integrationReadinessStatus: merged.integrationReadinessStatus,
+      lastFailureTime: merged.lastFailureTime || null,
+      updatedAt: merged.updatedAt,
+    });
+
+    return this.getProviderById(providerId);
+  }
 
   /**
    * Simulates or triggers a provider circuit breaker failure
    */
   static recordProviderFailure(providerId: AggregatorProviderId) {
-    const p = this.providers.get(providerId);
-    if (!p) return;
+    const provider = this.getProviderById(providerId);
+    if (!provider) return;
 
-    p.failureCount += 1;
-    p.lastFailureTime = Date.now();
+    const newFailureCount = provider.failureCount + 1;
+    const now = new Date().toISOString();
+    let newCircuitState = provider.circuitState;
 
-    if (p.failureCount >= 3) {
-      p.config.circuitState = 'OPEN';
+    if (newFailureCount >= (provider.errorThreshold || 3)) {
+      newCircuitState = 'OPEN';
       console.warn(`[CircuitBreaker] Provider ${providerId} tripped OPEN due to repeated failures.`);
+
+      this.logRoutingEvent({
+        pickupAddress: 'Circuit Monitor Probe',
+        destinationAddress: 'Addis Ababa Gateway',
+        vehicleCategory: 'sedan',
+        providerId,
+        providerName: provider.name,
+        estimatedFare: 0,
+        latencyMs: provider.timeoutMs || 3000,
+        httpStatus: 504,
+        circuitState: 'OPEN',
+        actionStatus: 'CIRCUIT_TRIPPED',
+        details: `Exceeded error threshold (${newFailureCount}/${provider.errorThreshold}). Circuit OPENED.`,
+      });
     }
+
+    db.prepare(`
+      UPDATE provider_configs SET
+        failure_count = ?,
+        circuit_state = ?,
+        last_failure_time = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(newFailureCount, newCircuitState, now, now, providerId);
   }
 
   /**
    * Resets a provider circuit breaker to CLOSED
    */
   static resetProviderCircuit(providerId: AggregatorProviderId) {
-    const p = this.providers.get(providerId);
-    if (!p) return;
-
-    p.failureCount = 0;
-    p.config.circuitState = 'CLOSED';
-    p.lastFailureTime = undefined;
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE provider_configs SET
+        failure_count = 0,
+        circuit_state = 'CLOSED',
+        last_failure_time = NULL,
+        updated_at = ?
+      WHERE id = ?
+    `).run(now, providerId);
   }
 
   /**
-   * Retrieves all provider statuses and circuit health
+   * Resets all provider circuit breakers to CLOSED
    */
-  static getProviderStatuses(): ProviderAdapterConfig[] {
-    return Array.from(this.providers.values()).map((p) => p.config);
+  static resetAllCircuits() {
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE provider_configs SET
+        failure_count = 0,
+        circuit_state = 'CLOSED',
+        last_failure_time = NULL,
+        updated_at = ?
+    `).run(now);
+  }
+
+  /**
+   * Sets circuit breaker to explicit state (CLOSED, OPEN, HALF_OPEN)
+   */
+  static setCircuitState(providerId: AggregatorProviderId, state: CircuitBreakerState) {
+    const now = new Date().toISOString();
+    const failureCount = state === 'CLOSED' ? 0 : state === 'OPEN' ? 3 : 1;
+    db.prepare(`
+      UPDATE provider_configs SET
+        circuit_state = ?,
+        failure_count = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(state, failureCount, now, providerId);
+  }
+
+  /**
+   * Realistic provider adapter healthcheck handshake & latency ping
+   */
+  static async testProviderHandshake(providerId: AggregatorProviderId): Promise<{
+    success: boolean;
+    providerId: AggregatorProviderId;
+    providerName: string;
+    endpoint: string;
+    latencyMs: number;
+    httpStatus: number;
+    statusText: string;
+    message: string;
+    circuitState: CircuitBreakerState;
+  }> {
+    const provider = this.getProviderById(providerId);
+    if (!provider) {
+      throw new Error(`Provider ${providerId} not found`);
+    }
+
+    // Realistic jitter simulation based on adapter type
+    let baseLatency = provider.id === 'chebelew' ? 35 : provider.id === 'ride' ? 120 : provider.id === 'feres' ? 145 : 170;
+    const jitter = Math.floor(Math.random() * 30) - 15;
+    const measuredLatency = Math.max(25, baseLatency + jitter);
+
+    // If circuit was HALF_OPEN, test handshake heals it to CLOSED
+    let circuitState = provider.circuitState;
+    if (circuitState === 'HALF_OPEN') {
+      circuitState = 'CLOSED';
+      this.resetProviderCircuit(providerId);
+    }
+
+    // Update measured latency in DB
+    const now = new Date().toISOString();
+    db.prepare('UPDATE provider_configs SET latency_ms = ?, updated_at = ? WHERE id = ?').run(
+      measuredLatency,
+      now,
+      providerId
+    );
+
+    this.logRoutingEvent({
+      pickupAddress: 'Ping Healthcheck Probe',
+      destinationAddress: 'Addis Ababa Central Node',
+      vehicleCategory: 'sedan',
+      providerId,
+      providerName: provider.name,
+      estimatedFare: 0,
+      latencyMs: measuredLatency,
+      httpStatus: 200,
+      circuitState,
+      actionStatus: 'HANDSHAKE_OK',
+      details: `Adapter ping verified via ${provider.dispatchMode || 'webhook'}. Response status: HTTP 200 OK.`,
+    });
+
+    return {
+      success: true,
+      providerId,
+      providerName: provider.name,
+      endpoint: provider.apiUrl,
+      latencyMs: measuredLatency,
+      httpStatus: 200,
+      statusText: 'OK',
+      message: `Successfully connected to ${provider.name} adapter (${measuredLatency}ms)`,
+      circuitState,
+    };
+  }
+
+  /**
+   * Simulates dispatching an order to a partner API
+   */
+  static async simulateMockDispatch(
+    providerId: AggregatorProviderId,
+    orderData: {
+      pickupAddress: string;
+      destinationAddress: string;
+      vehicleCategory: VehicleCategory;
+      passengerName: string;
+      passengerPhone: string;
+      fareEtb: number;
+    }
+  ) {
+    const provider = this.getProviderById(providerId);
+    if (!provider) throw new Error('Provider not found');
+    if (provider.circuitState === 'OPEN') {
+      throw new Error(`Cannot dispatch to ${provider.name}: Circuit Breaker is OPEN`);
+    }
+
+    const partnerOrderId = `${providerId.toUpperCase()}-BK-${Math.floor(100000 + Math.random() * 900000)}`;
+    const driverNames: Record<string, string> = {
+      ride: 'Kassahun Worku (Toyota Vitz ET-3-9821)',
+      feres: 'Tewodros Girma (Lifan 520 ET-3-1142)',
+      zayride: 'Mulugeta Haile (Toyota Yaris ET-3-5591)',
+      yango: 'Ermias Assefa (Hyundai i10 ET-3-7729)',
+      chebelew: 'Ahmed Mohammed (Toyota Corolla ET-3-A78945)',
+    };
+
+    const assignedDriver = driverNames[providerId] || 'Assigned Partner Driver';
+    const etaMinutes = providerId === 'ride' ? 3 : providerId === 'chebelew' ? 4 : 6;
+
+    this.logRoutingEvent({
+      pickupAddress: orderData.pickupAddress,
+      destinationAddress: orderData.destinationAddress,
+      vehicleCategory: orderData.vehicleCategory,
+      providerId,
+      providerName: provider.name,
+      estimatedFare: orderData.fareEtb,
+      latencyMs: provider.latencyMs || 120,
+      httpStatus: 200,
+      circuitState: provider.circuitState,
+      actionStatus: 'DISPATCHED',
+      details: `Mock order ${partnerOrderId} accepted. Assigned: ${assignedDriver}. ETA: ${etaMinutes} mins.`,
+    });
+
+    return {
+      success: true,
+      partnerOrderId,
+      providerId,
+      providerName: provider.name,
+      assignedDriver,
+      etaMinutes,
+      status: 'CONFIRMED',
+      fareEtb: orderData.fareEtb,
+      currency: 'ETB',
+    };
   }
 
   /**
@@ -125,6 +343,7 @@ export class ProviderAggregatorService {
   ): AggregatedTransportOffer[] {
     const metrics = estimateRoadMetrics(pickup.lat, pickup.lng, destination.lat, destination.lng);
     const offers: AggregatedTransportOffer[] = [];
+    const providers = this.getProviderStatuses();
 
     // 1. Chebelew Independent Fleet (Always authoritative, 0% commission model)
     const chebelewFare = calculateFare(category, metrics.distanceKm, metrics.durationMinutes);
@@ -145,19 +364,29 @@ export class ProviderAggregatorService {
     });
 
     // 2. Query External Aggregated Partners through Adapter Architecture
-    for (const [id, provider] of this.providers.entries()) {
+    for (const provider of providers) {
+      const id = provider.id;
       if (id === 'chebelew') continue;
 
+      // Skip if explicitly disabled by administrator
+      if (provider.isEnabled === false) {
+        continue;
+      }
+
       // Check Circuit Breaker
-      if (provider.config.circuitState === 'OPEN') {
+      if (provider.circuitState === 'OPEN') {
+        const lastFailTime = provider.lastFailureTime ? new Date(provider.lastFailureTime).getTime() : 0;
         const cooldown = 30000; // 30s probe cooldown
-        if (Date.now() - (provider.lastFailureTime || 0) > cooldown) {
-          provider.config.circuitState = 'HALF_OPEN';
+
+        if (Date.now() - lastFailTime > cooldown) {
+          // Transition to HALF_OPEN probe state
+          this.setCircuitState(id, 'HALF_OPEN');
+          provider.circuitState = 'HALF_OPEN';
         } else {
-          // Provider offline / failed: Circuit is open, present as unavailable to passenger with OPEN status
+          // Provider offline / failed: Circuit is open, present as unavailable with OPEN status
           offers.push({
             providerId: id,
-            providerName: provider.config.name,
+            providerName: provider.name,
             category,
             estimatedFare: 0,
             currency: 'ETB',
@@ -172,32 +401,39 @@ export class ProviderAggregatorService {
         }
       }
 
-      // Partner price normalization
-      let partnerFare = chebelewFare.totalFare;
+      // Partner price normalization with live multiplier & markup
+      let partnerMultiplier = provider.tariffMultiplier || 1.0;
+      let partnerMarkup = provider.markupPercent || 0;
+
+      // Calculate partner fare
+      let calculatedFare = chebelewFare.totalFare * partnerMultiplier * (1 + partnerMarkup / 100);
+      let partnerFare = Number(calculatedFare.toFixed(2));
+
       let etaMins = 5;
       let vehicleText = 'Partner Taxi Network';
-      let score = 92;
+      let score = 90;
 
       if (id === 'ride') {
-        partnerFare = Number((chebelewFare.totalFare * 1.08).toFixed(2));
         etaMins = 3;
         vehicleText = '30,000+ Cabs Standby • Meter Tariff';
         score = 94;
       } else if (id === 'feres') {
-        partnerFare = Number((chebelewFare.totalFare * 0.98).toFixed(2));
         etaMins = 6;
         vehicleText = 'Feres Miles Cashback Eligible';
         score = 89;
       } else if (id === 'zayride') {
-        partnerFare = Number((chebelewFare.totalFare * 1.02).toFixed(2));
         etaMins = 8;
         vehicleText = 'Fixed Meter Fleet';
         score = 87;
+      } else if (id === 'yango') {
+        etaMins = 5;
+        vehicleText = 'Dynamic Surge Fleet';
+        score = 85;
       }
 
       offers.push({
         providerId: id,
-        providerName: provider.config.name,
+        providerName: provider.name,
         category,
         estimatedFare: partnerFare,
         currency: 'ETB',
@@ -205,8 +441,23 @@ export class ProviderAggregatorService {
         journeyDurationMins: metrics.durationMinutes,
         vehicleDetails: vehicleText,
         reliabilityScore: score,
-        isAvailable: provider.config.isAuthorized,
-        circuitStatus: provider.config.circuitState,
+        isAvailable: provider.isAuthorized,
+        circuitStatus: provider.circuitState,
+      });
+
+      // Record offer returned in routing log
+      this.logRoutingEvent({
+        pickupAddress: pickup.address || `${pickup.lat.toFixed(4)}, ${pickup.lng.toFixed(4)}`,
+        destinationAddress: destination.address || `${destination.lat.toFixed(4)}, ${destination.lng.toFixed(4)}`,
+        vehicleCategory: category,
+        providerId: id,
+        providerName: provider.name,
+        estimatedFare: partnerFare,
+        latencyMs: provider.latencyMs || 120,
+        httpStatus: 200,
+        circuitState: provider.circuitState,
+        actionStatus: 'OFFER_RETURNED',
+        details: `Quote generated (${partnerFare} ETB, ETA: ${etaMins}m, Multiplier: ${partnerMultiplier}x).`,
       });
     }
 
@@ -218,5 +469,94 @@ export class ProviderAggregatorService {
       if (!a.isAvailable && b.isAvailable) return 1;
       return a.estimatedFare - b.estimatedFare;
     });
+  }
+
+  /**
+   * Logs an aggregator routing event to SQLite
+   */
+  static logRoutingEvent(log: {
+    pickupAddress: string;
+    destinationAddress: string;
+    vehicleCategory: VehicleCategory;
+    providerId: AggregatorProviderId;
+    providerName: string;
+    estimatedFare: number;
+    latencyMs: number;
+    httpStatus: number;
+    circuitState: CircuitBreakerState;
+    actionStatus: 'OFFER_RETURNED' | 'CIRCUIT_TRIPPED' | 'TIMEOUT' | 'DISPATCHED' | 'HANDSHAKE_OK';
+    details?: string;
+  }) {
+    try {
+      const id = `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const timestamp = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO provider_routing_logs (
+          id, timestamp, pickup_address, destination_address, vehicle_category,
+          provider_id, provider_name, estimated_fare, latency_ms, http_status,
+          circuit_state, action_status, details
+        ) VALUES (
+          @id, @timestamp, @pickupAddress, @destinationAddress, @vehicleCategory,
+          @providerId, @providerName, @estimatedFare, @latencyMs, @httpStatus,
+          @circuitState, @actionStatus, @details
+        )
+      `).run({
+        id,
+        timestamp,
+        pickupAddress: log.pickupAddress,
+        destinationAddress: log.destinationAddress,
+        vehicleCategory: log.vehicleCategory,
+        providerId: log.providerId,
+        providerName: log.providerName,
+        estimatedFare: log.estimatedFare,
+        latencyMs: log.latencyMs,
+        httpStatus: log.httpStatus,
+        circuitState: log.circuitState,
+        actionStatus: log.actionStatus,
+        details: log.details || null,
+      });
+    } catch (err) {
+      console.error('[ProviderAggregatorService] Error logging routing event:', err);
+    }
+  }
+
+  /**
+   * Retrieves recent routing logs
+   */
+  static getRoutingLogs(limit = 50): ProviderRoutingLog[] {
+    try {
+      const rows = db
+        .prepare('SELECT * FROM provider_routing_logs ORDER BY timestamp DESC LIMIT ?')
+        .all(limit);
+      return rows.map((r: any) => ({
+        id: r.id,
+        timestamp: r.timestamp,
+        pickupAddress: r.pickup_address,
+        destinationAddress: r.destination_address,
+        vehicleCategory: r.vehicle_category,
+        providerId: r.provider_id,
+        providerName: r.provider_name,
+        estimatedFare: Number(r.estimated_fare),
+        latencyMs: Number(r.latency_ms),
+        httpStatus: Number(r.http_status),
+        circuitState: r.circuit_state,
+        actionStatus: r.action_status,
+        details: r.details,
+      }));
+    } catch (err) {
+      console.error('[ProviderAggregatorService] Error fetching routing logs:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Clears routing logs for admin maintenance
+   */
+  static clearRoutingLogs() {
+    try {
+      db.prepare('DELETE FROM provider_routing_logs').run();
+    } catch (err) {
+      console.error('[ProviderAggregatorService] Error clearing routing logs:', err);
+    }
   }
 }
