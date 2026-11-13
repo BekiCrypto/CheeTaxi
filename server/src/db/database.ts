@@ -340,6 +340,33 @@ export function initDatabase() {
       action_status TEXT NOT NULL,
       details TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS system_tariffs (
+      category TEXT PRIMARY KEY,
+      base_fare REAL NOT NULL,
+      per_km REAL NOT NULL,
+      per_minute REAL NOT NULL,
+      min_fare REAL NOT NULL,
+      waiting_per_minute REAL NOT NULL DEFAULT 2.5,
+      night_multiplier REAL NOT NULL DEFAULT 1.25,
+      peak_multiplier REAL NOT NULL DEFAULT 1.15,
+      airport_surcharge REAL NOT NULL DEFAULT 50.0,
+      cancellation_fee REAL NOT NULL DEFAULT 50.0,
+      capacity INTEGER NOT NULL DEFAULT 4,
+      display_name TEXT NOT NULL,
+      display_name_am TEXT NOT NULL,
+      description TEXT NOT NULL,
+      description_am TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'general',
+      description TEXT,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Run safe schema migrations for existing database columns
@@ -369,6 +396,7 @@ export function initDatabase() {
 
   seedInitialData();
   seedProviderConfigs();
+  seedSystemTariffsAndSettings();
 }
 
 function seedInitialData() {
@@ -1302,6 +1330,191 @@ function seedProviderConfigs() {
 
     for (const l of pastLogs) {
       insertLog.run(l);
+    }
+  }
+}
+
+function seedSystemTariffsAndSettings() {
+  const tariffCount = db.prepare('SELECT count(*) as count FROM system_tariffs').get() as { count: number };
+  const now = new Date().toISOString();
+
+  if (tariffCount.count === 0) {
+    const insertTariff = db.prepare(`
+      INSERT INTO system_tariffs (
+        category, base_fare, per_km, per_minute, min_fare, waiting_per_minute,
+        night_multiplier, peak_multiplier, airport_surcharge, cancellation_fee,
+        capacity, display_name, display_name_am, description, description_am, updated_at
+      ) VALUES (
+        @category, @base_fare, @per_km, @per_minute, @min_fare, @waiting_per_minute,
+        @night_multiplier, @peak_multiplier, @airport_surcharge, @cancellation_fee,
+        @capacity, @display_name, @display_name_am, @description, @description_am, @updated_at
+      )
+    `);
+
+    const defaultTariffs = [
+      {
+        category: 'sedan',
+        base_fare: 70.0,
+        per_km: 14.0,
+        per_minute: 3.0,
+        min_fare: 110.0,
+        waiting_per_minute: 2.5,
+        night_multiplier: 1.25,
+        peak_multiplier: 1.15,
+        airport_surcharge: 50.0,
+        cancellation_fee: 50.0,
+        capacity: 4,
+        display_name: 'Chebelew Standard (Sedan)',
+        display_name_am: 'ቼበለው መደበኛ (ሴዳን)',
+        description: 'Toyota Corolla / Vitz / Dzire - 4 passenger seats with A/C',
+        description_am: 'ቶዮታ ኮሮላ / ቪትዝ - 4 መቀመጫ ከአየር ማቀዝቀዣ ጋር',
+        updated_at: now,
+      },
+      {
+        category: 'minivan',
+        base_fare: 110.0,
+        per_km: 18.0,
+        per_minute: 4.0,
+        min_fare: 160.0,
+        waiting_per_minute: 3.5,
+        night_multiplier: 1.25,
+        peak_multiplier: 1.15,
+        airport_surcharge: 75.0,
+        cancellation_fee: 75.0,
+        capacity: 7,
+        display_name: 'Chebelew XL (Minivan)',
+        display_name_am: 'ቼበለው ኤክስ ኤል (ሚኒቫን)',
+        description: 'Toyota Avanza / Noah - 7 seats for groups and airport luggage',
+        description_am: 'ቶዮታ አቫንዛ / ኖህ - 7 መቀመጫ ለቡድን እና ለሻንጣ',
+        updated_at: now,
+      },
+      {
+        category: 'comfort',
+        base_fare: 140.0,
+        per_km: 22.0,
+        per_minute: 5.0,
+        min_fare: 220.0,
+        waiting_per_minute: 4.5,
+        night_multiplier: 1.30,
+        peak_multiplier: 1.20,
+        airport_surcharge: 100.0,
+        cancellation_fee: 100.0,
+        capacity: 4,
+        display_name: 'Chebelew Executive Comfort',
+        display_name_am: 'ቼበለው ኤክስኪዩቲቭ',
+        description: 'Hyundai Elantra / Camry / RAV4 - Premium business comfort',
+        description_am: 'ፕሪሚየም መኪናዎች ለቢዝነስና ለክብር እንግዶች',
+        updated_at: now,
+      },
+      {
+        category: 'partner_ride',
+        base_fare: 80.0,
+        per_km: 15.5,
+        per_minute: 3.5,
+        min_fare: 120.0,
+        waiting_per_minute: 3.0,
+        night_multiplier: 1.25,
+        peak_multiplier: 1.15,
+        airport_surcharge: 60.0,
+        cancellation_fee: 60.0,
+        capacity: 4,
+        display_name: 'Partner: Licensed Meter Taxi',
+        display_name_am: 'አጋር፡ ፈቃድ ያለው ሚተር ታክሲ',
+        description: 'Direct taxi dispatch via integrated licensed partner fleet',
+        description_am: 'ፈቃድ ባላቸው የተባባሪ ታክሲዎች አውታረ መረብ የሚደረግ ጉዞ',
+        updated_at: now,
+      },
+      {
+        category: 'partner_feres',
+        base_fare: 75.0,
+        per_km: 15.0,
+        per_minute: 3.2,
+        min_fare: 115.0,
+        waiting_per_minute: 3.0,
+        night_multiplier: 1.25,
+        peak_multiplier: 1.15,
+        airport_surcharge: 50.0,
+        cancellation_fee: 50.0,
+        capacity: 4,
+        display_name: 'Partner: Municipal Taxi Cooperative',
+        display_name_am: 'አጋር፡ የማዘጋጃ ቤት ታክሲ ማህበር',
+        description: 'Local taxi cooperative association network with standardized tariffs',
+        description_am: 'የአዲስ አበባ ታክሲ ማህበራት አውታረ መረብ',
+        updated_at: now,
+      },
+      {
+        category: 'delivery_moto',
+        base_fare: 40.0,
+        per_km: 10.0,
+        per_minute: 2.0,
+        min_fare: 60.0,
+        waiting_per_minute: 1.5,
+        night_multiplier: 1.20,
+        peak_multiplier: 1.10,
+        airport_surcharge: 30.0,
+        cancellation_fee: 30.0,
+        capacity: 1,
+        display_name: 'Chebelew Moto Express Delivery',
+        display_name_am: 'ቼበለው ሞተር ፈጣን መልእክት',
+        description: 'Motorcycle courier for documents, food, and small parcels',
+        description_am: 'ለሰነዶች እና አነስተኛ እቃዎች ፈጣን የሞተር መልእክተኛ',
+        updated_at: now,
+      },
+      {
+        category: 'delivery_van',
+        base_fare: 120.0,
+        per_km: 20.0,
+        per_minute: 4.0,
+        min_fare: 180.0,
+        waiting_per_minute: 4.0,
+        night_multiplier: 1.25,
+        peak_multiplier: 1.15,
+        airport_surcharge: 80.0,
+        cancellation_fee: 80.0,
+        capacity: 2,
+        display_name: 'Chebelew Cargo Logistics Van',
+        display_name_am: 'ቼበለው የጭነት ቫን',
+        description: 'Cargo van for bulk retail, furniture, and heavy boxes',
+        description_am: 'ለትላልቅ እቃዎች እና የንግድ ጭነቶች',
+        updated_at: now,
+      },
+    ];
+
+    for (const t of defaultTariffs) {
+      insertTariff.run(t);
+    }
+  }
+
+  const settingCount = db.prepare('SELECT count(*) as count FROM system_settings').get() as { count: number };
+  if (settingCount.count === 0) {
+    const insertSetting = db.prepare(`
+      INSERT INTO system_settings (key, value, category, description, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    const defaultSettings: [string, string, string, string][] = [
+      ['vat_rate', '0.15', 'taxation', 'FDRE Value Added Tax rate on gross ride fares'],
+      ['tax_authority_name', 'FDRE Ministry of Revenues', 'taxation', 'Official Ethiopian Tax Authority'],
+      ['vat_regulation_reference', 'FDRE Ministry of Revenues - Value Added Tax Regulation No. 570/2025', 'taxation', 'Legal statutory reference for 15% VAT on rides'],
+      ['driver_commission_percent', '0', 'operations', 'Platform trip commission % for independent drivers (Founder Mandate: 0%)'],
+      ['telebirr_gateway_fee_percent', '1.0', 'payments', 'Ethio telecom payment gateway fee %'],
+      ['max_dispatch_radius_km', '6.5', 'dispatch', 'Maximum radius for automated driver proximity matching (km)'],
+      ['driver_acceptance_timeout_sec', '25', 'dispatch', 'Driver countdown timeout before reassigning to next nearest vehicle (seconds)'],
+      ['free_cancellation_window_min', '3', 'operations', 'Grace period after dispatch where passenger cancels without penalty (minutes)'],
+      ['driver_free_wait_time_min', '5', 'operations', 'Free waiting duration at pickup before per-minute waiting fee accrues (minutes)'],
+      ['emergency_police_hotline', '991', 'safety', 'Federal Police Emergency Operations Center hotline'],
+      ['customer_support_hotline', '9922', 'safety', 'Chebelew 24/7 Addis Ababa Call Center dispatch hotline'],
+      ['ambulance_hotline', '907', 'safety', 'Addis Ababa Emergency Medical Services / Ambulance hotline'],
+      ['sub_daily_price_etb', '50', 'subscriptions', 'Driver 24-hour unlimited ride access pass price (ETB)'],
+      ['sub_weekly_price_etb', '300', 'subscriptions', 'Driver 7-day unlimited ride access pass price (ETB)'],
+      ['sub_monthly_price_etb', '1000', 'subscriptions', 'Driver 30-day unlimited ride access pass price (ETB)'],
+      ['sub_quarterly_price_etb', '2700', 'subscriptions', 'Driver 90-day unlimited ride access pass price (ETB) - 10% discount'],
+      ['sub_yearly_price_etb', '9600', 'subscriptions', 'Driver 365-day unlimited ride access pass price (ETB) - 20% discount'],
+      ['sub_grace_period_hours', '24', 'subscriptions', 'Grace hours after pass expiry before driver account is locked from offers'],
+    ];
+
+    for (const [k, v, cat, desc] of defaultSettings) {
+      insertSetting.run(k, v, cat, desc, now);
     }
   }
 }

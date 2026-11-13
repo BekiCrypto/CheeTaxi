@@ -143,6 +143,59 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(res.body.tariffs.sedan.baseFare).toBe(70);
   });
 
+  it('PUT /api/admin/tariffs and POST /api/admin/tariffs/reset dynamic tuning', async () => {
+    // 1. Update Sedan tariff
+    const updateRes = await request(app)
+      .put('/api/admin/tariffs')
+      .send({
+        tariffs: {
+          sedan: {
+            baseFare: 85,
+            perKm: 16,
+            minFare: 125,
+          },
+        },
+      });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.success).toBe(true);
+    expect(updateRes.body.tariffs.sedan.baseFare).toBe(85);
+    expect(updateRes.body.tariffs.sedan.perKm).toBe(16);
+
+    // Verify GET reflects the update
+    const getRes = await request(app).get('/api/admin/tariffs');
+    expect(getRes.body.tariffs.sedan.baseFare).toBe(85);
+
+    // 2. Reset back to defaults
+    const resetRes = await request(app).post('/api/admin/tariffs/reset');
+    expect(resetRes.status).toBe(200);
+    expect(resetRes.body.tariffs.sedan.baseFare).toBe(70);
+  });
+
+  it('GET and PUT /api/admin/settings for regulatory, dispatch, and subscription parameters', async () => {
+    // 1. GET settings
+    const getRes = await request(app).get('/api/admin/settings');
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.settings).toBeDefined();
+    expect(getRes.body.settings.vatRate).toBe(0.15);
+    expect(getRes.body.settings.driverCommissionPercent).toBe(0);
+    expect(getRes.body.settings.emergencyPoliceHotline).toBe('991');
+
+    // 2. PUT update settings
+    const putRes = await request(app)
+      .put('/api/admin/settings')
+      .send({
+        settings: {
+          maxDispatchRadiusKm: 8.5,
+          driverAcceptanceTimeoutSec: 30,
+          customerSupportHotline: '9922',
+        },
+      });
+    expect(putRes.status).toBe(200);
+    expect(putRes.body.success).toBe(true);
+    expect(putRes.body.settings.maxDispatchRadiusKm).toBe(8.5);
+    expect(putRes.body.settings.driverAcceptanceTimeoutSec).toBe(30);
+  });
+
   it('Developer API keys: CRUD and OpenAPI spec endpoint', async () => {
     // 1. Fetch OpenAPI spec
     const specRes = await request(app).get('/api/developer/openapi.json');

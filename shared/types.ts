@@ -330,6 +330,46 @@ export interface Fleet {
 export type AggregatorProviderId = 'chebelew' | 'ride' | 'feres' | 'zayride' | 'yango';
 export type CircuitBreakerState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
+export interface TariffRate {
+  category: VehicleCategory;
+  baseFare: number;
+  perKm: number;
+  perMinute: number;
+  minFare: number;
+  waitingPerMinute: number;
+  nightMultiplier: number;
+  peakMultiplier: number;
+  airportSurcharge: number;
+  cancellationFee: number;
+  capacity: number;
+  displayName: string;
+  displayNameAm: string;
+  description: string;
+  descriptionAm: string;
+  updatedAt?: string;
+}
+
+export interface SystemSettings {
+  vatRate: number;
+  taxAuthorityName: string;
+  vatRegulationReference: string;
+  driverCommissionPercent: number;
+  telebirrGatewayFeePercent: number;
+  maxDispatchRadiusKm: number;
+  driverAcceptanceTimeoutSec: number;
+  freeCancellationWindowMin: number;
+  driverFreeWaitTimeMin: number;
+  emergencyPoliceHotline: string;
+  customerSupportHotline: string;
+  ambulanceHotline: string;
+  subDailyPriceEtb: number;
+  subWeeklyPriceEtb: number;
+  subMonthlyPriceEtb: number;
+  subQuarterlyPriceEtb: number;
+  subYearlyPriceEtb: number;
+  subGracePeriodHours: number;
+}
+
 export interface ProviderAdapterConfig {
   id: AggregatorProviderId;
   name: string;

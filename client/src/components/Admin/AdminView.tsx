@@ -31,6 +31,7 @@ import { AdminCorporateTab } from './AdminCorporateTab';
 import { AdminProviderTab } from './AdminProviderTab';
 import { AdminSosTab } from './AdminSosTab';
 import { AdminDeveloperTab } from './AdminDeveloperTab';
+import { AdminTariffSettingsTab } from './AdminTariffSettingsTab';
 
 interface AdminViewProps {
   language: Language;
@@ -909,54 +910,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
           </div>
         )}
 
-        {/* Tab 6: Tariffs & Regulatory Configuration */}
-        {activeTab === 'tariffs' && tariffs && (
-          <div className="max-w-4xl mx-auto p-8 overflow-y-auto h-full space-y-5">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
-              <div className="border-b pb-3">
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-brand-500" />
-                  Active Tariff Engine & Regulatory Parameters
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  City of Addis Ababa Transport Bureau rates & FDRE VAT Regulation No. 570/2025.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                {Object.entries(tariffs).map(([key, t]: [string, any]) => (
-                  <div key={key} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                    <div className="font-bold text-slate-800 text-sm">{t.displayName}</div>
-                    <div className="text-[11px] text-slate-500">{t.description}</div>
-                    <div className="pt-2 border-t border-slate-200 space-y-1 font-mono text-[11px]">
-                      <div className="flex justify-between">
-                        <span>Base Fare:</span>
-                        <strong className="text-slate-800">{t.baseFare} ETB</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Per Kilometer:</span>
-                        <strong className="text-slate-800">{t.perKm} ETB/km</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Per Minute:</span>
-                        <strong className="text-slate-800">{t.perMinute} ETB/min</strong>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Minimum Fare:</span>
-                        <strong className="text-slate-800">{t.minFare} ETB</strong>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-xs text-blue-900 space-y-1">
-                <div className="font-bold">Taxation & Commercial Policy (Founder Mandate 2.0):</div>
-                <p>• <strong>15% VAT:</strong> Automatically added to gross ride fare and remitted to FDRE Ministry of Revenues per Regulation No. 570/2025.</p>
-                <p>• <strong>0% Platform Take Rate:</strong> Subscribed independent drivers keep 100% of their trip earnings! No per-trip commission deductions.</p>
-                <p>• <strong>1% Telebirr Fee:</strong> Processing fee for Ethio Telecom payment gateway settlements.</p>
-              </div>
-            </div>
+        {/* Tab 6: Dynamic Tariffs & Flexible Configuration Studio */}
+        {activeTab === 'tariffs' && (
+          <div className="overflow-y-auto h-full">
+            <AdminTariffSettingsTab />
           </div>
         )}
 

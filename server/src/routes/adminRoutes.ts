@@ -2,9 +2,16 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/database.js';
 import { DispatchService } from '../services/dispatchService.js';
-import { TARIFFS } from '../services/fareService.js';
+import {
+  TARIFFS,
+  getAllTariffs,
+  updateTariffs,
+  resetTariffsToDefaults,
+  getSystemSettings,
+  updateSystemSettings,
+} from '../services/fareService.js';
 import { Server as SocketIOServer } from 'socket.io';
-import { SystemMetrics, VatReportSummary } from '../../../shared/types.js';
+import { SystemMetrics, VatReportSummary, SystemSettings } from '../../../shared/types.js';
 
 export function createAdminRouter(io: SocketIOServer) {
   const router = Router();
@@ -293,10 +300,43 @@ export function createAdminRouter(io: SocketIOServer) {
   });
 
   /**
-   * Get Active Tariffs
+   * Dynamic Tariff Engine Endpoints
    */
   router.get('/tariffs', (req, res) => {
-    return res.json({ tariffs: TARIFFS });
+    return res.json({ tariffs: getAllTariffs() });
+  });
+
+  router.put('/tariffs', (req, res) => {
+    const { tariffs } = req.body;
+    if (!tariffs || typeof tariffs !== 'object') {
+      return res.status(400).json({ error: 'Tariffs payload object required' });
+    }
+    const updated = updateTariffs(tariffs);
+    io.to('admin:dispatch').emit('admin:tariffs_updated', updated);
+    return res.json({ success: true, tariffs: updated, message: 'Tariffs updated successfully' });
+  });
+
+  router.post('/tariffs/reset', (req, res) => {
+    const reset = resetTariffsToDefaults();
+    io.to('admin:dispatch').emit('admin:tariffs_updated', reset);
+    return res.json({ success: true, tariffs: reset, message: 'Tariffs restored to statutory defaults' });
+  });
+
+  /**
+   * System & Regulatory Parameters
+   */
+  router.get('/settings', (req, res) => {
+    return res.json({ settings: getSystemSettings() });
+  });
+
+  router.put('/settings', (req, res) => {
+    const { settings } = req.body;
+    if (!settings || typeof settings !== 'object') {
+      return res.status(400).json({ error: 'Settings payload object required' });
+    }
+    const updated = updateSystemSettings(settings);
+    io.to('admin:dispatch').emit('admin:settings_updated', updated);
+    return res.json({ success: true, settings: updated, message: 'System settings updated successfully' });
   });
 
   return router;
