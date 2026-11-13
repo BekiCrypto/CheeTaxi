@@ -1,13 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Navbar } from './components/Navbar';
-import { RiderView } from './components/Rider/RiderView';
-import { DriverView } from './components/Driver/DriverView';
-import { AdminView } from './components/Admin/AdminView';
-import { SplitView } from './components/Split/SplitView';
-import { PublicWebsite } from './components/Public/PublicWebsite';
 import { Language } from './i18n/translations';
 import { useSocket } from './hooks/useSocket';
 import { sounds } from './utils/audio';
+
+// Lazy-loaded functional modules for optimal code-splitting and performance
+const RiderView = lazy(() =>
+  import('./components/Rider/RiderView').then((m) => ({ default: m.RiderView }))
+);
+const DriverView = lazy(() =>
+  import('./components/Driver/DriverView').then((m) => ({ default: m.DriverView }))
+);
+const AdminView = lazy(() =>
+  import('./components/Admin/AdminView').then((m) => ({ default: m.AdminView }))
+);
+const SplitView = lazy(() =>
+  import('./components/Split/SplitView').then((m) => ({ default: m.SplitView }))
+);
+const PublicWebsite = lazy(() =>
+  import('./components/Public/PublicWebsite').then((m) => ({ default: m.PublicWebsite }))
+);
+
+function ModuleLoadingFallback({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full min-h-[450px] text-slate-500 gap-3">
+      <div className="relative w-12 h-12">
+        <div className="absolute inset-0 rounded-full border-4 border-slate-200" />
+        <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-t-transparent animate-spin" />
+      </div>
+      <div className="text-center space-y-1">
+        <p className="text-xs font-extrabold tracking-wide uppercase text-slate-700">
+          Loading {label}...
+        </p>
+        <p className="text-[11px] text-slate-400">
+          Chebelew Mobility & Logistics Engine
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function App() {
   const [role, setRole] = useState<'rider' | 'driver' | 'admin' | 'split' | 'website'>('rider');
@@ -156,43 +187,45 @@ export function App() {
       />
 
       <main className="flex-1 overflow-hidden relative">
-        {role === 'rider' && (
-          <RiderView
-            currentRiderId={currentRider.id}
-            currentRiderName={currentRider.name}
-            currentRiderPhone={currentRider.phone}
-            language={language}
-            socket={socket}
-          />
-        )}
+        <Suspense fallback={<ModuleLoadingFallback label={role.toUpperCase()} />}>
+          {role === 'rider' && (
+            <RiderView
+              currentRiderId={currentRider.id}
+              currentRiderName={currentRider.name}
+              currentRiderPhone={currentRider.phone}
+              language={language}
+              socket={socket}
+            />
+          )}
 
-        {role === 'driver' && (
-          <DriverView
-            currentDriverId={currentDriverId}
-            language={language}
-            socket={socket}
-          />
-        )}
+          {role === 'driver' && (
+            <DriverView
+              currentDriverId={currentDriverId}
+              language={language}
+              socket={socket}
+            />
+          )}
 
-        {role === 'admin' && <AdminView language={language} socket={socket} />}
+          {role === 'admin' && <AdminView language={language} socket={socket} />}
 
-        {role === 'split' && (
-          <SplitView
-            language={language}
-            socket={socket}
-            currentRiderId={currentRider.id}
-            currentRiderName={currentRider.name}
-            currentRiderPhone={currentRider.phone}
-            currentDriverId={currentDriverId}
-          />
-        )}
+          {role === 'split' && (
+            <SplitView
+              language={language}
+              socket={socket}
+              currentRiderId={currentRider.id}
+              currentRiderName={currentRider.name}
+              currentRiderPhone={currentRider.phone}
+              currentDriverId={currentDriverId}
+            />
+          )}
 
-        {role === 'website' && (
-          <PublicWebsite
-            language={language}
-            onNavigateToApp={(r) => setRole(r)}
-          />
-        )}
+          {role === 'website' && (
+            <PublicWebsite
+              language={language}
+              onNavigateToApp={(r) => setRole(r)}
+            />
+          )}
+        </Suspense>
       </main>
     </div>
   );
