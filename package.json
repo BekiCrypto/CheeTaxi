@@ -2,6 +2,7 @@
   "name": "chebelew-monorepo",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Chebelew: Ethiopia Ride-Hailing Aggregator & Dispatch Platform",
   "scripts": {
     "server:dev": "npm --prefix server run dev",
