@@ -105,3 +105,67 @@
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
 }
+
+/* ========================================================
+   Mobile App Top Industry Prototype & Haptic UI Styling
+   ======================================================== */
+.mobile-bottom-sheet {
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.45);
+}
+
+.mobile-bottom-sheet-light {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.active-press {
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.active-press:active {
+  transform: scale(0.965);
+  opacity: 0.9;
+}
+
+@keyframes pulseBeacon {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.beacon-pulse {
+  animation: pulseBeacon 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes urgentRing {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.8); }
+  70% { transform: scale(1.02); box-shadow: 0 0 0 18px rgba(245, 158, 11, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.urgent-pulse {
+  animation: urgentRing 1.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
