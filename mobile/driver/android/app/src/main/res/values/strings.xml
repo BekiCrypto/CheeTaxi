@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Chebelew Driver</string>
+    <string name="app_name_am">ቼበለው አሽከርካሪ (0%)</string>
+    <string name="package_name">com.chebelew.driver</string>
+    <string name="server_url">https://chebelew.trustlotto.app</string>
+    <string name="background_location_rationale">Chebelew Driver collects location data in the background to dispatch nearby trip offers and provide live trip tracking to passengers even when the app is minimized.</string>
+</resources>

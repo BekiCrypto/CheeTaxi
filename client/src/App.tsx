@@ -11,6 +11,9 @@ const DriverModule = lazy(() => import('./modules/driver'));
 const AdminModule = lazy(() => import('./modules/admin'));
 const SimulatorModule = lazy(() => import('./modules/simulator'));
 const PublicPortalModule = lazy(() => import('./modules/portal'));
+const PublicTripTracker = lazy(() => import('./components/Tracking/PublicTripTracker').then(m => ({ default: m.PublicTripTracker })));
+const PassengerMobileShell = lazy(() => import('./components/Rider/PassengerMobileShell').then(m => ({ default: m.PassengerMobileShell })));
+const DriverMobileShell = lazy(() => import('./components/Driver/DriverMobileShell').then(m => ({ default: m.DriverMobileShell })));
 
 function ModuleLoadingFallback({ label }: { label: string }) {
   return (
@@ -32,7 +35,7 @@ function ModuleLoadingFallback({ label }: { label: string }) {
 }
 
 export function App() {
-  const { currentModule, subPath, setModule } = useRoute();
+  const { currentModule, subPath, setModule, isStandaloneMobile } = useRoute();
   const [language, setLanguage] = useState<Language>('en');
 
   // Active Demo Users
@@ -182,7 +185,7 @@ export function App() {
         <div className="absolute -bottom-32 left-1/3 w-[550px] h-[550px] bg-amber-500/15 rounded-full blur-[110px]" />
       </div>
 
-      {currentModule !== 'website' && (
+      {currentModule !== 'website' && currentModule !== 'track' && !isStandaloneMobile && (
         <Navbar
           currentRole={currentModule}
           onRoleChange={(m) => setModule(m)}
@@ -195,7 +198,22 @@ export function App() {
 
       <main className="flex-1 overflow-hidden relative z-10">
         <Suspense fallback={<ModuleLoadingFallback label={currentModule.toUpperCase()} />}>
-          {currentModule === 'rider' && (
+          {currentModule === 'track' && (
+            <PublicTripTracker rideId={subPath || ''} />
+          )}
+
+          {currentModule === 'rider' && isStandaloneMobile && (
+            <PassengerMobileShell
+              currentRiderId={currentRider.id}
+              currentRiderName={currentRider.name}
+              currentRiderPhone={currentRider.phone}
+              language={language}
+              onLanguageChange={setLanguage}
+              socket={socket}
+            />
+          )}
+
+          {currentModule === 'rider' && !isStandaloneMobile && (
             <RiderModule
               currentRiderId={currentRider.id}
               currentRiderName={currentRider.name}
@@ -205,7 +223,16 @@ export function App() {
             />
           )}
 
-          {currentModule === 'driver' && (
+          {currentModule === 'driver' && isStandaloneMobile && (
+            <DriverMobileShell
+              currentDriverId={currentDriverId}
+              language={language}
+              onLanguageChange={setLanguage}
+              socket={socket}
+            />
+          )}
+
+          {currentModule === 'driver' && !isStandaloneMobile && (
             <DriverModule
               currentDriverId={currentDriverId}
               language={language}

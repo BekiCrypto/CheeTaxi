@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Chebelew Passenger</string>
+    <string name="app_name_am">ቼበለው መንገደኛ</string>
+    <string name="package_name">com.chebelew.passenger</string>
+    <string name="server_url">https://chebelew.trustlotto.app</string>
+    <string name="location_permission_rationale">Chebelew requires location access to find licensed drivers near your pickup location in Addis Ababa.</string>
+</resources>
