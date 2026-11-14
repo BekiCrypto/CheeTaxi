@@ -469,6 +469,99 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_sched_rides_status ON scheduled_rides(status);
     CREATE INDEX IF NOT EXISTS idx_heatmap_zones ON demand_heatmap_zones(forecast_period);
     CREATE INDEX IF NOT EXISTS idx_deviations_ride ON route_deviations(ride_id);
+
+    -- Advanced Direct-to-Driver Payment Rails, Tax Routing & Wallet Subsystems
+    CREATE TABLE IF NOT EXISTS driver_payment_rails (
+      driver_id TEXT PRIMARY KEY,
+      telebirr_phone TEXT NOT NULL,
+      telebirr_account_name TEXT,
+      cbe_account_number TEXT NOT NULL,
+      cbe_account_name TEXT,
+      bank_name TEXT NOT NULL DEFAULT 'Commercial Bank of Ethiopia',
+      bank_account_number TEXT,
+      bank_account_name TEXT,
+      primary_rail TEXT NOT NULL DEFAULT 'TELEBIRR',
+      qr_code_data TEXT,
+      is_verified INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (driver_id) REFERENCES drivers(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS payment_audit_records (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      ride_id TEXT,
+      rider_id TEXT NOT NULL,
+      driver_id TEXT,
+      amount_etb REAL NOT NULL,
+      fare_subtotal_etb REAL NOT NULL,
+      vat_amount_etb REAL NOT NULL,
+      payment_method TEXT NOT NULL,
+      routing_destination TEXT NOT NULL,
+      driver_rail_json TEXT,
+      platform_rail_json TEXT,
+      tax_routing_destination TEXT NOT NULL,
+      tax_amount_etb REAL NOT NULL,
+      tax_recipient_account TEXT NOT NULL,
+      compliance_reference TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'RECORDED',
+      timestamp TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS driver_platform_credits (
+      driver_id TEXT PRIMARY KEY,
+      credit_balance_etb REAL NOT NULL DEFAULT 0.0,
+      total_topups_etb REAL NOT NULL DEFAULT 0.0,
+      total_deductions_etb REAL NOT NULL DEFAULT 0.0,
+      last_topup_at TEXT,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (driver_id) REFERENCES drivers(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS driver_credit_transactions (
+      id TEXT PRIMARY KEY,
+      driver_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      amount_etb REAL NOT NULL,
+      balance_after_etb REAL NOT NULL,
+      payment_method TEXT NOT NULL,
+      payment_reference TEXT NOT NULL,
+      description TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (driver_id) REFERENCES drivers(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS passenger_wallets (
+      user_id TEXT PRIMARY KEY,
+      balance_etb REAL NOT NULL DEFAULT 0.0,
+      currency TEXT NOT NULL DEFAULT 'ETB',
+      total_topped_up_etb REAL NOT NULL DEFAULT 0.0,
+      total_spent_etb REAL NOT NULL DEFAULT 0.0,
+      last_topup_at TEXT,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS passenger_wallet_transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      amount_etb REAL NOT NULL,
+      balance_after_etb REAL NOT NULL,
+      topup_rail TEXT,
+      card_details_json TEXT,
+      reference TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'COMPLETED',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_audit_records_order ON payment_audit_records(order_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_records_ride ON payment_audit_records(ride_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_records_dest ON payment_audit_records(routing_destination);
+    CREATE INDEX IF NOT EXISTS idx_driver_credit_txs ON driver_credit_transactions(driver_id);
+    CREATE INDEX IF NOT EXISTS idx_passenger_wallet_txs ON passenger_wallet_transactions(user_id);
   `);
 
   // Run safe schema migrations for existing database columns
@@ -509,6 +602,9 @@ export function initDatabase() {
   seedSystemTariffsAndSettings();
   seedDemandHeatmapZones();
   seedDriverExpenses();
+  seedDriverPaymentRails();
+  seedDriverPlatformCredits();
+  seedPassengerWallets();
 }
 
 function seedInitialData() {
@@ -1629,6 +1725,26 @@ function seedSystemTariffsAndSettings() {
       insertSetting.run(k, v, cat, desc, now);
     }
   }
+
+  // Ensure advanced payment routing and tax destination settings exist
+  const additionalSettings: [string, string, string, string][] = [
+    ['tax_routing_mode', 'DRIVER', 'taxation', 'Tax collection routing destination: DRIVER (default for 0% commission), PLATFORM, or AUTHORITY'],
+    ['tax_authority_account', 'ERCA-VAT-570-2025', 'taxation', 'Official Ministry of Revenues account number for direct VAT settlement'],
+    ['tax_authority_bank', 'National Bank of Ethiopia', 'taxation', 'Tax authority primary treasury bank'],
+    ['platform_telebirr_merchant_id', 'ETH-TB-99882', 'payments', 'Chebelew Corporate Telebirr merchant ID for platform rides'],
+    ['platform_telebirr_merchant_name', 'Chebelew Technologies Ethiopia PLC', 'payments', 'Chebelew registered corporate title for mobile money'],
+    ['platform_cbe_account', '1000987654321', 'payments', 'Chebelew Commercial Bank of Ethiopia treasury account'],
+    ['driver_minimum_credit_threshold', '100.0', 'operations', 'Minimum platform credit threshold before cash trip alert'],
+    ['usd_to_etb_rate', '138.5', 'payments', 'NBE benchmark exchange rate for international card processing'],
+  ];
+
+  const insertOrIgnore = db.prepare(`
+    INSERT OR IGNORE INTO system_settings (key, value, category, description, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  for (const [k, v, cat, desc] of additionalSettings) {
+    insertOrIgnore.run(k, v, cat, desc, now);
+  }
 }
 
 function seedDemandHeatmapZones() {
@@ -1773,5 +1889,209 @@ function seedDriverExpenses() {
       'driver_ahmed_01', 4.2, 85.0, 45.0, 50.0, ?
     )
   `).run(now);
+}
+
+function seedDriverPaymentRails() {
+  const count = db.prepare('SELECT count(*) as count FROM driver_payment_rails').get() as { count: number };
+  if (count.count > 0) return;
+
+  const now = new Date().toISOString();
+  const insert = db.prepare(`
+    INSERT INTO driver_payment_rails (
+      driver_id, telebirr_phone, telebirr_account_name, cbe_account_number, cbe_account_name,
+      bank_name, bank_account_number, bank_account_name, primary_rail, qr_code_data, is_verified, updated_at
+    ) VALUES (
+      @driver_id, @telebirr_phone, @telebirr_account_name, @cbe_account_number, @cbe_account_name,
+      @bank_name, @bank_account_number, @bank_account_name, @primary_rail, @qr_code_data, @is_verified, @updated_at
+    )
+  `);
+
+  const rails = [
+    {
+      driver_id: 'driver_ahmed_01',
+      telebirr_phone: '+251911223344',
+      telebirr_account_name: 'Ahmed Mohammed Ali',
+      cbe_account_number: '1000192837465',
+      cbe_account_name: 'Ahmed Mohammed Ali',
+      bank_name: 'Commercial Bank of Ethiopia',
+      bank_account_number: '1000192837465',
+      bank_account_name: 'Ahmed Mohammed Ali',
+      primary_rail: 'TELEBIRR',
+      qr_code_data: JSON.stringify({ rail: 'TELEBIRR', phone: '+251911223344', name: 'Ahmed Mohammed' }),
+      is_verified: 1,
+      updated_at: now,
+    },
+    {
+      driver_id: 'driver_dawit_02',
+      telebirr_phone: '+251922334455',
+      telebirr_account_name: 'Dawit Tadesse Bekele',
+      cbe_account_number: '1000283746519',
+      cbe_account_name: 'Dawit Tadesse Bekele',
+      bank_name: 'Commercial Bank of Ethiopia',
+      bank_account_number: '1000283746519',
+      bank_account_name: 'Dawit Tadesse Bekele',
+      primary_rail: 'CBE_BIRR',
+      qr_code_data: JSON.stringify({ rail: 'CBE_BIRR', cbe: '1000283746519', name: 'Dawit Tadesse' }),
+      is_verified: 1,
+      updated_at: now,
+    },
+    {
+      driver_id: 'driver_bethlehem_03',
+      telebirr_phone: '+251933445566',
+      telebirr_account_name: 'Bethlehem Haile Wolde',
+      cbe_account_number: '1000374651928',
+      cbe_account_name: 'Bethlehem Haile Wolde',
+      bank_name: 'Bank of Abyssinia',
+      bank_account_number: '8872910293',
+      bank_account_name: 'Bethlehem Haile Wolde',
+      primary_rail: 'TELEBIRR',
+      qr_code_data: JSON.stringify({ rail: 'TELEBIRR', phone: '+251933445566', name: 'Bethlehem Haile' }),
+      is_verified: 1,
+      updated_at: now,
+    },
+    {
+      driver_id: 'driver_henok_04',
+      telebirr_phone: '+251944556677',
+      telebirr_account_name: 'Henok Girma Kassa',
+      cbe_account_number: '1000465192837',
+      cbe_account_name: 'Henok Girma Kassa',
+      bank_name: 'Awash Bank',
+      bank_account_number: '01429182736400',
+      bank_account_name: 'Henok Girma Kassa',
+      primary_rail: 'BANK_TRANSFER',
+      qr_code_data: JSON.stringify({ rail: 'AWASH', account: '01429182736400', name: 'Henok Girma' }),
+      is_verified: 1,
+      updated_at: now,
+    },
+    {
+      driver_id: 'driver_solomon_05',
+      telebirr_phone: '+251955667788',
+      telebirr_account_name: 'Solomon Kebede Tefera',
+      cbe_account_number: '1000519283746',
+      cbe_account_name: 'Solomon Kebede Tefera',
+      bank_name: 'Commercial Bank of Ethiopia',
+      bank_account_number: '1000519283746',
+      bank_account_name: 'Solomon Kebede Tefera',
+      primary_rail: 'TELEBIRR',
+      qr_code_data: JSON.stringify({ rail: 'TELEBIRR', phone: '+251955667788', name: 'Solomon Kebede' }),
+      is_verified: 1,
+      updated_at: now,
+    },
+  ];
+
+  for (const r of rails) {
+    insert.run(r);
+  }
+}
+
+function seedDriverPlatformCredits() {
+  const count = db.prepare('SELECT count(*) as count FROM driver_platform_credits').get() as { count: number };
+  if (count.count > 0) return;
+
+  const now = new Date().toISOString();
+  const insertCredit = db.prepare(`
+    INSERT INTO driver_platform_credits (
+      driver_id, credit_balance_etb, total_topups_etb, total_deductions_etb, last_topup_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertTx = db.prepare(`
+    INSERT INTO driver_credit_transactions (
+      id, driver_id, type, amount_etb, balance_after_etb, payment_method, payment_reference, description, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  insertCredit.run('driver_ahmed_01', 1500.0, 2000.0, 500.0, now, now);
+  insertTx.run(
+    'tx_cred_ahmed_init',
+    'driver_ahmed_01',
+    'TOPUP',
+    2000.0,
+    2000.0,
+    'TELEBIRR',
+    'TB_CR_992101',
+    'Prepaid driver platform credit top-up via Telebirr',
+    now
+  );
+  insertTx.run(
+    'tx_cred_ahmed_recon1',
+    'driver_ahmed_01',
+    'CASH_RECONCILIATION',
+    -500.0,
+    1500.0,
+    'CASH',
+    'RECON_CASH_01',
+    'Reconciled platform fee offset for cash collected trip',
+    now
+  );
+
+  insertCredit.run('driver_dawit_02', 850.0, 1000.0, 150.0, now, now);
+  insertTx.run(
+    'tx_cred_dawit_init',
+    'driver_dawit_02',
+    'TOPUP',
+    1000.0,
+    1000.0,
+    'BANK_TRANSFER',
+    'CBE_TR_881923',
+    'Prepaid driver credit top-up via CBE transfer',
+    now
+  );
+}
+
+function seedPassengerWallets() {
+  const count = db.prepare('SELECT count(*) as count FROM passenger_wallets').get() as { count: number };
+  if (count.count > 0) return;
+
+  const now = new Date().toISOString();
+  const insertWallet = db.prepare(`
+    INSERT INTO passenger_wallets (
+      user_id, balance_etb, currency, total_topped_up_etb, total_spent_etb, last_topup_at, updated_at
+    ) VALUES (?, ?, 'ETB', ?, ?, ?, ?)
+  `);
+
+  const insertWalletTx = db.prepare(`
+    INSERT INTO passenger_wallet_transactions (
+      id, user_id, type, amount_etb, balance_after_etb, topup_rail, card_details_json, reference, description, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Rider 1: Leila Haile
+  insertWallet.run('user_leila_01', 1250.0, 2500.0, 1250.0, now, now);
+  insertWalletTx.run(
+    'tx_wal_leila_card',
+    'user_leila_01',
+    'TOPUP',
+    2500.0,
+    2500.0,
+    'INTERNATIONAL_CARD',
+    JSON.stringify({
+      brand: 'VISA',
+      last4: '4242',
+      sourceCurrency: 'USD',
+      sourceAmount: 18.05,
+      exchangeRate: 138.5,
+    }),
+    'CHB_VISA_INTL_99182',
+    'International Visa Card top-up ($18.05 USD converted @ 138.5 ETB/USD)',
+    'COMPLETED',
+    now
+  );
+
+  // Rider 2: Tsegaye Gebre
+  insertWallet.run('user_tsegaye_02', 600.0, 1000.0, 400.0, now, now);
+  insertWalletTx.run(
+    'tx_wal_tsegaye_tb',
+    'user_tsegaye_02',
+    'TOPUP',
+    1000.0,
+    1000.0,
+    'TELEBIRR',
+    null,
+    'TB_WAL_772819',
+    'Telebirr mobile money wallet top-up',
+    'COMPLETED',
+    now
+  );
 }
 

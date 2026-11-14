@@ -37,6 +37,7 @@ import { AdminSosTab } from './AdminSosTab';
 import { AdminDeveloperTab } from './AdminDeveloperTab';
 import { AdminTariffSettingsTab } from './AdminTariffSettingsTab';
 import { AdminKycQueueTab } from './AdminKycQueueTab';
+import { AdminPaymentTaxConsole } from './AdminPaymentTaxConsole';
 
 interface AdminViewProps {
   language: Language;
@@ -768,9 +769,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
           </div>
         )}
 
-        {/* Tab 4: Ethiopian VAT Regulation No. 570/2025 Ledger */}
+        {/* Tab 4: Ethiopian VAT Regulation No. 570/2025 Ledger & Tax Routing Console */}
         {activeTab === 'vat' && (
-          <div className="max-w-6xl mx-auto p-8 overflow-y-auto h-full space-y-5">
+          <div className="max-w-6xl mx-auto p-8 overflow-y-auto h-full space-y-6">
+            <AdminPaymentTaxConsole />
+
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
                 <div>

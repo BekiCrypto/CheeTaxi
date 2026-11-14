@@ -19,6 +19,7 @@ import { providerRouter } from './routes/providerRoutes.js';
 import { createSafetyRouter } from './routes/safetyRoutes.js';
 import { corporateRouter } from './routes/corporateRoutes.js';
 import { developerRouter } from './routes/developerRoutes.js';
+import { paymentRouter } from './routes/paymentRoutes.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -154,6 +155,8 @@ app.use('/api/providers', providerRouter);
 app.use('/api/safety', createSafetyRouter(io));
 app.use('/api/corporate', corporateRouter);
 app.use('/api/developer', developerRouter);
+app.use('/api/payment', paymentRouter);
+app.use('/api', paymentRouter);
 
 // Serve frontend static build if available (production mode / unified server)
 const possiblePaths = [

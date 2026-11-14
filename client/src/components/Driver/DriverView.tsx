@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   Calculator,
   Target,
+  CreditCard,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { DemandHeatmapZone, Driver, DriverNetProfitability, DriverOperatingExpenses, Ride, VehicleCategory } from '@shared/types';
@@ -37,6 +38,7 @@ import { DriverSubscriptionTab } from './DriverSubscriptionTab';
 import { DriverDeliveryTab } from './DriverDeliveryTab';
 import { DriverKYCVerification } from './DriverKYCVerification';
 import { DriverOnboardingModal } from '../Onboarding/DriverOnboardingModal';
+import { DriverPaymentRailsTab } from './DriverPaymentRailsTab';
 
 interface DriverViewProps {
   currentDriverId: string;
@@ -57,7 +59,7 @@ export const DriverView: React.FC<DriverViewProps> = ({
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [incomingRide, setIncomingRide] = useState<Ride | null>(null);
   const [countdown, setCountdown] = useState<number>(30);
-  const [activeTab, setActiveTab] = useState<'trip' | 'subscription' | 'deliveries' | 'earnings' | 'kyc' | 'heatmap'>('trip');
+  const [activeTab, setActiveTab] = useState<'trip' | 'subscription' | 'deliveries' | 'earnings' | 'kyc' | 'heatmap' | 'payout_rails'>('trip');
   const [sosActive, setSosActive] = useState(false);
   const [sosMessage, setSosMessage] = useState<string | null>(null);
   const [showDriverOnboardingModal, setShowDriverOnboardingModal] = useState(false);
@@ -602,6 +604,17 @@ export const DriverView: React.FC<DriverViewProps> = ({
           >
             KYC
           </button>
+          <button
+            onClick={() => setActiveTab('payout_rails')}
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition flex items-center gap-1 ${
+              activeTab === 'payout_rails'
+                ? 'border-brand-500 text-brand-600 bg-white'
+                : 'border-transparent hover:text-slate-900'
+            }`}
+          >
+            <CreditCard className="w-3 h-3 text-emerald-600" />
+            <span>Payout Rails & Credit</span>
+          </button>
         </div>
 
         {/* Tab 1: Active Trip & Navigation */}
@@ -1009,6 +1022,13 @@ export const DriverView: React.FC<DriverViewProps> = ({
               language={language}
               onKycUpdated={fetchDriverProfile}
             />
+          </div>
+        )}
+
+        {/* Tab 4: Direct Payout Rails & Platform Credit */}
+        {activeTab === 'payout_rails' && driver && (
+          <div className="flex-1 overflow-y-auto bg-slate-50">
+            <DriverPaymentRailsTab driverId={driver.id} />
           </div>
         )}
 

@@ -34,11 +34,14 @@ import {
   Luggage,
   Wind,
   VolumeX,
+  Wallet,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { LocationSearchInput } from './LocationSearchInput';
 import { TelebirrModal } from '../Payment/TelebirrModal';
 import { VatReceiptModal } from '../Payment/VatReceiptModal';
+import { RoutedPaymentModal } from '../Payment/RoutedPaymentModal';
+import { PassengerWalletModal } from '../Payment/PassengerWalletModal';
 import { RiderDeliveryPanel } from './RiderDeliveryPanel';
 import { PassengerOnboardingModal } from '../Onboarding/PassengerOnboardingModal';
 import { ADDIS_LANDMARKS, AddisLandmark } from '@shared/landmarks';
@@ -114,6 +117,11 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [ratingValue, setRatingValue] = useState(5);
   const [tipValue, setTipValue] = useState(0);
   const [quickNoteSent, setQuickNoteSent] = useState<string | null>(null);
+
+  // Advanced Payment Systems: Direct Driver Rails & Passenger Wallet
+  const [showRoutedPaymentModal, setShowRoutedPaymentModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [passengerWalletBalance, setPassengerWalletBalance] = useState<number | null>(null);
 
   // Passenger Onboarding Flow
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -213,6 +221,13 @@ export const RiderView: React.FC<RiderViewProps> = ({
       .then((res) => res.json())
       .then((data) => {
         if (data.preferences) setComfortPreferences(data.preferences);
+      })
+      .catch(console.error);
+
+    fetch(`/api/wallet/${currentRiderId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.wallet) setPassengerWalletBalance(data.wallet.balanceEtb);
       })
       .catch(console.error);
   }, [currentRiderId]);
@@ -498,6 +513,17 @@ export const RiderView: React.FC<RiderViewProps> = ({
               {t.whereTo}
             </h2>
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowWalletModal(true)}
+                className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 transition"
+                title="Chebelew Passenger Wallet"
+              >
+                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>
+                  {passengerWalletBalance !== null ? `${passengerWalletBalance.toFixed(0)} Br` : 'Wallet'}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => setShowOnboardingModal(true)}
@@ -1263,13 +1289,15 @@ export const RiderView: React.FC<RiderViewProps> = ({
 
             {/* Bottom Action buttons */}
             <div className="space-y-2 pt-4 border-t border-slate-100">
-              {activeRide.paymentMethod === 'TELEBIRR' && activeRide.paymentStatus !== 'PAID' && (
+              {activeRide.paymentStatus !== 'PAID' && (
                 <button
-                  onClick={handleOpenTelebirrPayment}
-                  className="w-full bg-[#0070ba] hover:bg-[#004c82] text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md"
+                  onClick={() => setShowRoutedPaymentModal(true)}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md"
                 >
-                  <Smartphone className="w-4 h-4" />
-                  <span>Pay Now via Telebirr ({activeRide.fare.totalFare.toFixed(2)} ETB)</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-200" />
+                  <span>
+                    Pay Now (Direct Driver Rails / Wallet / Telebirr) • {activeRide.fare.totalFare.toFixed(2)} ETB
+                  </span>
                 </button>
               )}
 
@@ -1343,6 +1371,37 @@ export const RiderView: React.FC<RiderViewProps> = ({
           onClose={() => setShowTelebirrModal(false)}
         />
       )}
+
+      {/* Advanced Routed Payment Modal (Direct Driver Rails vs Platform Escrow + Wallet) */}
+      {activeRide && (
+        <RoutedPaymentModal
+          ride={activeRide}
+          isOpen={showRoutedPaymentModal}
+          userId={currentRiderId}
+          userPhone={currentRiderPhone}
+          onSuccess={(audit) => {
+            setShowRoutedPaymentModal(false);
+            setActiveRide({
+              ...activeRide,
+              paymentStatus: 'PAID',
+            });
+            setShowReceiptModal(true);
+          }}
+          onClose={() => setShowRoutedPaymentModal(false)}
+          onOpenWalletModal={() => {
+            setShowRoutedPaymentModal(false);
+            setShowWalletModal(true);
+          }}
+        />
+      )}
+
+      {/* Passenger Wallet Modal (Multi-Rail Top Up & Balance) */}
+      <PassengerWalletModal
+        userId={currentRiderId}
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onBalanceUpdated={(balance) => setPassengerWalletBalance(balance)}
+      />
 
       {/* Electronic VAT Tax Receipt Modal */}
       {activeRide && (

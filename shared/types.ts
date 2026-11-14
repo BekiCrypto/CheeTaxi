@@ -56,7 +56,17 @@ export type DeliveryStatus =
   | 'FAILED'
   | 'CANCELLED';
 
-export type PaymentMethod = 'CASH' | 'TELEBIRR' | 'BANK_TRANSFER' | 'CORPORATE_BILLING' | 'CARD';
+export type PaymentMethod = 
+  | 'CASH' 
+  | 'TELEBIRR' 
+  | 'CBE_BIRR'
+  | 'BANK_TRANSFER' 
+  | 'CORPORATE_BILLING' 
+  | 'CARD'
+  | 'WALLET'
+  | 'INTERNATIONAL_CARD'
+  | 'APPLE_PAY'
+  | 'POS_SWIPE';
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
 
 export type SubscriptionBillingPeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
@@ -687,5 +697,138 @@ export interface RouteDeviationAlert {
   status: 'FLAGGED' | 'INVESTIGATING' | 'RESOLVED_NORMAL_TRAFFIC' | 'ESCALATED';
   resolvedBy?: string;
   resolutionNotes?: string;
+  createdAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Advanced Payment Systems: Direct Driver Rails, Tax Routing & Credit Topup
+// ----------------------------------------------------------------------------
+
+export type PrimaryPaymentRail = 'TELEBIRR' | 'CBE_BIRR' | 'BANK_TRANSFER';
+
+export interface DriverPaymentRails {
+  driverId: string;
+  telebirrPhone: string;
+  telebirrAccountName?: string;
+  cbeAccountNumber: string;
+  cbeAccountName?: string;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName?: string;
+  primaryRail: PrimaryPaymentRail;
+  qrCodeData?: string;
+  isVerified: boolean;
+  updatedAt: string;
+}
+
+export type TaxRoutingMode = 'DRIVER' | 'PLATFORM' | 'AUTHORITY';
+
+export interface TaxRoutingConfig {
+  taxRoutingMode: TaxRoutingMode; // 'DRIVER' (default for 0% commission) | 'PLATFORM' | 'AUTHORITY'
+  vatRatePercent: number; // 15% under Ethiopian Regulation No. 570/2025
+  authorityAccountName: string; // e.g. "FDRE Ministry of Revenues"
+  authorityAccountNumber: string; // e.g. "ERCA-VAT-570-2025"
+  authorityBank: string; // e.g. "National Bank of Ethiopia"
+  platformTaxEscrowBalanceEtb: number;
+  platformTelebirrMerchantId: string;
+  platformTelebirrMerchantName: string;
+  platformCbeAccount: string;
+  updatedAt: string;
+}
+
+export type PaymentRoutingDestination = 'DRIVER_DIRECT' | 'PLATFORM_ESCROW';
+
+export interface PaymentAuditRecord {
+  id: string;
+  orderId: string;
+  rideId?: string;
+  riderId: string;
+  driverId?: string;
+  amountEtb: number;
+  fareSubtotalEtb: number;
+  vatAmountEtb: number;
+  paymentMethod: PaymentMethod;
+  routingDestination: PaymentRoutingDestination;
+  driverRailUsed?: {
+    railType: string;
+    accountIdentifier: string;
+    accountName: string;
+  };
+  platformRailUsed?: {
+    merchantId: string;
+    merchantName: string;
+  };
+  taxRoutingDestination: TaxRoutingMode;
+  taxAmountEtb: number;
+  taxRecipientAccount: string;
+  complianceReference: string; // e.g. "ET-TAX-2026-XXXXX"
+  status: 'RECORDED' | 'SETTLED' | 'RECONCILED';
+  timestamp: string;
+}
+
+export interface DriverPlatformCredit {
+  driverId: string;
+  creditBalanceEtb: number; // Prepaid platform credits for cash reconciliation / subscription
+  totalTopupsEtb: number;
+  totalDeductionsEtb: number;
+  lastTopupAt?: string;
+  updatedAt: string;
+}
+
+export interface DriverCreditTransaction {
+  id: string;
+  driverId: string;
+  type: 'TOPUP' | 'CASH_RECONCILIATION' | 'SUBSCRIPTION_RENEWAL' | 'COMMISSION_SETTLEMENT' | 'MANUAL_ADJUSTMENT';
+  amountEtb: number;
+  balanceAfterEtb: number;
+  paymentMethod: PaymentMethod;
+  paymentReference: string;
+  description: string;
+  createdAt: string;
+}
+
+export interface DriverCashReconciliationSummary {
+  driverId: string;
+  totalCashCollectedEtb: number;
+  platformCreditsRemainingEtb: number;
+  pendingReconciliationEtb: number;
+  status: 'IN_GOOD_STANDING' | 'LOW_CREDIT_ALERT' | 'TOPUP_REQUIRED';
+}
+
+export type PassengerTopupRail = 
+  | 'TELEBIRR' 
+  | 'CBE_BIRR' 
+  | 'BANK_TRANSFER' 
+  | 'INTERNATIONAL_CARD' 
+  | 'APPLE_PAY' 
+  | 'POS_SWIPE';
+
+export interface PassengerWallet {
+  userId: string;
+  balanceEtb: number;
+  currency: string;
+  totalToppedUpEtb: number;
+  totalSpentEtb: number;
+  lastTopupAt?: string;
+  updatedAt: string;
+}
+
+export interface PassengerWalletTransaction {
+  id: string;
+  userId: string;
+  type: 'TOPUP' | 'RIDE_PAYMENT' | 'DELIVERY_PAYMENT' | 'REFUND';
+  amountEtb: number;
+  balanceAfterEtb: number;
+  topupRail?: PassengerTopupRail;
+  cardDetails?: {
+    brand: 'VISA' | 'MASTERCARD' | 'AMEX';
+    last4: string;
+    sourceCurrency?: string;
+    sourceAmount?: number;
+    exchangeRate?: number;
+  };
+  reference: string;
+  description: string;
+  status: 'COMPLETED' | 'PENDING' | 'FAILED';
   createdAt: string;
 }
