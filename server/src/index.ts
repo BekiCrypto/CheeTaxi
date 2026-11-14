@@ -93,13 +93,49 @@ const io = new SocketIOServer(server, {
 
 setupSocketHandlers(io);
 
-// Health check endpoint
+// Health check and diagnostic endpoint
 app.get('/api/health', (req, res) => {
+  let dbHealthy = false;
+  let activeRides = 0;
+  let onlineDrivers = 0;
+  let totalTariffs = 0;
+
+  try {
+    const rideRow = db.prepare(`SELECT count(*) as count FROM rides WHERE status IN ('REQUESTED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')`).get() as any;
+    const driverRow = db.prepare(`SELECT count(*) as count FROM drivers WHERE is_online = 1`).get() as any;
+    const tariffRow = db.prepare(`SELECT count(*) as count FROM system_tariffs`).get() as any;
+    activeRides = rideRow?.count || 0;
+    onlineDrivers = driverRow?.count || 0;
+    totalTariffs = tariffRow?.count || 0;
+    dbHealthy = true;
+  } catch (e) {
+    dbHealthy = false;
+  }
+
+  const memory = process.memoryUsage();
+  const socketClientsCount = io.engine?.clientsCount || 0;
+
   res.json({
-    status: 'ok',
+    status: dbHealthy ? 'ok' : 'degraded',
     service: 'Chebelew Mobility & Dispatch API',
-    version: '1.0.0',
+    version: '2.0.0-enterprise',
+    environment: process.env.NODE_ENV || 'production',
     uptimeSeconds: Math.floor(process.uptime()),
+    database: {
+      connected: dbHealthy,
+      journalMode: 'WAL',
+      activeRidesCount: activeRides,
+      onlineDriversCount: onlineDrivers,
+      configuredTariffsCount: totalTariffs,
+    },
+    websockets: {
+      activeClientsCount: socketClientsCount,
+    },
+    memory: {
+      rssMb: Math.round(memory.rss / 1024 / 1024),
+      heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
+      heapTotalMb: Math.round(memory.heapTotal / 1024 / 1024),
+    },
     time: new Date().toISOString(),
     addisTimezone: 'Africa/Addis_Ababa',
   });

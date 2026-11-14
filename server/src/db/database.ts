@@ -367,6 +367,29 @@ export function initDatabase() {
       description TEXT,
       updated_at TEXT NOT NULL
     );
+
+    -- High Performance Indexes for Core Tables
+    CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
+    CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id);
+    CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id);
+    CREATE INDEX IF NOT EXISTS idx_rides_created ON rides(created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_drivers_online ON drivers(is_online, is_busy);
+    CREATE INDEX IF NOT EXISTS idx_drivers_user ON drivers(user_id);
+    CREATE INDEX IF NOT EXISTS idx_drivers_kyc ON drivers(kyc_status);
+
+    CREATE INDEX IF NOT EXISTS idx_telebirr_out_trade ON telebirr_orders(out_trade_no);
+    CREATE INDEX IF NOT EXISTS idx_telebirr_ride ON telebirr_orders(ride_id);
+
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id);
+
+    CREATE INDEX IF NOT EXISTS idx_sos_status ON sos_incidents(status);
+    CREATE INDEX IF NOT EXISTS idx_delivery_status ON delivery_orders(status);
+    CREATE INDEX IF NOT EXISTS idx_delivery_courier ON delivery_orders(courier_id);
+
+    CREATE INDEX IF NOT EXISTS idx_subs_driver ON driver_subscriptions(driver_id);
+    CREATE INDEX IF NOT EXISTS idx_subs_status ON driver_subscriptions(status);
   `);
 
   // Run safe schema migrations for existing database columns

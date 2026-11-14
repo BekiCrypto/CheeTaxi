@@ -160,22 +160,22 @@ export function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 font-sans antialiased text-slate-900">
-      <Navbar
-        currentRole={currentModule}
-        onRoleChange={(m) => setModule(m)}
-        language={language}
-        onLanguageChange={setLanguage}
-        onRunFastDemo={handleRunFastDemo}
-        activeUserName={
-          currentModule === 'driver'
-            ? 'Ahmed Mohammed (Driver)'
-            : currentModule === 'admin'
-            ? 'Almaz Tefera (Dispatcher)'
-            : currentModule === 'website'
-            ? 'Public Visitor'
-            : 'Leila Haile (Rider)'
-        }
-      />
+      {currentModule !== 'website' && (
+        <Navbar
+          currentRole={currentModule}
+          onRoleChange={(m) => setModule(m)}
+          language={language}
+          onLanguageChange={setLanguage}
+          onRunFastDemo={handleRunFastDemo}
+          activeUserName={
+            currentModule === 'driver'
+              ? 'Ahmed Mohammed (Driver)'
+              : currentModule === 'admin'
+              ? 'Almaz Tefera (Dispatcher)'
+              : 'Leila Haile (Rider)'
+          }
+        />
+      )}
 
       <main className="flex-1 overflow-hidden relative">
         <Suspense fallback={<ModuleLoadingFallback label={currentModule.toUpperCase()} />}>

@@ -21,6 +21,8 @@ import {
   Send,
   X,
   Package,
+  Building2,
+  CreditCard,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { TelebirrModal } from '../Payment/TelebirrModal';
@@ -558,11 +560,11 @@ export const RiderView: React.FC<RiderViewProps> = ({
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                 {t.paymentMethod}
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('TELEBIRR')}
-                  className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 text-xs font-bold transition ${
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
                     paymentMethod === 'TELEBIRR'
                       ? 'border-[#0070ba] bg-blue-50/50 text-[#0070ba]'
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -575,7 +577,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('CASH')}
-                  className={`p-3 rounded-xl border-2 flex items-center justify-center gap-2 text-xs font-bold transition ${
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
                     paymentMethod === 'CASH'
                       ? 'border-emerald-600 bg-emerald-50/50 text-emerald-700'
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -584,7 +586,40 @@ export const RiderView: React.FC<RiderViewProps> = ({
                   <DollarSign className="w-4 h-4 text-emerald-600" />
                   <span>{t.cash}</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('BANK_TRANSFER')}
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
+                    paymentMethod === 'BANK_TRANSFER'
+                      ? 'border-purple-600 bg-purple-50/50 text-purple-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-purple-600" />
+                  <span>CBE Birr / Bank</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('CORPORATE_BILLING')}
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
+                    paymentMethod === 'CORPORATE_BILLING'
+                      ? 'border-amber-600 bg-amber-50/50 text-amber-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Building2 className="w-4 h-4 text-amber-600" />
+                  <span>Corporate Account</span>
+                </button>
               </div>
+
+              {paymentMethod === 'CORPORATE_BILLING' && (
+                <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+                  <span>🏢 Billed to <strong>Ethiopian Airlines Commercial Fleet</strong></span>
+                  <span className="font-mono font-bold text-amber-700">Allowance: 12,500 ETB</span>
+                </div>
+              )}
             </div>
 
             {/* Book Now Button */}

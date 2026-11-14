@@ -81,8 +81,17 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
   const [currentPage, setCurrentPage] = useState<PageId>(
     (initialPageId as PageId) || 'home'
   );
+
+  React.useEffect(() => {
+    if (initialPageId) {
+      setCurrentPage(initialPageId as PageId);
+    }
+  }, [initialPageId]);
+
   const [activeMenuDropdown, setActiveMenuDropdown] = useState<string | null>(null);
   const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [ticketIdCreated, setTicketIdCreated] = useState<string | null>(null);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
     phone: '',
@@ -91,6 +100,39 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
     message: '',
   });
 
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactForm.phone || !contactForm.message) return;
+    setIsSubmittingContact(true);
+    try {
+      const res = await fetch('/api/admin/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: `visitor_${Date.now()}`,
+          userName: contactForm.name || 'Web Visitor',
+          userPhone: contactForm.phone,
+          userRole: 'rider',
+          category: contactForm.subject.toLowerCase().includes('dispute') ? 'fare_dispute' : 'app_issue',
+          subject: contactForm.subject,
+          message: `${contactForm.message} [Email: ${contactForm.email || 'N/A'}]`,
+        }),
+      });
+      const data = await res.json();
+      if (data.ticket) {
+        setTicketIdCreated(data.ticket.id);
+        setContactSubmitted(true);
+      } else {
+        setContactSubmitted(true);
+      }
+    } catch (err) {
+      console.error('Contact submit error:', err);
+      setContactSubmitted(true);
+    } finally {
+      setIsSubmittingContact(false);
+    }
+  };
+
   // Demo route estimator on homepage
   const [demoPickup, setDemoPickup] = useState('Bole Medhanialem Mall');
   const [demoDropoff, setDemoDropoff] = useState('Meskel Square');
@@ -98,6 +140,7 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
   const navigateTo = (page: PageId) => {
     setCurrentPage(page);
     setActiveMenuDropdown(null);
+    window.history.pushState({}, '', page === 'home' ? '/portal' : `/portal/${page}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -444,11 +487,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
             {/* Quick Action CTAs */}
             <div className="flex items-center gap-2">
               <button
+                onClick={() => onNavigateToApp('driver')}
+                className="hidden sm:flex px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white text-xs font-bold rounded-lg border border-slate-800 transition items-center gap-1.5"
+              >
+                <Car className="w-3.5 h-3.5 text-amber-400" />
+                <span>Driver Portal</span>
+              </button>
+              <button
                 onClick={() => onNavigateToApp('rider')}
                 className="px-3.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5"
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span>Launch App</span>
+                <span>Passenger App</span>
               </button>
             </div>
           </div>
@@ -1320,13 +1370,137 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
             <div className="border-b pb-4">
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Contact Chebelew (9922)</h2>
-              <p className="text-xs text-slate-500 mt-1">24/7 dedicated customer support, sales, and safety operations.</p>
+              <p className="text-xs text-slate-500 mt-1">24/7 dedicated customer support, partnership inquiries, and safety operations.</p>
             </div>
-            <div className="grid md:grid-cols-2 gap-6 text-xs">
-              <div className="space-y-3">
-                <p><strong>Hotline:</strong> 9922 (Toll-Free Nationwide)</p>
-                <p><strong>Address:</strong> Bole Medhanialem Mall, 4th Floor, Addis Ababa, Ethiopia</p>
-                <p><strong>Support Email:</strong> support@chebelew.et</p>
+
+            <div className="grid md:grid-cols-12 gap-8 text-xs">
+              {/* Contact Information & Hotlines */}
+              <div className="md:col-span-5 space-y-5">
+                <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-3">
+                  <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-brand-600" />
+                    Central Operations Hotline
+                  </h4>
+                  <p className="text-slate-600">
+                    Dial <strong>9922</strong> toll-free from any Ethio Telecom or Safaricom mobile line in Ethiopia.
+                  </p>
+                  <div className="pt-2 border-t border-slate-200 space-y-2 text-slate-700">
+                    <div><strong>Headquarters:</strong> Bole Medhanialem Mall, 4th Floor, Addis Ababa, Ethiopia</div>
+                    <div><strong>Support Email:</strong> support@chebelew.et</div>
+                    <div><strong>Corporate Inquiries:</strong> enterprise@chebelew.et</div>
+                    <div><strong>Police Emergency:</strong> 991 (Integrated with SOS Console)</div>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 text-emerald-900 space-y-1">
+                  <strong className="block font-bold">Fast In-App Resolution</strong>
+                  <p>Existing passengers and drivers can report lost items or fare disputes directly from their trip history for instant GPS route auditing.</p>
+                </div>
+              </div>
+
+              {/* Live Interactive Support Ticket Form */}
+              <div className="md:col-span-7">
+                {contactSubmitted ? (
+                  <div className="p-8 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-3">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
+                    <h3 className="font-bold text-base text-emerald-900">Message Received!</h3>
+                    <p className="text-xs text-emerald-700 max-w-md mx-auto">
+                      Thank you for contacting Chebelew. Your inquiry has been routed to our Central Dispatch & Support Team.
+                      {ticketIdCreated && (
+                        <span className="block mt-2 font-mono font-bold bg-white/80 py-1 px-2 rounded border border-emerald-300">
+                          Tracking Ticket: #{ticketIdCreated}
+                        </span>
+                      )}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setContactSubmitted(false);
+                        setTicketIdCreated(null);
+                        setContactForm({ name: '', phone: '', email: '', subject: 'General Inquiry', message: '' });
+                      }}
+                      className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition"
+                    >
+                      Send Another Message
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleContactSubmit} className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                    <h4 className="font-bold text-sm text-slate-800">Send an Inquiry or Support Request</h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Your Full Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={contactForm.name}
+                          onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                          placeholder="e.g. Abebe Bikila"
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Mobile Phone Number</label>
+                        <input
+                          type="tel"
+                          required
+                          value={contactForm.phone}
+                          onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                          placeholder="+251 9..."
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Email Address</label>
+                        <input
+                          type="email"
+                          value={contactForm.email}
+                          onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                          placeholder="your.email@example.com"
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Inquiry Subject</label>
+                        <select
+                          value={contactForm.subject}
+                          onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
+                          className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        >
+                          <option value="General Inquiry">General Inquiry</option>
+                          <option value="Driver Onboarding (0% Comm)">Driver Onboarding (0% Comm)</option>
+                          <option value="Fleet / Cooperative Partnership">Fleet / Cooperative Partnership</option>
+                          <option value="Corporate Business Account">Corporate Business Account</option>
+                          <option value="Fare Meter Dispute">Fare Meter Dispute</option>
+                          <option value="Lost & Found Report">Lost & Found Report</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Message / Details</label>
+                      <textarea
+                        required
+                        rows={4}
+                        value={contactForm.message}
+                        onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                        placeholder="Please describe your question, vehicle fleet size, or issue..."
+                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmittingContact}
+                      className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl text-xs transition shadow-sm disabled:opacity-50"
+                    >
+                      {isSubmittingContact ? 'Submitting to Dispatch Queue...' : 'Submit Inquiry (Ticket Created)'}
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>

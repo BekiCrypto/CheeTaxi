@@ -148,14 +148,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden sm:inline">{t.fastDemo}</span>
         </button>
 
-        {/* Language Toggle */}
-        <button
-          onClick={() => onLanguageChange(language === 'en' ? 'am' : 'en')}
-          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-1.5 px-2.5 rounded-lg flex items-center gap-1.5 transition border border-slate-200"
-        >
-          <Globe className="w-3.5 h-3.5 text-brand-500" />
-          <span>{language === 'en' ? 'አማርኛ' : 'English'}</span>
-        </button>
+        {/* Multi-Language Regional Selector */}
+        <div className="relative flex items-center">
+          <Globe className="w-3.5 h-3.5 text-brand-600 absolute left-2 pointer-events-none" />
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value as Language)}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold py-1.5 pl-7 pr-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer transition appearance-none"
+            title="Select Regional Language"
+          >
+            <option value="en">English</option>
+            <option value="am">አማርኛ (Amharic)</option>
+            <option value="om">Afaan Oromoo</option>
+            <option value="ti">ትግርኛ (Tigrinya)</option>
+            <option value="so">Soomaali (Somali)</option>
+            <option value="sw">Kiswahili (Swahili)</option>
+          </select>
+        </div>
 
         {/* User Badge */}
         <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-200 text-xs">
