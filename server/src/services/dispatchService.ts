@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/database.js';
-import { Driver, LocationPoint, Ride, VehicleCategory } from '../../../shared/types.js';
+import { Driver, LocationPoint, Ride, VehicleCategory, PaymentMethod } from '../../../shared/types.js';
 import { calculateHaversineDistance, estimateRoadMetrics, generateRouteCoordinates } from './geoService.js';
 import { calculateFare } from './fareService.js';
 
@@ -11,7 +11,7 @@ export interface CreateRideInput {
   pickup: LocationPoint;
   destination: LocationPoint;
   vehicleCategory: VehicleCategory;
-  paymentMethod: 'CASH' | 'TELEBIRR';
+  paymentMethod: PaymentMethod;
   isManualDispatch?: boolean;
   operatorNotes?: string;
   driverId?: string; // Optional direct manual assignment
