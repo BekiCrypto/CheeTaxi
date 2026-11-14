@@ -31,7 +31,13 @@ export type VehicleCategory =
   | 'delivery_moto'
   | 'delivery_van';
 
-export type KycStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type KycStatus = 'pending' | 'approved' | 'rejected' | 'suspended' | 'ai_verified' | 'manual_review';
+
+export type OperatorType =
+  | 'city_driver'
+  | 'airport_flight_operator'
+  | 'moto_courier'
+  | 'intercity_minibus';
 
 export type RideStatus =
   | 'REQUESTED'
@@ -162,6 +168,24 @@ export interface Driver {
   fleetId?: string;
   countryCode: string;
   cityCode: string;
+  operatorType?: OperatorType;
+  faydaId?: string;
+  airportBadgeNumber?: string;
+  aiVerificationScore?: number;
+  aiVerificationStatus?: 'verified' | 'flagged' | 'pending' | 'manual_override';
+  adminOverrideBy?: string;
+  adminOverrideAt?: string;
+  kycDocuments?: {
+    licenseUrl?: string;
+    licenseExpiry?: string;
+    libriUrl?: string;
+    libriVin?: string;
+    boloUrl?: string;
+    boloExpiry?: string;
+    faydaIdUrl?: string;
+    airportBadgeUrl?: string;
+    aiOcrSummary?: string;
+  };
 }
 
 // ----------------------------------------------------------------------------

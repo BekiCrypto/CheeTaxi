@@ -21,6 +21,7 @@ import {
   Package,
   AlertTriangle,
   UserPlus,
+  ShieldAlert,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Driver, Ride, VehicleCategory } from '@shared/types';
@@ -149,14 +150,21 @@ export const DriverView: React.FC<DriverViewProps> = ({
       }
     };
 
+    const onKycUpdated = (payload: any) => {
+      fetchDriverProfile();
+      sounds.playPaymentSuccess();
+    };
+
     socket.on('driver:incoming_ride', onIncomingRide);
     socket.on('driver:ride_cancelled', onRideCancelled);
     socket.on('ride:status_changed', onStatusChanged);
+    socket.on('driver:kyc_updated', onKycUpdated);
 
     return () => {
       socket.off('driver:incoming_ride', onIncomingRide);
       socket.off('driver:ride_cancelled', onRideCancelled);
       socket.off('ride:status_changed', onStatusChanged);
+      socket.off('driver:kyc_updated', onKycUpdated);
     };
   }, [socket, driver?.id]);
 
@@ -178,6 +186,14 @@ export const DriverView: React.FC<DriverViewProps> = ({
   // Toggle online status
   const handleToggleOnline = async () => {
     if (!driver) return;
+
+    // Protection Guardrail: Unverified drivers cannot switch online
+    if (!driver.isOnline && driver.kycStatus !== 'approved') {
+      sounds.playBeep(400, 'sawtooth', 0.2);
+      setShowDriverOnboardingModal(true);
+      return;
+    }
+
     const newStatus = !driver.isOnline;
 
     try {
@@ -187,12 +203,16 @@ export const DriverView: React.FC<DriverViewProps> = ({
         body: JSON.stringify({ isOnline: newStatus }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setDriver({ ...driver, isOnline: newStatus });
         sounds.playBeep(newStatus ? 800 : 400, 'sine', 0.15);
       } else {
-        alert(data.error || 'Cannot go online without an active driver subscription.');
-        setActiveTab('subscription');
+        alert(data.error || 'Cannot go online. Compliance verification required.');
+        if (data.code === 'KYC_NOT_APPROVED') {
+          setShowDriverOnboardingModal(true);
+        } else {
+          setActiveTab('subscription');
+        }
       }
     } catch (err) {
       console.error('Failed to toggle status:', err);
@@ -409,6 +429,29 @@ export const DriverView: React.FC<DriverViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Ethiopian Compliance & Onboarding Guardrail Banner */}
+        {driver.kycStatus !== 'approved' && (
+          <div className="bg-amber-500/10 border-b border-amber-500/30 p-3 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
+              <div>
+                <span className="font-bold text-amber-900 block">KYC Verification Required</span>
+                <span className="text-[10px] text-amber-700">
+                  {driver.kycStatus === 'pending'
+                    ? 'Compliance check in progress. Await Admin approval or complete Self-Assisted AI verification.'
+                    : 'Account not approved. Complete Ethiopian compliance onboarding to go online.'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowDriverOnboardingModal(true)}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-[10px] font-black shrink-0 transition cursor-pointer"
+            >
+              Verify Now
+            </button>
+          </div>
+        )}
 
         {sosMessage && (
           <div className="bg-rose-50 border-b border-rose-200 text-rose-800 p-2 text-xs font-bold text-center">

@@ -33,6 +33,7 @@ import { AdminProviderTab } from './AdminProviderTab';
 import { AdminSosTab } from './AdminSosTab';
 import { AdminDeveloperTab } from './AdminDeveloperTab';
 import { AdminTariffSettingsTab } from './AdminTariffSettingsTab';
+import { AdminKycQueueTab } from './AdminKycQueueTab';
 
 interface AdminViewProps {
   language: Language;
@@ -630,108 +631,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
           </div>
         )}
 
-        {/* Tab 3: Driver KYC Approvals */}
+        {/* Tab 3: Driver & Flight Operator KYC Approvals */}
         {activeTab === 'kyc' && (
-          <div className="max-w-4xl mx-auto p-8 overflow-y-auto h-full">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
-              <div className="border-b pb-3">
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  {t.driverKycQueue}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Compliance review per Addis Ababa Transport Bureau Directive & INSA verification.
-                </p>
-              </div>
-
-              {kycQueue.length === 0 ? (
-                <div className="space-y-4">
-                  <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-xl text-emerald-900 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>All active drivers in the production fleet are verified and certified under AI Vision KYC.</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
-                      Zero Backlog
-                    </span>
-                  </div>
-
-                  {/* Sample AI Verified Driver Record in Audit Mode */}
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-sm text-slate-900">Ahmed Mohammed (አህመድ መሀመድ)</span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
-                            AI CERTIFIED (99.4%)
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                          License: <code>AA-DL-98231</code> • Phone: <strong>+251912334455</strong>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">Verified Nov 14, 2026</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px] font-mono">
-                      <div className="p-2 bg-white rounded-lg border border-slate-200">
-                        <span className="text-slate-400 block text-[9px]">Vehicle & Category</span>
-                        <span className="font-bold text-slate-800">Toyota Corolla (Sedan)</span>
-                      </div>
-                      <div className="p-2 bg-white rounded-lg border border-slate-200">
-                        <span className="text-slate-400 block text-[9px]">Plate Number</span>
-                        <span className="font-bold text-indigo-700">ET-3-A78945</span>
-                      </div>
-                      <div className="p-2 bg-white rounded-lg border border-slate-200">
-                        <span className="text-slate-400 block text-[9px]">Biometric Match</span>
-                        <span className="font-bold text-emerald-700">99.2% Likeness</span>
-                      </div>
-                      <div className="p-2 bg-white rounded-lg border border-slate-200">
-                        <span className="text-slate-400 block text-[9px]">INSA Barcode</span>
-                        <span className="font-bold text-emerald-700">SHA-256 Valid</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {kycQueue.map((driver) => (
-                    <div
-                      key={driver.id}
-                      className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-4 text-xs"
-                    >
-                      <div>
-                        <div className="font-bold text-slate-800 text-sm">{driver.full_name}</div>
-                        <div className="text-slate-500 mt-0.5">
-                          Phone: <strong>{driver.phone}</strong> | License: <code>{driver.license_number}</code>
-                        </div>
-                        <div className="text-slate-600 mt-1">
-                          Vehicle: {driver.vehicle_make} {driver.vehicle_model} ({driver.vehicle_year}) •
-                          Plate: <strong className="font-mono">{driver.vehicle_plate}</strong> ({driver.vehicle_category})
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleKycDecision(driver.id, false)}
-                          className="px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold flex items-center gap-1 transition"
-                        >
-                          <XCircle className="w-4 h-4" />
-                          <span>{t.reject}</span>
-                        </button>
-                        <button
-                          onClick={() => handleKycDecision(driver.id, true)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1 shadow-sm transition"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          <span>{t.approve}</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="flex-1 overflow-y-auto">
+            <AdminKycQueueTab
+              authHeaders={authHeaders}
+              adminSession={adminSession}
+              onKycUpdated={loadDashboardData}
+            />
           </div>
         )}
 

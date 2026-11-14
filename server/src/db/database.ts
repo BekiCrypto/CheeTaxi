@@ -408,6 +408,14 @@ export function initDatabase() {
   migrateColumn('drivers', 'fleet_id', 'TEXT');
   migrateColumn('drivers', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
   migrateColumn('drivers', 'city_code', "TEXT NOT NULL DEFAULT 'ADDIS_ABABA'");
+  migrateColumn('drivers', 'operator_type', "TEXT DEFAULT 'city_driver'");
+  migrateColumn('drivers', 'fayda_id', 'TEXT');
+  migrateColumn('drivers', 'airport_badge_number', 'TEXT');
+  migrateColumn('drivers', 'kyc_documents_json', 'TEXT');
+  migrateColumn('drivers', 'ai_verification_score', 'REAL DEFAULT 0');
+  migrateColumn('drivers', 'ai_verification_status', "TEXT DEFAULT 'pending'");
+  migrateColumn('drivers', 'admin_override_by', 'TEXT');
+  migrateColumn('drivers', 'admin_override_at', 'TEXT');
 
   migrateColumn('rides', 'corporate_id', 'TEXT');
   migrateColumn('rides', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");

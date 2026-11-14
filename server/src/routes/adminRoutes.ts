@@ -156,30 +156,101 @@ export function createAdminRouter(io: SocketIOServer) {
   });
 
   /**
-   * KYC Verification Queue
+   * KYC Verification Queue & Flight Operator Compliance Review
    */
   router.get('/kyc-queue', (req, res) => {
-    const rows = db.prepare('SELECT * FROM drivers WHERE kyc_status = ?').all('pending') as any[];
-    return res.json({ pendingDrivers: rows });
+    const rows = db.prepare(`
+      SELECT * FROM drivers
+      WHERE kyc_status IN ('pending', 'manual_review', 'rejected', 'suspended')
+      ORDER BY created_at DESC
+    `).all() as any[];
+
+    const pendingDrivers = rows.map((d) => ({
+      id: d.id,
+      userId: d.user_id,
+      fullName: d.full_name,
+      phone: d.phone,
+      avatarUrl: d.avatar_url,
+      vehicleMake: d.vehicle_make,
+      vehicleModel: d.vehicle_model,
+      vehicleYear: d.vehicle_year,
+      vehiclePlate: d.vehicle_plate,
+      vehicleColor: d.vehicle_color,
+      vehicleCategory: d.vehicle_category,
+      licenseNumber: d.license_number,
+      kycStatus: d.kyc_status,
+      kycNotes: d.kyc_notes,
+      operatorType: d.operator_type || 'city_driver',
+      faydaId: d.fayda_id,
+      airportBadgeNumber: d.airport_badge_number,
+      aiVerificationScore: d.ai_verification_score || 0,
+      aiVerificationStatus: d.ai_verification_status || 'pending',
+      adminOverrideBy: d.admin_override_by,
+      adminOverrideAt: d.admin_override_at,
+      kycDocuments: d.kyc_documents_json ? JSON.parse(d.kyc_documents_json) : null,
+      createdAt: d.created_at,
+    }));
+
+    return res.json({
+      pendingDrivers,
+      summary: {
+        totalPending: pendingDrivers.length,
+        airportOperators: pendingDrivers.filter((p) => p.operatorType === 'airport_flight_operator').length,
+        aiHighConfidence: pendingDrivers.filter((p) => (p.aiVerificationScore || 0) >= 90).length,
+      },
+    });
   });
 
   /**
-   * KYC Decision (Approve / Reject)
+   * KYC Decision & Administrative Override
    */
   router.post('/kyc/:driverId/decide', (req, res) => {
-    const { approved, notes } = req.body;
-    const status = approved ? 'approved' : 'rejected';
+    const { approved, action, notes, adminName = 'Almaz Tefera (Super Admin)' } = req.body;
+    
+    let status = 'pending';
+    let aiStatus = 'manual_override';
+
+    if (action === 'override' || action === 'approve' || approved === true) {
+      status = 'approved';
+    } else if (action === 'grant_airport_pass') {
+      status = 'approved';
+    } else if (action === 'request_reupload') {
+      status = 'manual_review';
+    } else if (action === 'reject' || approved === false) {
+      status = 'rejected';
+      aiStatus = 'flagged';
+    }
+
+    const now = new Date().toISOString();
 
     db.prepare(`
       UPDATE drivers
-      SET kyc_status = ?, kyc_notes = ?
+      SET kyc_status = ?,
+          kyc_notes = ?,
+          ai_verification_status = ?,
+          admin_override_by = ?,
+          admin_override_at = ?
       WHERE id = ?
-    `).run(status, notes || null, req.params.driverId);
+    `).run(status, notes || null, aiStatus, adminName, now, req.params.driverId);
+
+    // Live Socket Notification to Driver and Dispatch Center
+    io.to(`driver:${req.params.driverId}`).emit('driver:kyc_updated', {
+      driverId: req.params.driverId,
+      kycStatus: status,
+      notes,
+    });
+    io.to('admin:dispatch').emit('admin:kyc_decided', {
+      driverId: req.params.driverId,
+      status,
+      overrideBy: adminName,
+    });
 
     return res.json({
       success: true,
       status,
-      message: `Driver KYC has been marked as ${status}`,
+      adminOverrideBy: adminName,
+      adminOverrideAt: now,
+      message: `Driver / Operator credentials have been marked as ${status}${action === 'override' ? ' via Administrative Override' : ''}.`,
     });
   });
 

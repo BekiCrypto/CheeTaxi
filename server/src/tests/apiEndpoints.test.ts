@@ -318,4 +318,69 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(invalidVerify.status).toBe(401);
     expect(invalidVerify.body.valid).toBe(false);
   });
+
+  it('Driver & Flight Operator Advanced KYC with Admin Override Protection', async () => {
+    // 1. Reset a pending driver
+    const driverId = 'driver_solomon_05';
+    db.prepare("UPDATE drivers SET kyc_status = 'pending', is_online = 0 WHERE id = ?").run(driverId);
+
+    // 2. Unapproved driver should be blocked from going online (403 KYC_NOT_APPROVED)
+    const blockedOnlineRes = await request(app)
+      .post(`/api/drivers/${driverId}/status`)
+      .send({ isOnline: true });
+    expect(blockedOnlineRes.status).toBe(403);
+    expect(blockedOnlineRes.body.code).toBe('KYC_NOT_APPROVED');
+
+    // 3. Driver submits Advanced Self-Assisted AI KYC with Flight Operator badge
+    const kycRes = await request(app)
+      .post(`/api/drivers/${driverId}/advanced-kyc`)
+      .send({
+        operatorType: 'airport_flight_operator',
+        airportBadgeNumber: 'ADD-BOLE-SEC-8841',
+        licenseNumber: 'AA-DL-44129',
+        faydaId: 'ET-FIN-9921-4451-2290',
+        documents: {
+          licenseUrl: 'https://cdn.chebelew.et/kyc/license_dl44129.jpg',
+          libriUrl: 'https://cdn.chebelew.et/kyc/libri_et3b44129.jpg',
+          boloUrl: 'https://cdn.chebelew.et/kyc/bolo_2026.jpg',
+        },
+        autoApproveIfQualified: true,
+      });
+    expect(kycRes.status).toBe(200);
+    expect(kycRes.body.success).toBe(true);
+    expect(kycRes.body.aiVerificationScore).toBeGreaterThanOrEqual(95);
+    expect(kycRes.body.checks.length).toBeGreaterThan(0);
+
+    // 4. Admin KYC Queue check
+    const adminLogin = await request(app)
+      .post('/api/auth/admin/login')
+      .send({ emailOrPhone: 'dispatch@chebelew.et', passwordOrPin: '9922' });
+    const adminToken = adminLogin.body.token;
+
+    const queueRes = await request(app)
+      .get('/api/admin/kyc-queue')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(queueRes.status).toBe(200);
+    expect(Array.isArray(queueRes.body.pendingDrivers)).toBe(true);
+
+    // 5. Admin Override & Approval
+    const overrideRes = await request(app)
+      .post(`/api/admin/kyc/${driverId}/decide`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        action: 'override',
+        notes: 'Kazanchis operations center verified and granted Bole airport clearance pass',
+      });
+    expect(overrideRes.status).toBe(200);
+    expect(overrideRes.body.success).toBe(true);
+    expect(overrideRes.body.status).toBe('approved');
+
+    // 6. Now the driver CAN go online
+    const onlineRes = await request(app)
+      .post(`/api/drivers/${driverId}/status`)
+      .send({ isOnline: true });
+    expect(onlineRes.status).toBe(200);
+    expect(onlineRes.body.success).toBe(true);
+    expect(onlineRes.body.isOnline).toBe(true);
+  });
 });
