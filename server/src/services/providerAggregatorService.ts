@@ -3,6 +3,10 @@ import {
   AggregatorProviderId,
   CircuitBreakerState,
   LocationPoint,
+  MarketplaceOffer,
+  OfferComparisonMode,
+  PassengerComfortPreferences,
+  PaymentMethod,
   ProviderAdapterConfig,
   ProviderRoutingLog,
   VehicleCategory,
@@ -335,35 +339,64 @@ export class ProviderAggregatorService {
 
   /**
    * Unified normalized multi-provider search & ranking
+   * Section 3.1: Intelligent Multi-Provider Comparison & Configurable Offer Ranking
+   * Supports: 'best_value' | 'cheapest' | 'fastest_pickup' | 'premium_comfort'
    */
   static searchAndRankOffers(
     pickup: LocationPoint,
     destination: LocationPoint,
-    category: VehicleCategory = 'sedan'
-  ): AggregatedTransportOffer[] {
+    category: VehicleCategory = 'sedan',
+    mode: OfferComparisonMode = 'best_value',
+    preferences?: PassengerComfortPreferences
+  ): (MarketplaceOffer & AggregatedTransportOffer)[] {
     const metrics = estimateRoadMetrics(pickup.lat, pickup.lng, destination.lat, destination.lng);
-    const offers: AggregatedTransportOffer[] = [];
+    const rawOffers: (MarketplaceOffer & AggregatedTransportOffer)[] = [];
     const providers = this.getProviderStatuses();
+    const now = new Date();
+    const quoteExpiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
 
-    // 1. Chebelew Independent Fleet (Always authoritative, 0% commission model)
+    // 1. Chebelew Independent Fleet (Authoritative, 0% commission direct marketplace)
     const chebelewFare = calculateFare(category, metrics.distanceKm, metrics.durationMinutes);
     const chebelewAvailable = DispatchService.findEligibleDrivers(pickup.lat, pickup.lng, category).length > 0;
+    const chebelewEtaMins = chebelewAvailable ? 4 : 7;
+    const chebelewArrivalTime = new Date(now.getTime() + (chebelewEtaMins + metrics.durationMinutes) * 60 * 1000).toISOString();
 
-    offers.push({
+    const chebelewBaseFare = chebelewFare.totalFare;
+    const chebelewCapacity = category === 'delivery_van' ? 12 : 4;
+    const chebelewLuggage = category === 'delivery_van' ? 6 : category === 'comfort' ? 3 : 2;
+
+    rawOffers.push({
+      id: `offer_chebelew_${Date.now()}`,
       providerId: 'chebelew',
       providerName: 'Chebelew Standard (Direct Dispatch)',
+      providerLogo: '/logo-chebelew.png',
       category,
-      estimatedFare: chebelewFare.totalFare,
+      vehicleCategory: category,
+      vehicleDescription: 'Vetted Chebelew Driver • 100% Earnings Retention',
+      estimatedFare: chebelewBaseFare,
+      confirmedFare: chebelewBaseFare,
       currency: 'ETB',
-      estimatedArrivalMins: chebelewAvailable ? 4 : 7,
+      isConfirmedPrice: true,
+      estimatedPickupMinutes: chebelewEtaMins,
+      estimatedArrivalMins: chebelewEtaMins,
+      estimatedJourneyMinutes: metrics.durationMinutes,
       journeyDurationMins: metrics.durationMinutes,
+      estimatedArrivalTime: chebelewArrivalTime,
+      paymentMethods: ['TELEBIRR', 'CASH', 'BANK_TRANSFER', 'CORPORATE_BILLING'],
+      driverRating: 4.92,
+      providerServiceRating: 4.95,
+      passengerCapacity: chebelewCapacity,
+      luggageCapacity: chebelewLuggage,
       vehicleDetails: 'Vetted Chebelew Driver • 100% Earnings Retention',
       reliabilityScore: 98,
       isAvailable: true,
       circuitStatus: 'CLOSED',
+      quoteExpiresAt,
+      cancellationPolicy: 'Free cancellation within 3 minutes of driver dispatch',
+      sourceAttribution: 'Chebelew Direct Independent Marketplace (0% Commission)',
     });
 
-    // 2. Query External Aggregated Partners through Adapter Architecture
+    // 2. External Aggregated Partners through Adapter Architecture
     for (const provider of providers) {
       const id = provider.id;
       if (id === 'chebelew') continue;
@@ -384,65 +417,108 @@ export class ProviderAggregatorService {
           provider.circuitState = 'HALF_OPEN';
         } else {
           // Provider offline / failed: Circuit is open, present as unavailable with OPEN status
-          offers.push({
+          rawOffers.push({
+            id: `offer_${id}_${Date.now()}`,
             providerId: id,
             providerName: provider.name,
+            providerLogo: `/logos/${id}.png`,
             category,
+            vehicleCategory: category,
+            vehicleDescription: 'Provider temporarily offline (Circuit Breaker Tripped)',
             estimatedFare: 0,
             currency: 'ETB',
+            isConfirmedPrice: false,
+            estimatedPickupMinutes: 0,
             estimatedArrivalMins: 0,
+            estimatedJourneyMinutes: metrics.durationMinutes,
             journeyDurationMins: metrics.durationMinutes,
+            estimatedArrivalTime: new Date().toISOString(),
+            paymentMethods: ['CASH', 'TELEBIRR'],
+            passengerCapacity: 4,
+            luggageCapacity: 2,
             vehicleDetails: 'Provider temporarily offline (Circuit Breaker Tripped)',
             reliabilityScore: 0,
             isAvailable: false,
+            unavailabilityReason: 'Circuit Breaker OPEN - Provider API health degraded',
             circuitStatus: 'OPEN',
+            quoteExpiresAt,
+            cancellationPolicy: 'Partner terms apply',
+            sourceAttribution: `Authorized Partner API (${provider.name})`,
           });
           continue;
         }
       }
 
       // Partner price normalization with live multiplier & markup
-      let partnerMultiplier = provider.tariffMultiplier || 1.0;
-      let partnerMarkup = provider.markupPercent || 0;
+      const partnerMultiplier = provider.tariffMultiplier || 1.0;
+      const partnerMarkup = provider.markupPercent || 0;
 
       // Calculate partner fare
-      let calculatedFare = chebelewFare.totalFare * partnerMultiplier * (1 + partnerMarkup / 100);
-      let partnerFare = Number(calculatedFare.toFixed(2));
+      const calculatedFare = chebelewFare.totalFare * partnerMultiplier * (1 + partnerMarkup / 100);
+      const partnerFare = Number(calculatedFare.toFixed(2));
 
       let etaMins = 5;
       let vehicleText = 'Partner Taxi Network';
       let score = 90;
+      let driverRating = 4.8;
+      let providerRating = 4.7;
 
       if (id === 'ride') {
         etaMins = 3;
         vehicleText = 'Licensed Meter Network • Standard Tariff';
         score = 94;
+        driverRating = 4.85;
+        providerRating = 4.8;
       } else if (id === 'feres') {
         etaMins = 6;
         vehicleText = 'Municipal Association Meter Tariff';
         score = 89;
+        driverRating = 4.75;
+        providerRating = 4.7;
       } else if (id === 'zayride') {
         etaMins = 8;
         vehicleText = 'Regional Cab Fleet';
         score = 87;
+        driverRating = 4.7;
+        providerRating = 4.6;
       } else if (id === 'yango') {
         etaMins = 5;
         vehicleText = 'On-Demand Urban Cab Fleet';
         score = 85;
+        driverRating = 4.78;
+        providerRating = 4.72;
       }
 
-      offers.push({
+      const partnerArrivalTime = new Date(now.getTime() + (etaMins + metrics.durationMinutes) * 60 * 1000).toISOString();
+
+      rawOffers.push({
+        id: `offer_${id}_${Date.now()}`,
         providerId: id,
         providerName: provider.name,
+        providerLogo: `/logos/${id}.png`,
         category,
+        vehicleCategory: category,
+        vehicleDescription: vehicleText,
         estimatedFare: partnerFare,
         currency: 'ETB',
+        isConfirmedPrice: false,
+        estimatedPickupMinutes: etaMins,
         estimatedArrivalMins: etaMins,
+        estimatedJourneyMinutes: metrics.durationMinutes,
         journeyDurationMins: metrics.durationMinutes,
+        estimatedArrivalTime: partnerArrivalTime,
+        paymentMethods: ['CASH', 'TELEBIRR'],
+        driverRating,
+        providerServiceRating: providerRating,
+        passengerCapacity: 4,
+        luggageCapacity: 2,
         vehicleDetails: vehicleText,
         reliabilityScore: score,
         isAvailable: provider.isAuthorized,
         circuitStatus: provider.circuitState,
+        quoteExpiresAt,
+        cancellationPolicy: 'Subject to partner cancellation policies',
+        sourceAttribution: `Authorized Partner API (${provider.name})`,
       });
 
       // Record offer returned in routing log
@@ -461,13 +537,99 @@ export class ProviderAggregatorService {
       });
     }
 
-    // Sort: Chebelew primary direct dispatch first, then available by lowest estimated fare
-    return offers.sort((a, b) => {
-      if (a.providerId === 'chebelew' && b.providerId !== 'chebelew') return -1;
-      if (b.providerId === 'chebelew' && a.providerId !== 'chebelew') return 1;
+    // 3. Compute Normalized Scoring Breakdown for Each Available Offer
+    // Formula (Section 3.1): Offer Score = Price Score + Pickup ETA Score + Journey Time Score + Reliability Score + Quality Score + Preference Match Score
+    const availableFares = rawOffers.filter((o) => o.isAvailable && o.estimatedFare > 0).map((o) => o.estimatedFare);
+    const minFare = availableFares.length > 0 ? Math.min(...availableFares) : 100;
+
+    const scoredOffers = rawOffers.map((offer) => {
+      if (!offer.isAvailable || offer.estimatedFare <= 0) {
+        offer.scoreBreakdown = {
+          priceScore: 0,
+          pickupEtaScore: 0,
+          journeyTimeScore: 0,
+          reliabilityScore: 0,
+          qualityScore: 0,
+          preferenceMatchScore: 0,
+          totalOfferScore: 0,
+        };
+        return offer;
+      }
+
+      // Price Score (0 - 25 points): lower fare is rewarded
+      const fareRatio = offer.estimatedFare / minFare;
+      const priceScore = Math.max(0, Math.min(25, 25 - (fareRatio - 1) * 20));
+
+      // Pickup ETA Score (0 - 20 points): lower ETA is rewarded
+      const pickupEtaScore = Math.max(0, Math.min(20, 20 - offer.estimatedPickupMinutes * 1.8));
+
+      // Journey Time Score (0 - 15 points)
+      const journeyTimeScore = Math.max(0, Math.min(15, 15 - offer.estimatedJourneyMinutes * 0.15));
+
+      // Reliability Score (0 - 15 points)
+      const reliabilityScore = ((offer.reliabilityScore || 80) / 100) * 15;
+
+      // Quality Score (0 - 15 points)
+      const qualityScore = ((offer.driverRating || 4.5) / 5.0) * 15;
+
+      // Preference Match Score (0 - 10 points)
+      let prefScore = 8.0;
+      if (preferences) {
+        if (preferences.acRequired) prefScore += 0.5;
+        if (preferences.quietRide) prefScore += 0.5;
+        if (preferences.extraLuggage && offer.luggageCapacity >= 3) prefScore += 0.5;
+        if (preferences.childSeat && offer.passengerCapacity >= 5) prefScore += 0.5;
+      }
+      const preferenceMatchScore = Math.min(10, prefScore);
+
+      const totalOfferScore = Number(
+        (priceScore + pickupEtaScore + journeyTimeScore + reliabilityScore + qualityScore + preferenceMatchScore).toFixed(1)
+      );
+
+      offer.scoreBreakdown = {
+        priceScore: Number(priceScore.toFixed(1)),
+        pickupEtaScore: Number(pickupEtaScore.toFixed(1)),
+        journeyTimeScore: Number(journeyTimeScore.toFixed(1)),
+        reliabilityScore: Number(reliabilityScore.toFixed(1)),
+        qualityScore: Number(qualityScore.toFixed(1)),
+        preferenceMatchScore: Number(preferenceMatchScore.toFixed(1)),
+        totalOfferScore,
+      };
+
+      return offer;
+    });
+
+    // 4. Sort Based on Active OfferComparisonMode
+    return scoredOffers.sort((a, b) => {
+      // Available offers always precede unavailable/circuit-tripped offers
       if (a.isAvailable && !b.isAvailable) return -1;
       if (!a.isAvailable && b.isAvailable) return 1;
-      return a.estimatedFare - b.estimatedFare;
+      if (!a.isAvailable && !b.isAvailable) return 0;
+
+      switch (mode) {
+        case 'cheapest':
+          return a.estimatedFare - b.estimatedFare;
+
+        case 'fastest_pickup':
+          return a.estimatedPickupMinutes - b.estimatedPickupMinutes;
+
+        case 'premium_comfort': {
+          const aComfort = (a.scoreBreakdown?.qualityScore || 0) + (a.scoreBreakdown?.preferenceMatchScore || 0);
+          const bComfort = (b.scoreBreakdown?.qualityScore || 0) + (b.scoreBreakdown?.preferenceMatchScore || 0);
+          return bComfort - aComfort;
+        }
+
+        case 'best_value':
+        default: {
+          // Chebelew direct 0% commission gets authoritative preference if within 2 score points
+          const diff = (b.scoreBreakdown?.totalOfferScore || 0) - (a.scoreBreakdown?.totalOfferScore || 0);
+          if (Math.abs(diff) <= 2.0) {
+            if (a.providerId === 'chebelew') return -1;
+            if (b.providerId === 'chebelew') return 1;
+          }
+          return diff;
+        }
+      }
     });
   }
 

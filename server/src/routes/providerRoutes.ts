@@ -6,29 +6,31 @@ export const providerRouter = Router();
 
 /**
  * Normalized multi-provider search & ranking
+ * Supports mode: 'best_value' | 'cheapest' | 'fastest_pickup' | 'premium_comfort'
+ * and passenger comfort preferences
  */
 providerRouter.post('/offers', (req, res) => {
-  const { pickup, destination, category = 'sedan' } = req.body;
+  const { pickup, destination, category = 'sedan', mode = 'best_value', preferences } = req.body;
   if (!pickup || !destination) {
     return res.status(400).json({ error: 'Pickup and destination are required' });
   }
 
-  const offers = ProviderAggregatorService.searchAndRankOffers(pickup, destination, category);
-  return res.json({ offers });
+  const offers = ProviderAggregatorService.searchAndRankOffers(pickup, destination, category, mode, preferences);
+  return res.json({ offers, mode });
 });
 
 /**
  * Compatibility alias for search
  */
 providerRouter.post('/search', (req, res) => {
-  const { pickup, destination, category = 'sedan', vehicleCategory } = req.body;
+  const { pickup, destination, category = 'sedan', vehicleCategory, mode = 'best_value', preferences } = req.body;
   const cat = vehicleCategory || category || 'sedan';
   if (!pickup || !destination) {
     return res.status(400).json({ error: 'Pickup and destination are required' });
   }
 
-  const offers = ProviderAggregatorService.searchAndRankOffers(pickup, destination, cat);
-  return res.json({ offers });
+  const offers = ProviderAggregatorService.searchAndRankOffers(pickup, destination, cat, mode, preferences);
+  return res.json({ offers, mode });
 });
 
 /**

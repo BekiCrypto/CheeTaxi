@@ -25,6 +25,15 @@ import {
   CreditCard,
   UserPlus,
   ArrowUpDown,
+  Sliders,
+  Calendar,
+  Plane,
+  CheckCircle2,
+  ShieldCheck,
+  ShieldAlert,
+  Luggage,
+  Wind,
+  VolumeX,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { LocationSearchInput } from './LocationSearchInput';
@@ -37,8 +46,12 @@ import {
   Driver,
   FareEstimate,
   LocationPoint,
+  MarketplaceOffer,
+  OfferComparisonMode,
+  PassengerComfortPreferences,
   PaymentMethod,
   Ride,
+  ScheduledRide,
   TelebirrOrder,
   VehicleCategory,
 } from '@shared/types';
@@ -105,6 +118,36 @@ export const RiderView: React.FC<RiderViewProps> = ({
   // Passenger Onboarding Flow
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
+  // Intelligent Multi-Provider Comparison (Section 3.1)
+  const [comparisonMode, setComparisonMode] = useState<OfferComparisonMode>('best_value');
+  const [marketplaceOffers, setMarketplaceOffers] = useState<MarketplaceOffer[]>([]);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+
+  // Comfort Preferences (Workstream 5)
+  const [showComfortModal, setShowComfortModal] = useState(false);
+  const [comfortPreferences, setComfortPreferences] = useState<PassengerComfortPreferences>({
+    userId: currentRiderId,
+    acRequired: false,
+    quietRide: false,
+    extraLuggage: false,
+    temperaturePreference: 'normal',
+    femaleDriverPreference: false,
+    accessibilityAssistance: false,
+    petFriendly: false,
+    childSeat: false,
+    notes: '',
+    updatedAt: new Date().toISOString(),
+  });
+
+  // Scheduled & Recurring Bookings (Workstream 5)
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [flightNumber, setFlightNumber] = useState('');
+  const [airportTerminal, setAirportTerminal] = useState('Terminal 2 International');
+  const [recurrenceType, setRecurrenceType] = useState<'once' | 'daily' | 'weekly'>('once');
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
+
   // History & Support Modals
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyRides, setHistoryRides] = useState<Ride[]>([]);
@@ -157,7 +200,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
     }
   };
 
-  // Fetch online drivers
+  // Fetch online drivers & comfort preferences
   useEffect(() => {
     fetch('/api/drivers')
       .then((res) => res.json())
@@ -165,9 +208,16 @@ export const RiderView: React.FC<RiderViewProps> = ({
         if (data.drivers) setAvailableDrivers(data.drivers);
       })
       .catch(console.error);
-  }, []);
 
-  // Fetch fare estimates whenever pickup or destination changes
+    fetch(`/api/rides/preferences/${currentRiderId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.preferences) setComfortPreferences(data.preferences);
+      })
+      .catch(console.error);
+  }, [currentRiderId]);
+
+  // Fetch fare estimates and marketplace multi-provider offers
   useEffect(() => {
     if (!pickup || !destination) return;
     setIsCalculating(true);
@@ -188,7 +238,83 @@ export const RiderView: React.FC<RiderViewProps> = ({
       })
       .catch(console.error)
       .finally(() => setIsCalculating(false));
-  }, [pickup, destination]);
+
+    // Section 3.1: Query Multi-Provider Comparison Engine with Active Mode & Preferences
+    fetch('/api/providers/offers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pickup,
+        destination,
+        category: selectedCategory,
+        mode: comparisonMode,
+        preferences: comfortPreferences,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.offers) {
+          setMarketplaceOffers(data.offers);
+          if (!selectedOfferId && data.offers.length > 0) {
+            setSelectedOfferId(data.offers[0].id);
+          }
+        }
+      })
+      .catch(console.error);
+  }, [pickup, destination, selectedCategory, comparisonMode, comfortPreferences]);
+
+  const handleSavePreferences = async (updated: PassengerComfortPreferences) => {
+    try {
+      setComfortPreferences(updated);
+      await fetch(`/api/rides/preferences/${currentRiderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated),
+      });
+      setShowComfortModal(false);
+    } catch (e) {
+      console.error('Failed to update comfort preferences', e);
+    }
+  };
+
+  const handleCreateScheduledRide = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scheduledDate || !scheduledTime) {
+      alert('Please select both date and time for scheduled pickup.');
+      return;
+    }
+    try {
+      const scheduledIso = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
+      const res = await fetch('/api/rides/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          riderId: currentRiderId,
+          riderName: currentRiderName,
+          riderPhone: currentRiderPhone,
+          scheduledTime: scheduledIso,
+          pickup,
+          destination,
+          vehicleCategory: selectedCategory,
+          flightNumber: flightNumber || undefined,
+          airportTerminal: airportTerminal || undefined,
+          recurrenceType,
+          notes: flightNumber ? `Airport Transfer (Flight ${flightNumber}, ${airportTerminal})` : 'Scheduled Pickup',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setScheduleSuccessMsg('Scheduled booking confirmed! Operations dispatcher assigned.');
+        setTimeout(() => {
+          setScheduleSuccessMsg(null);
+          setShowScheduleModal(false);
+          setFlightNumber('');
+        }, 2200);
+      }
+    } catch (err: any) {
+      alert('Failed to schedule ride: ' + err.message);
+    }
+  };
 
   // Socket listener for ride status updates & location ticks
   useEffect(() => {
@@ -572,48 +698,193 @@ export const RiderView: React.FC<RiderViewProps> = ({
               </div>
             </div>
 
-            {/* Aggregator Comparison Drawer */}
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+            {/* Section 3.1: Intelligent Multi-Provider Comparison & Configurable Offer Ranking */}
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  {t.partnerComparison}
-                </span>
-                <span className="text-[10px] text-slate-500">Live Comparison</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                    <Sparkles className="w-4 h-4 text-amber-200" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-black text-slate-800 tracking-tight block">
+                      {language === 'am' ? 'የአቅራቢዎች ንፅፅር' : 'Multi-Provider Ride Comparison'}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-medium">
+                      {language === 'am' ? 'የተረጋገጠ ዋጋ እና የጥራት ደረጃ' : '4-Mode Algorithmic Offer Ranking'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowComfortModal(true)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-xs"
+                    title="Customize Comfort Preferences"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-brand-600" />
+                    <span>{language === 'am' ? 'ምቾት' : 'Comfort'}</span>
+                    {(comfortPreferences.acRequired || comfortPreferences.quietRide || comfortPreferences.extraLuggage) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg transition shadow-xs"
+                    title="Schedule Advance Trip or Airport Transfer"
+                  >
+                    <Plane className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{language === 'am' ? 'ቀጠሮ' : 'Schedule'}</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                {/* Chebelew */}
-                <div className="bg-white p-2.5 rounded-lg border-2 border-brand-500 shadow-sm relative">
-                  <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-brand-500 text-white text-[9px] font-black px-1.5 rounded-full">
-                    BEST
-                  </div>
-                  <div className="font-bold text-brand-700 text-[11px] mt-1">Chebelew</div>
-                  <div className="text-sm font-extrabold text-slate-900 mt-0.5">
-                    {selectedEstimate?.fare.totalFare.toFixed(0)} <span className="text-[9px]">ETB</span>
-                  </div>
-                  <div className="text-[10px] text-emerald-600 font-bold mt-1">Direct Match</div>
-                </div>
+              {/* 4 Selectable Comparison Modes */}
+              <div className="grid grid-cols-4 gap-1 p-1 bg-slate-200/60 rounded-xl text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setComparisonMode('best_value')}
+                  className={`py-1.5 px-2 rounded-lg transition text-center ${
+                    comparisonMode === 'best_value'
+                      ? 'bg-white text-brand-700 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {language === 'am' ? 'ምርጥ ዋጋ' : 'Best Value'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComparisonMode('cheapest')}
+                  className={`py-1.5 px-2 rounded-lg transition text-center ${
+                    comparisonMode === 'cheapest'
+                      ? 'bg-white text-emerald-700 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {language === 'am' ? 'ቅናሽ' : 'Cheapest'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComparisonMode('fastest_pickup')}
+                  className={`py-1.5 px-2 rounded-lg transition text-center ${
+                    comparisonMode === 'fastest_pickup'
+                      ? 'bg-white text-amber-700 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {language === 'am' ? 'ፈጣን' : 'Fastest'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComparisonMode('premium_comfort')}
+                  className={`py-1.5 px-2 rounded-lg transition text-center ${
+                    comparisonMode === 'premium_comfort'
+                      ? 'bg-white text-indigo-700 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {language === 'am' ? 'ምቾት' : 'Comfort'}
+                </button>
+              </div>
 
-                {/* Partner Metered Taxi */}
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-slate-600">
-                  <div className="font-bold text-slate-800 text-[11px]">Metered Cab</div>
-                  <div className="text-sm font-bold text-slate-700 mt-0.5">
-                    {estimates.find((e) => e.category === 'partner_ride')?.fare.totalFare.toFixed(0) || '245'}{' '}
-                    <span className="text-[9px]">ETB</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-1">Partner Network</div>
-                </div>
+              {/* Offer Cards Stream */}
+              <div className="space-y-2 pt-1 max-h-56 overflow-y-auto pr-0.5">
+                {marketplaceOffers.length > 0 ? (
+                  marketplaceOffers.map((offer) => {
+                    const isSelected = selectedOfferId === offer.id;
+                    const isChebelew = offer.providerId === 'chebelew';
 
-                {/* Municipal Taxi Cooperative */}
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-slate-600">
-                  <div className="font-bold text-slate-800 text-[11px]">Taxi Co-op</div>
-                  <div className="text-sm font-bold text-slate-700 mt-0.5">
-                    {estimates.find((e) => e.category === 'partner_feres')?.fare.totalFare.toFixed(0) || '230'}{' '}
-                    <span className="text-[9px]">ETB</span>
+                    return (
+                      <div
+                        key={offer.id}
+                        onClick={() => {
+                          if (offer.isAvailable) {
+                            setSelectedOfferId(offer.id);
+                            if (isChebelew) setSelectedCategory('sedan');
+                          }
+                        }}
+                        className={`p-3 rounded-xl border-2 transition cursor-pointer relative ${
+                          !offer.isAvailable
+                            ? 'bg-slate-100/70 border-slate-200 opacity-60 cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-brand-50/50 border-brand-500 shadow-sm'
+                            : 'bg-white border-slate-200/80 hover:border-slate-300'
+                        }`}
+                      >
+                        {isChebelew && (
+                          <span className="absolute -top-2 right-3 bg-brand-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs">
+                            0% COMMISSION • DIRECT MATCH
+                          </span>
+                        )}
+
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                              <span>{offer.providerName}</span>
+                              {offer.driverRating && (
+                                <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5">
+                                  ★ {offer.driverRating.toFixed(1)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-500 line-clamp-1">
+                              {offer.sourceAttribution}
+                            </div>
+                            <div className="flex items-center gap-2 pt-1 text-[10px]">
+                              <span className="text-slate-600 font-medium">
+                                ⏱️ ETA: {offer.estimatedPickupMinutes}m
+                              </span>
+                              <span className="text-slate-400">•</span>
+                              <span className="text-slate-600 font-medium">
+                                🏁 {offer.estimatedJourneyMinutes}m trip
+                              </span>
+                              {offer.scoreBreakdown && (
+                                <>
+                                  <span className="text-slate-400">•</span>
+                                  <span className="font-bold text-brand-700 bg-brand-100/60 px-1.5 py-0.2 rounded text-[9px]">
+                                    Score: {offer.scoreBreakdown.totalOfferScore}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right flex flex-col items-end">
+                            <div className="text-sm font-black text-slate-900">
+                              {offer.estimatedFare > 0 ? (
+                                <>
+                                  {offer.estimatedFare.toFixed(0)}{' '}
+                                  <span className="text-[10px] font-bold text-slate-500">ETB</span>
+                                </>
+                              ) : (
+                                <span className="text-[11px] text-red-500 font-bold">Offline</span>
+                              )}
+                            </div>
+                            <span className="text-[9px] font-medium text-slate-400">
+                              {offer.isConfirmedPrice ? 'Fixed Upfront Price' : 'Estimated Meter'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {offer.scoreBreakdown && (
+                          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-500 font-mono">
+                            <span>Price: {offer.scoreBreakdown.priceScore}/25</span>
+                            <span>ETA: {offer.scoreBreakdown.pickupEtaScore}/20</span>
+                            <span>Rel: {offer.scoreBreakdown.reliabilityScore}/15</span>
+                            <span>Qual: {offer.scoreBreakdown.qualityScore}/15</span>
+                            <span>Match: {offer.scoreBreakdown.preferenceMatchScore}/10</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-xs text-slate-400">
+                    Querying authorized provider adapters...
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-1">Municipal Association</div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -1286,6 +1557,236 @@ export const RiderView: React.FC<RiderViewProps> = ({
           }}
         />
       )}
+      {/* Comfort Preferences Modal (Workstream 5) */}
+      {showComfortModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-brand-500" />
+                <h3 className="font-bold text-sm text-slate-800">
+                  {language === 'am' ? 'የተሳፋሪ ምቾት ምርጫዎች' : 'Passenger Comfort Preferences'}
+                </h3>
+              </div>
+              <button onClick={() => setShowComfortModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <Wind className="w-4 h-4 text-sky-500" />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Air Conditioning (A/C)</span>
+                    <span className="text-[10px] text-slate-500">Ensure cabin cooling is active upon pickup</span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={comfortPreferences.acRequired}
+                  onChange={(e) => setComfortPreferences({ ...comfortPreferences, acRequired: e.target.checked })}
+                  className="rounded text-brand-600 focus:ring-brand-500 h-4 w-4"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <VolumeX className="w-4 h-4 text-violet-500" />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Quiet Ride</span>
+                    <span className="text-[10px] text-slate-500">Low audio volume & minimal driver conversation</span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={comfortPreferences.quietRide}
+                  onChange={(e) => setComfortPreferences({ ...comfortPreferences, quietRide: e.target.checked })}
+                  className="rounded text-brand-600 focus:ring-brand-500 h-4 w-4"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <Luggage className="w-4 h-4 text-amber-500" />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Extra Luggage Space</span>
+                    <span className="text-[10px] text-slate-500">Trunk room for 3+ bags or airport suitcases</span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={comfortPreferences.extraLuggage}
+                  onChange={(e) => setComfortPreferences({ ...comfortPreferences, extraLuggage: e.target.checked })}
+                  className="rounded text-brand-600 focus:ring-brand-500 h-4 w-4"
+                />
+              </label>
+
+              <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  <div>
+                    <span className="font-bold text-slate-800 block">Female Driver Preference</span>
+                    <span className="text-[10px] text-slate-500">Prioritize vetted female driver if available nearby</span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={comfortPreferences.femaleDriverPreference}
+                  onChange={(e) => setComfortPreferences({ ...comfortPreferences, femaleDriverPreference: e.target.checked })}
+                  className="rounded text-brand-600 focus:ring-brand-500 h-4 w-4"
+                />
+              </label>
+
+              <div className="pt-1">
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Cabin Temperature</label>
+                <div className="grid grid-cols-3 gap-2 text-center font-bold">
+                  {(['cool', 'normal', 'warm'] as const).map((temp) => (
+                    <button
+                      key={temp}
+                      type="button"
+                      onClick={() => setComfortPreferences({ ...comfortPreferences, temperaturePreference: temp })}
+                      className={`py-1.5 rounded-lg border text-xs capitalize ${
+                        comfortPreferences.temperaturePreference === temp
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {temp}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleSavePreferences(comfortPreferences)}
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm"
+            >
+              Save Preferences
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scheduled Rides & Airport Transfer Modal (Workstream 5) */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Plane className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-sm text-slate-800">
+                  {language === 'am' ? 'ቀጠሮ እና አየር ማረፊያ ጉዞ' : 'Schedule Ride / Airport Transfer'}
+                </h3>
+              </div>
+              <button onClick={() => setShowScheduleModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {scheduleSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-bold animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>{scheduleSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateScheduledRide} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Pickup Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl p-2 font-mono text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Pickup Time</label>
+                  <input
+                    type="time"
+                    required
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl p-2 font-mono text-xs focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 space-y-2">
+                <div className="font-bold text-emerald-900 flex items-center gap-1.5">
+                  <Plane className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Bole International Airport Details (Optional)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-medium block">Flight Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. ET-500"
+                      value={flightNumber}
+                      onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
+                      className="w-full border border-slate-300 rounded-lg p-1.5 font-mono text-xs uppercase focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-600 font-medium block">Terminal</label>
+                    <select
+                      value={airportTerminal}
+                      onChange={(e) => setAirportTerminal(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:outline-none"
+                    >
+                      <option value="Terminal 2 International">Terminal 2 (International)</option>
+                      <option value="Terminal 1 Domestic">Terminal 1 (Domestic)</option>
+                      <option value="VIP Lounge / Cargo">VIP / Diplomatic</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Recurrence</label>
+                <div className="grid grid-cols-3 gap-2 text-center font-bold">
+                  {(['once', 'daily', 'weekly'] as const).map((rec) => (
+                    <button
+                      key={rec}
+                      type="button"
+                      onClick={() => setRecurrenceType(rec)}
+                      className={`py-1.5 rounded-lg border text-xs capitalize ${
+                        recurrenceType === rec
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                          : 'border-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {rec === 'once' ? 'One-Time' : rec}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleModal(false)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition shadow-sm"
+                >
+                  Confirm Booking
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Passenger Onboarding Flow Modal */}
       <PassengerOnboardingModal
         isOpen={showOnboardingModal}

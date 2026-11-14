@@ -82,5 +82,60 @@ export function createSafetyRouter(io: SocketIOServer) {
     return res.json({ success: true, incident });
   });
 
+  // --------------------------------------------------------------------------
+  // Priority 0: Route Deviation Anomaly Detection Endpoints
+  // --------------------------------------------------------------------------
+
+  /**
+   * Check vehicle coordinate against planned route
+   */
+  router.post('/check-deviation', (req, res) => {
+    const { rideId, driverId, riderId, actualLat, actualLng, expectedCoords, thresholdMeters } = req.body;
+
+    if (!rideId || actualLat === undefined || actualLng === undefined || !expectedCoords) {
+      return res.status(400).json({ error: 'rideId, actualLat, actualLng, and expectedCoords are required' });
+    }
+
+    const alert = SafetyService.checkRouteDeviation({
+      rideId,
+      driverId: driverId || 'unknown_driver',
+      riderId: riderId || 'unknown_rider',
+      actualLat,
+      actualLng,
+      expectedCoords,
+      thresholdMeters,
+    });
+
+    if (alert) {
+      io.to('admin:dispatch').emit('safety:route_deviation', alert);
+      return res.json({ isDeviated: true, alert });
+    }
+
+    return res.json({ isDeviated: false, alert: null });
+  });
+
+  /**
+   * List all route deviation alerts
+   */
+  router.get('/deviations', (req, res) => {
+    const status = req.query.status as string;
+    const deviations = SafetyService.listRouteDeviations(status);
+    return res.json({ deviations });
+  });
+
+  /**
+   * Resolve route deviation alert
+   */
+  router.post('/deviations/:id/resolve', (req, res) => {
+    const { resolutionNotes = 'Driver followed authorized bypass', resolvedBy = 'Operations Dispatcher', status = 'RESOLVED_NORMAL_TRAFFIC' } = req.body;
+    const alert = SafetyService.resolveRouteDeviation(req.params.id, resolutionNotes, resolvedBy, status);
+    if (!alert) {
+      return res.status(404).json({ error: 'Route deviation alert not found' });
+    }
+
+    io.to('admin:dispatch').emit('safety:deviation_resolved', alert);
+    return res.json({ success: true, alert });
+  });
+
   return router;
 }

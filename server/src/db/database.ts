@@ -368,6 +368,80 @@ export function initDatabase() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS scheduled_rides (
+      id TEXT PRIMARY KEY,
+      rider_id TEXT NOT NULL,
+      rider_name TEXT NOT NULL,
+      rider_phone TEXT NOT NULL,
+      scheduled_time TEXT NOT NULL,
+      pickup_json TEXT NOT NULL,
+      destination_json TEXT NOT NULL,
+      vehicle_category TEXT NOT NULL,
+      flight_number TEXT,
+      airport_terminal TEXT,
+      recurrence_type TEXT DEFAULT 'once',
+      assigned_driver_id TEXT,
+      assigned_driver_name TEXT,
+      assigned_driver_phone TEXT,
+      status TEXT NOT NULL DEFAULT 'SCHEDULED',
+      notes TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS passenger_comfort_preferences (
+      user_id TEXT PRIMARY KEY,
+      ac_required INTEGER NOT NULL DEFAULT 0,
+      quiet_ride INTEGER NOT NULL DEFAULT 0,
+      extra_luggage INTEGER NOT NULL DEFAULT 0,
+      temperature_preference TEXT DEFAULT 'normal',
+      female_driver_preference INTEGER NOT NULL DEFAULT 0,
+      accessibility_assistance INTEGER NOT NULL DEFAULT 0,
+      pet_friendly INTEGER NOT NULL DEFAULT 0,
+      child_seat INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS driver_operating_expenses (
+      driver_id TEXT PRIMARY KEY,
+      fuel_cost_per_km REAL NOT NULL DEFAULT 4.2,
+      daily_maintenance_etb REAL NOT NULL DEFAULT 80.0,
+      daily_insurance_etb REAL NOT NULL DEFAULT 45.0,
+      daily_misc_expenses_etb REAL NOT NULL DEFAULT 50.0,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS demand_heatmap_zones (
+      zone_id TEXT PRIMARY KEY,
+      zone_name TEXT NOT NULL,
+      zone_name_am TEXT NOT NULL,
+      center_lat REAL NOT NULL,
+      center_lng REAL NOT NULL,
+      radius_meters REAL NOT NULL DEFAULT 1200,
+      demand_intensity REAL NOT NULL DEFAULT 1.0,
+      driver_supply_count INTEGER NOT NULL DEFAULT 5,
+      estimated_wait_minutes REAL NOT NULL DEFAULT 3.5,
+      potential_hourly_earnings_etb REAL NOT NULL DEFAULT 350.0,
+      confidence_score REAL NOT NULL DEFAULT 0.9,
+      forecast_period TEXT NOT NULL DEFAULT 'next_30_mins',
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS route_deviations (
+      id TEXT PRIMARY KEY,
+      ride_id TEXT NOT NULL,
+      driver_id TEXT NOT NULL,
+      rider_id TEXT NOT NULL,
+      expected_coords_json TEXT NOT NULL,
+      actual_lat REAL NOT NULL,
+      actual_lng REAL NOT NULL,
+      deviation_meters REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'FLAGGED',
+      resolved_by TEXT,
+      resolution_notes TEXT,
+      created_at TEXT NOT NULL
+    );
+
     -- High Performance Indexes for Core Tables
     CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
     CREATE INDEX IF NOT EXISTS idx_rides_rider ON rides(rider_id);
@@ -390,6 +464,11 @@ export function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_subs_driver ON driver_subscriptions(driver_id);
     CREATE INDEX IF NOT EXISTS idx_subs_status ON driver_subscriptions(status);
+
+    CREATE INDEX IF NOT EXISTS idx_sched_rides_rider ON scheduled_rides(rider_id);
+    CREATE INDEX IF NOT EXISTS idx_sched_rides_status ON scheduled_rides(status);
+    CREATE INDEX IF NOT EXISTS idx_heatmap_zones ON demand_heatmap_zones(forecast_period);
+    CREATE INDEX IF NOT EXISTS idx_deviations_ride ON route_deviations(ride_id);
   `);
 
   // Run safe schema migrations for existing database columns
@@ -428,6 +507,8 @@ export function initDatabase() {
   seedInitialData();
   seedProviderConfigs();
   seedSystemTariffsAndSettings();
+  seedDemandHeatmapZones();
+  seedDriverExpenses();
 }
 
 function seedInitialData() {
@@ -1549,3 +1630,148 @@ function seedSystemTariffsAndSettings() {
     }
   }
 }
+
+function seedDemandHeatmapZones() {
+  const count = db.prepare('SELECT count(*) as count FROM demand_heatmap_zones').get() as { count: number };
+  if (count.count > 0) return;
+
+  const now = new Date().toISOString();
+  const insert = db.prepare(`
+    INSERT INTO demand_heatmap_zones (
+      zone_id, zone_name, zone_name_am, center_lat, center_lng, radius_meters,
+      demand_intensity, driver_supply_count, estimated_wait_minutes,
+      potential_hourly_earnings_etb, confidence_score, forecast_period, updated_at
+    ) VALUES (
+      @zone_id, @zone_name, @zone_name_am, @center_lat, @center_lng, @radius_meters,
+      @demand_intensity, @driver_supply_count, @estimated_wait_minutes,
+      @potential_hourly_earnings_etb, @confidence_score, @forecast_period, @updated_at
+    )
+  `);
+
+  const zones = [
+    {
+      zone_id: 'zone_bole_medhanialem',
+      zone_name: 'Bole Medhanialem & Edna Mall Corridor',
+      zone_name_am: 'ቦሌ መድኃኔዓለም እና ኤድና ሞል',
+      center_lat: 8.9950,
+      center_lng: 38.7880,
+      radius_meters: 1400,
+      demand_intensity: 2.6,
+      driver_supply_count: 12,
+      estimated_wait_minutes: 2.1,
+      potential_hourly_earnings_etb: 480.0,
+      confidence_score: 0.95,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+    {
+      zone_id: 'zone_bole_airport',
+      zone_name: 'Bole Addis Ababa International Airport',
+      zone_name_am: 'ቦሌ ዓለም አቀፍ አውሮፕላን ማረፊያ',
+      center_lat: 8.9778,
+      center_lng: 38.7993,
+      radius_meters: 1800,
+      demand_intensity: 2.9,
+      driver_supply_count: 18,
+      estimated_wait_minutes: 1.8,
+      potential_hourly_earnings_etb: 560.0,
+      confidence_score: 0.98,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+    {
+      zone_id: 'zone_kazanchis',
+      zone_name: 'UNECA & Kazanchis Business District',
+      zone_name_am: 'የተመድ ኢኮኖሚክ ኮሚሽን እና ካዛንቺስ',
+      center_lat: 9.0185,
+      center_lng: 38.7705,
+      radius_meters: 1300,
+      demand_intensity: 2.3,
+      driver_supply_count: 9,
+      estimated_wait_minutes: 2.7,
+      potential_hourly_earnings_etb: 430.0,
+      confidence_score: 0.92,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+    {
+      zone_id: 'zone_meskel_square',
+      zone_name: 'Meskel Square & Stadium Hub',
+      zone_name_am: 'መስቀል አደባባይ እና ስታዲየም',
+      center_lat: 9.0105,
+      center_lng: 38.7615,
+      radius_meters: 1500,
+      demand_intensity: 2.1,
+      driver_supply_count: 14,
+      estimated_wait_minutes: 2.4,
+      potential_hourly_earnings_etb: 400.0,
+      confidence_score: 0.94,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+    {
+      zone_id: 'zone_piassa',
+      zone_name: 'Piassa & Churchill Avenue',
+      zone_name_am: 'ፒያሳ እና ቸርችል ጎዳና',
+      center_lat: 9.0345,
+      center_lng: 38.7525,
+      radius_meters: 1200,
+      demand_intensity: 1.8,
+      driver_supply_count: 7,
+      estimated_wait_minutes: 3.5,
+      potential_hourly_earnings_etb: 350.0,
+      confidence_score: 0.88,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+    {
+      zone_id: 'zone_mercato',
+      zone_name: 'Addis Mercato Commercial Market',
+      zone_name_am: 'አዲስ መርካቶ የንግድ ማዕከል',
+      center_lat: 9.0300,
+      center_lng: 38.7390,
+      radius_meters: 1600,
+      demand_intensity: 2.5,
+      driver_supply_count: 11,
+      estimated_wait_minutes: 3.0,
+      potential_hourly_earnings_etb: 460.0,
+      confidence_score: 0.91,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+    {
+      zone_id: 'zone_sarbet',
+      zone_name: 'Sarbet & African Union Headquarters',
+      zone_name_am: 'ሳርቤት እና የአፍሪካ ህብረት',
+      center_lat: 8.9970,
+      center_lng: 38.7360,
+      radius_meters: 1300,
+      demand_intensity: 1.9,
+      driver_supply_count: 6,
+      estimated_wait_minutes: 3.2,
+      potential_hourly_earnings_etb: 360.0,
+      confidence_score: 0.89,
+      forecast_period: 'next_30_mins',
+      updated_at: now,
+    },
+  ];
+
+  for (const z of zones) {
+    insert.run(z);
+  }
+}
+
+function seedDriverExpenses() {
+  const count = db.prepare('SELECT count(*) as count FROM driver_operating_expenses').get() as { count: number };
+  if (count.count > 0) return;
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO driver_operating_expenses (
+      driver_id, fuel_cost_per_km, daily_maintenance_etb, daily_insurance_etb, daily_misc_expenses_etb, updated_at
+    ) VALUES (
+      'driver_ahmed_01', 4.2, 85.0, 45.0, 50.0, ?
+    )
+  `).run(now);
+}
+

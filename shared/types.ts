@@ -547,3 +547,145 @@ export interface SystemMetrics {
   averageEtaMinutes: number;
   acceptanceRatePercent: number;
 }
+
+// ----------------------------------------------------------------------------
+// Priority 0: Intelligent Multi-Provider Comparison & Offer Ranking
+// ----------------------------------------------------------------------------
+export type OfferComparisonMode = 'best_value' | 'cheapest' | 'fastest_pickup' | 'premium_comfort';
+
+export interface MarketplaceOffer {
+  id: string;
+  providerId: string;
+  providerName: string;
+  providerLogo?: string;
+  vehicleCategory: VehicleCategory | string;
+  vehicleDescription?: string;
+  estimatedFare: number;
+  confirmedFare?: number;
+  currency: string;
+  isConfirmedPrice: boolean;
+  estimatedPickupMinutes: number;
+  estimatedJourneyMinutes: number;
+  estimatedArrivalTime: string;
+  paymentMethods: PaymentMethod[];
+  driverRating?: number;
+  providerServiceRating?: number;
+  passengerCapacity: number;
+  luggageCapacity: number;
+  isAvailable: boolean;
+  unavailabilityReason?: string;
+  quoteExpiresAt: string;
+  cancellationPolicy: string;
+  sourceAttribution: string;
+  scoreBreakdown?: {
+    priceScore: number;
+    pickupEtaScore: number;
+    journeyTimeScore: number;
+    reliabilityScore: number;
+    qualityScore: number;
+    preferenceMatchScore: number;
+    totalOfferScore: number;
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Priority 1: Passenger Comfort Preferences
+// ----------------------------------------------------------------------------
+export interface PassengerComfortPreferences {
+  userId: string;
+  acRequired: boolean;
+  quietRide: boolean;
+  extraLuggage: boolean;
+  temperaturePreference: 'cool' | 'normal' | 'warm';
+  femaleDriverPreference: boolean;
+  accessibilityAssistance: boolean;
+  petFriendly: boolean;
+  childSeat: boolean;
+  notes?: string;
+  updatedAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Priority 1: Scheduled & Recurring Bookings
+// ----------------------------------------------------------------------------
+export interface ScheduledRide {
+  id: string;
+  riderId: string;
+  riderName: string;
+  riderPhone: string;
+  scheduledTime: string;
+  pickup: LocationPoint;
+  destination: LocationPoint;
+  vehicleCategory: VehicleCategory;
+  flightNumber?: string;
+  airportTerminal?: string;
+  recurrenceType: 'once' | 'daily' | 'weekly';
+  assignedDriverId?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
+  status: 'SCHEDULED' | 'ASSIGNED' | 'COMPLETED' | 'CANCELLED';
+  notes?: string;
+  createdAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Priority 0: Driver Demand Heatmaps & Intelligence
+// ----------------------------------------------------------------------------
+export interface DemandHeatmapZone {
+  zoneId: string;
+  zoneName: string;
+  zoneNameAm: string;
+  centerLat: number;
+  centerLng: number;
+  radiusMeters: number;
+  demandIntensity: number; // 0.5 to 3.0 multiplier
+  driverSupplyCount: number;
+  estimatedWaitMinutes: number;
+  potentialHourlyEarningsEtb: number;
+  confidenceScore: number; // 0.0 to 1.0
+  forecastPeriod: 'next_15_mins' | 'next_30_mins' | 'next_60_mins';
+  lastUpdatedAt: string;
+}
+
+// ----------------------------------------------------------------------------
+// Priority 1: Driver Operating Expenses & Net Profitability
+// ----------------------------------------------------------------------------
+export interface DriverOperatingExpenses {
+  driverId: string;
+  fuelCostPerKm: number;
+  dailyMaintenanceEtb: number;
+  dailyInsuranceEtb: number;
+  dailyMiscExpensesEtb: number;
+  updatedAt: string;
+}
+
+export interface DriverNetProfitability {
+  grossEarningsTodayEtb: number;
+  totalTripsToday: number;
+  totalDistanceKmToday: number;
+  estimatedFuelCostEtb: number;
+  allocatedMaintenanceEtb: number;
+  allocatedInsuranceEtb: number;
+  subscriptionCostTodayEtb: number; // Daily fraction of active subscription
+  netOperatingEarningsEtb: number;
+  hourlyEarningsEtb: number;
+  earningsPerKmEtb: number;
+  subscriptionBreakEvenTrips: number;
+}
+
+// ----------------------------------------------------------------------------
+// Priority 0: Route Deviations & Anomaly Detection
+// ----------------------------------------------------------------------------
+export interface RouteDeviationAlert {
+  id: string;
+  rideId: string;
+  driverId: string;
+  riderId: string;
+  expectedCoords: [number, number][];
+  actualLocation: [number, number];
+  deviationMeters: number;
+  status: 'FLAGGED' | 'INVESTIGATING' | 'RESOLVED_NORMAL_TRAFFIC' | 'ESCALATED';
+  resolvedBy?: string;
+  resolutionNotes?: string;
+  createdAt: string;
+}

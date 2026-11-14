@@ -22,9 +22,12 @@ import {
   Radio,
   AlertTriangle,
   Lock,
+  Navigation2,
+  CalendarClock,
+  Compass,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
-import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory, SupportTicket } from '@shared/types';
+import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory, SupportTicket, RouteDeviationAlert, ScheduledRide } from '@shared/types';
 import { translations, Language } from '../../i18n/translations';
 import { ADDIS_LANDMARKS, AddisLandmark } from '@shared/landmarks';
 import { AdminSubscriptionLedgerTab } from './AdminSubscriptionLedgerTab';
@@ -53,13 +56,13 @@ interface AdminViewProps {
 }
 
 const ROLE_PERMITTED_TABS: Record<string, string[]> = {
-  super_admin: ['fleet', 'callcenter', 'subscriptions', 'corporate', 'providers', 'sos', 'developer', 'kyc', 'vat', 'tickets', 'tariffs'],
-  platform_admin: ['fleet', 'callcenter', 'subscriptions', 'corporate', 'providers', 'sos', 'developer', 'kyc', 'vat', 'tickets', 'tariffs'],
-  dispatcher: ['fleet', 'callcenter', 'sos', 'providers'],
-  compliance_officer: ['kyc', 'tickets', 'fleet'],
-  support_agent: ['tickets', 'kyc', 'callcenter', 'fleet'],
+  super_admin: ['fleet', 'callcenter', 'subscriptions', 'corporate', 'providers', 'sos', 'developer', 'kyc', 'vat', 'tickets', 'tariffs', 'deviations', 'scheduled'],
+  platform_admin: ['fleet', 'callcenter', 'subscriptions', 'corporate', 'providers', 'sos', 'developer', 'kyc', 'vat', 'tickets', 'tariffs', 'deviations', 'scheduled'],
+  dispatcher: ['fleet', 'callcenter', 'sos', 'providers', 'deviations', 'scheduled'],
+  compliance_officer: ['kyc', 'tickets', 'fleet', 'deviations'],
+  support_agent: ['tickets', 'kyc', 'callcenter', 'fleet', 'scheduled'],
   finance_officer: ['vat', 'subscriptions', 'corporate'],
-  fleet_manager: ['fleet', 'corporate', 'subscriptions'],
+  fleet_manager: ['fleet', 'corporate', 'subscriptions', 'scheduled'],
 };
 
 export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialTab, adminSession }) => {
@@ -80,6 +83,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
     | 'vat'
     | 'tickets'
     | 'tariffs'
+    | 'deviations'
+    | 'scheduled'
   >((initialTab as any) || (allowedTabs[0] as any) || 'fleet');
 
   // Guard active tab if not allowed for this role
@@ -98,6 +103,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
   const [tariffs, setTariffs] = useState<any>(null);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
+
+  // Route Deviations & Scheduled Bookings (Workstreams 5 & 10)
+  const [deviations, setDeviations] = useState<RouteDeviationAlert[]>([]);
+  const [scheduledRides, setScheduledRides] = useState<ScheduledRide[]>([]);
 
   // VAT Report
   const [vatSummary, setVatSummary] = useState<VatReportSummary | null>(null);
@@ -164,6 +173,47 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
         if (data.tariffs) setTariffs(data.tariffs);
       })
       .catch(console.error);
+
+    fetch('/api/safety/deviations')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.deviations) setDeviations(data.deviations);
+      })
+      .catch(console.error);
+
+    fetch('/api/rides/scheduled')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.scheduledRides) setScheduledRides(data.scheduledRides);
+      })
+      .catch(console.error);
+  };
+
+  const handleResolveDeviation = async (id: string, action: 'RESOLVED_NORMAL_TRAFFIC' | 'ESCALATED') => {
+    try {
+      await fetch(`/api/safety/deviations/${id}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resolutionNotes: action === 'ESCALATED' ? 'Escalated to safety patrol team' : 'Driver verified traffic detour',
+          resolvedBy: adminSession?.admin?.name || 'Operations Dispatcher',
+          status: action,
+        }),
+      });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCancelScheduled = async (id: string) => {
+    if (!window.confirm('Cancel this scheduled ride?')) return;
+    try {
+      await fetch(`/api/rides/scheduled/${id}/cancel`, { method: 'POST' });
+      loadDashboardData();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleResolveTicket = async (ticketId: string) => {
@@ -508,6 +558,30 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Tariff Rules</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('deviations') && (
+            <button
+              onClick={() => setActiveTab('deviations')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+                activeTab === 'deviations' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-amber-300 hover:bg-slate-700'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-400" />
+              <span>Route Deviations ({deviations.filter((d) => d.status === 'FLAGGED').length})</span>
+            </button>
+          )}
+
+          {allowedTabs.includes('scheduled') && (
+            <button
+              onClick={() => setActiveTab('scheduled')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
+                activeTab === 'scheduled' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'
+              }`}
+            >
+              <CalendarClock className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Airport & Scheduled ({scheduledRides.length})</span>
             </button>
           )}
         </div>
@@ -934,6 +1008,178 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
 
         {/* Tab 11: Developer API Keys & Webhooks */}
         {activeTab === 'developer' && <AdminDeveloperTab />}
+
+        {/* Tab 12: Route Deviations & Anomaly Monitor (Section 3.4 & Workstream 10) */}
+        {activeTab === 'deviations' && (
+          <div className="p-6 space-y-4 overflow-y-auto h-full">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <Compass className="w-6 h-6 text-amber-500" />
+                <div>
+                  <h3 className="font-bold text-base text-slate-800">
+                    Route Deviation Anomaly Monitor (Section 3.4)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Real-time detection of in-cab vehicle route deviations exceeding 600m safety threshold
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={loadDashboardData}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition"
+              >
+                Refresh Queue
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {deviations.length > 0 ? (
+                deviations.map((dev) => (
+                  <div
+                    key={dev.id}
+                    className={`p-4 rounded-xl border flex items-center justify-between gap-4 transition ${
+                      dev.status === 'FLAGGED'
+                        ? 'bg-amber-50/50 border-amber-300'
+                        : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <div className="space-y-1 text-xs">
+                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                        <span className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded font-mono">
+                          {dev.deviationMeters}m OFF ROUTE
+                        </span>
+                        <span>Trip #{dev.rideId}</span>
+                        <span className="text-[10px] font-normal text-slate-500">
+                          ({new Date(dev.createdAt).toLocaleTimeString()})
+                        </span>
+                      </div>
+                      <div className="text-slate-600">
+                        Driver ID: <span className="font-mono font-bold">{dev.driverId}</span> • Rider ID:{' '}
+                        <span className="font-mono font-bold">{dev.riderId}</span>
+                      </div>
+                      <div className="text-slate-500 text-[11px]">
+                        Actual GPS: [{dev.actualLocation[0].toFixed(4)}, {dev.actualLocation[1].toFixed(4)}] •
+                        Status: <span className="font-bold text-slate-800">{dev.status}</span>
+                      </div>
+                      {dev.resolutionNotes && (
+                        <div className="text-emerald-700 text-[11px] font-medium pt-1">
+                          ✓ {dev.resolutionNotes} (by {dev.resolvedBy})
+                        </div>
+                      )}
+                    </div>
+
+                    {dev.status === 'FLAGGED' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleResolveDeviation(dev.id, 'RESOLVED_NORMAL_TRAFFIC')}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition shadow-xs"
+                        >
+                          Approve Detour
+                        </button>
+                        <button
+                          onClick={() => handleResolveDeviation(dev.id, 'ESCALATED')}
+                          className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition shadow-xs"
+                        >
+                          Escalate Incident
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 text-sm text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
+                  No active route deviations detected. All active trips are within threshold.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 13: Scheduled Rides & Airport Transfer Dispatch Queue (Workstream 5) */}
+        {activeTab === 'scheduled' && (
+          <div className="p-6 space-y-4 overflow-y-auto h-full">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="w-6 h-6 text-emerald-600" />
+                <div>
+                  <h3 className="font-bold text-base text-slate-800">
+                    Scheduled Bookings & Airport Transfer Dispatch (Workstream 5)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Advance scheduled reservations, Bole International Airport flight transfers, and recurring commutes
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={loadDashboardData}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition"
+              >
+                Refresh Queue
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {scheduledRides.length > 0 ? (
+                scheduledRides.map((sr) => (
+                  <div
+                    key={sr.id}
+                    className="p-4 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-4 shadow-xs"
+                  >
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase">
+                          {sr.status}
+                        </span>
+                        <span>{sr.riderName} ({sr.riderPhone})</span>
+                        <span className="text-[11px] text-brand-600 font-bold">
+                          • {new Date(sr.scheduledTime).toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="text-slate-600 flex items-center gap-3 text-[11px]">
+                        <span>Pickup: <strong>{sr.pickup.address}</strong></span>
+                        <span>→</span>
+                        <span>Dest: <strong>{sr.destination.address}</strong></span>
+                      </div>
+
+                      <div className="flex items-center gap-3 text-[10px] text-slate-500 pt-0.5">
+                        {sr.flightNumber && (
+                          <span className="bg-blue-50 text-blue-700 font-mono font-bold px-1.5 py-0.5 rounded border border-blue-200">
+                            ✈️ Flight: {sr.flightNumber} ({sr.airportTerminal})
+                          </span>
+                        )}
+                        <span className="capitalize">Recurrence: {sr.recurrenceType}</span>
+                        <span>Category: {sr.vehicleCategory}</span>
+                        {sr.assignedDriverName && (
+                          <span className="text-emerald-700 font-bold">
+                            Assigned Driver: {sr.assignedDriverName} ({sr.assignedDriverPhone})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {sr.status === 'SCHEDULED' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleCancelScheduled(sr.id)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-lg transition border border-rose-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-12 text-sm text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <CalendarClock className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-60" />
+                  No upcoming scheduled rides or airport transfers in queue.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -22,9 +22,15 @@ import {
   AlertTriangle,
   UserPlus,
   ShieldAlert,
+  Flame,
+  Fuel,
+  Wrench,
+  ShieldCheck,
+  Calculator,
+  Target,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
-import { Driver, Ride, VehicleCategory } from '@shared/types';
+import { DemandHeatmapZone, Driver, DriverNetProfitability, DriverOperatingExpenses, Ride, VehicleCategory } from '@shared/types';
 import { translations, Language } from '../../i18n/translations';
 import { sounds } from '../../utils/audio';
 import { DriverSubscriptionTab } from './DriverSubscriptionTab';
@@ -51,10 +57,72 @@ export const DriverView: React.FC<DriverViewProps> = ({
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [incomingRide, setIncomingRide] = useState<Ride | null>(null);
   const [countdown, setCountdown] = useState<number>(30);
-  const [activeTab, setActiveTab] = useState<'trip' | 'subscription' | 'deliveries' | 'earnings' | 'kyc'>('trip');
+  const [activeTab, setActiveTab] = useState<'trip' | 'subscription' | 'deliveries' | 'earnings' | 'kyc' | 'heatmap'>('trip');
   const [sosActive, setSosActive] = useState(false);
   const [sosMessage, setSosMessage] = useState<string | null>(null);
   const [showDriverOnboardingModal, setShowDriverOnboardingModal] = useState(false);
+
+  // Demand Heatmap Intelligence (Workstream 8)
+  const [heatmapZones, setHeatmapZones] = useState<DemandHeatmapZone[]>([]);
+  const [forecastPeriod, setForecastPeriod] = useState<'next_15_mins' | 'next_30_mins' | 'next_60_mins'>('next_30_mins');
+
+  // Driver Profitability & Net Earnings (Workstream 9)
+  const [profitability, setProfitability] = useState<DriverNetProfitability | null>(null);
+  const [expenses, setExpenses] = useState<DriverOperatingExpenses | null>(null);
+  const [showEditExpenses, setShowEditExpenses] = useState(false);
+  const [editFuelCost, setEditFuelCost] = useState('4.2');
+  const [editMaintenance, setEditMaintenance] = useState('80.0');
+
+  const fetchHeatmap = () => {
+    fetch(`/api/drivers/heatmap?forecast=${forecastPeriod}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.zones) setHeatmapZones(data.zones);
+      })
+      .catch(console.error);
+  };
+
+  const fetchProfitability = () => {
+    if (!driver) return;
+    fetch(`/api/drivers/${driver.id}/profitability`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.profitability) setProfitability(data.profitability);
+      })
+      .catch(console.error);
+
+    fetch(`/api/drivers/${driver.id}/expenses`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.expenses) {
+          setExpenses(data.expenses);
+          setEditFuelCost(String(data.expenses.fuelCostPerKm));
+          setEditMaintenance(String(data.expenses.dailyMaintenanceEtb));
+        }
+      })
+      .catch(console.error);
+  };
+
+  const handleSaveExpenses = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!driver) return;
+    try {
+      const res = await fetch(`/api/drivers/${driver.id}/expenses`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fuelCostPerKm: parseFloat(editFuelCost) || 4.2,
+          dailyMaintenanceEtb: parseFloat(editMaintenance) || 80.0,
+        }),
+      });
+      if (res.ok) {
+        setShowEditExpenses(false);
+        fetchProfitability();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleTriggerDriverSos = async () => {
     if (!driver) return;
@@ -118,6 +186,14 @@ export const DriverView: React.FC<DriverViewProps> = ({
   useEffect(() => {
     fetchDriverProfile();
   }, [currentDriverId]);
+
+  useEffect(() => {
+    if (activeTab === 'heatmap') {
+      fetchHeatmap();
+    } else if (activeTab === 'earnings') {
+      fetchProfitability();
+    }
+  }, [activeTab, forecastPeriod, driver?.id]);
 
   // Socket room and listeners
   useEffect(() => {
@@ -496,6 +572,17 @@ export const DriverView: React.FC<DriverViewProps> = ({
             <span>Subscription</span>
           </button>
           <button
+            onClick={() => setActiveTab('heatmap')}
+            className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition flex items-center gap-1 ${
+              activeTab === 'heatmap'
+                ? 'border-brand-500 text-brand-600 bg-white'
+                : 'border-transparent hover:text-slate-900'
+            }`}
+          >
+            <Flame className="w-3 h-3 text-rose-500" />
+            <span>Heatmap</span>
+          </button>
+          <button
             onClick={() => setActiveTab('earnings')}
             className={`px-3 py-3 text-center border-b-2 whitespace-nowrap transition ${
               activeTab === 'earnings'
@@ -503,7 +590,7 @@ export const DriverView: React.FC<DriverViewProps> = ({
                 : 'border-transparent hover:text-slate-900'
             }`}
           >
-            Wallet
+            Profit & Wallet
           </button>
           <button
             onClick={() => setActiveTab('kyc')}
@@ -675,9 +762,203 @@ export const DriverView: React.FC<DriverViewProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Wallet & Telebirr Payout */}
+        {/* Tab: Demand Heatmap & Intelligence (Workstream 8) */}
+        {activeTab === 'heatmap' && (
+          <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-rose-500" />
+                <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
+                  Addis Ababa Demand Hotspots
+                </h4>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">Live Predictive</span>
+            </div>
+
+            {/* Forecast Window Toggle */}
+            <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl text-[11px] font-bold text-center">
+              {(['next_15_mins', 'next_30_mins', 'next_60_mins'] as const).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setForecastPeriod(period)}
+                  className={`py-1.5 rounded-lg transition ${
+                    forecastPeriod === period
+                      ? 'bg-white text-rose-600 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {period === 'next_15_mins' ? 'Next 15m' : period === 'next_30_mins' ? 'Next 30m' : 'Next 60m'}
+                </button>
+              ))}
+            </div>
+
+            {/* Hotspot Zone Cards */}
+            <div className="space-y-2.5">
+              {heatmapZones.map((zone) => {
+                const isHighSurge = zone.demandIntensity >= 2.2;
+                return (
+                  <div
+                    key={zone.zoneId}
+                    className={`p-3.5 rounded-xl border transition ${
+                      isHighSurge
+                        ? 'bg-rose-50/40 border-rose-200 shadow-xs'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-black text-xs text-slate-900 flex items-center gap-1.5">
+                          <span>{zone.zoneName}</span>
+                          {isHighSurge && (
+                            <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                              Surge
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                          {zone.zoneNameAm}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-sm font-black text-rose-600 block">
+                          {zone.demandIntensity.toFixed(1)}x
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-medium">Demand Index</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 mt-2.5 pt-2 border-t border-slate-100 text-center text-[10px]">
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Est. Earnings</span>
+                        <span className="font-black text-emerald-700 font-mono">
+                          {zone.potentialHourlyEarningsEtb} <span className="text-[8px]">ETB/h</span>
+                        </span>
+                      </div>
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Avg. Wait</span>
+                        <span className="font-bold text-slate-700 font-mono">{zone.estimatedWaitMinutes}m</span>
+                      </div>
+                      <div className="bg-white/80 p-1.5 rounded-lg border border-slate-100">
+                        <span className="text-slate-400 block">Supply</span>
+                        <span className="font-bold text-slate-700 font-mono">{zone.driverSupplyCount} cabs</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Profitability & Telebirr Wallet */}
         {activeTab === 'earnings' && (
-          <div className="p-5 space-y-5 flex-1">
+          <div className="p-5 space-y-4 flex-1 overflow-y-auto">
+            {/* Real-Time Net Profitability Intelligence Card (Section 3.3 & Workstream 9) */}
+            {profitability && (
+              <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-md space-y-3 border border-slate-800">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
+                      Driver Net Profitability
+                    </span>
+                  </div>
+                  <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    0% PLATFORM FEE
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 block">Net Operating Earnings</span>
+                    <span className="text-lg font-black text-emerald-400">
+                      {profitability.netOperatingEarningsEtb.toFixed(0)}{' '}
+                      <span className="text-[10px] font-bold">ETB</span>
+                    </span>
+                  </div>
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 block">Hourly Net Take-Home</span>
+                    <span className="text-lg font-black text-brand-300">
+                      {profitability.hourlyEarningsEtb.toFixed(0)}{' '}
+                      <span className="text-[10px] font-bold">ETB/h</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] pt-1 border-t border-slate-800/80 font-mono text-slate-300">
+                  <div className="flex justify-between">
+                    <span>Gross Trip Fares ({profitability.totalTripsToday} trips, {profitability.totalDistanceKmToday} km)</span>
+                    <span className="text-white font-bold">+{profitability.grossEarningsTodayEtb.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between text-rose-300">
+                    <span>Estimated Fuel Expense (@ {expenses?.fuelCostPerKm || 4.2} ETB/km)</span>
+                    <span>-{profitability.estimatedFuelCostEtb.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between text-rose-300">
+                    <span>Daily Maintenance & Oil Reserve</span>
+                    <span>-{profitability.allocatedMaintenanceEtb.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between text-rose-300">
+                    <span>Daily Insurance & Vehicle Overhead</span>
+                    <span>-{profitability.allocatedInsuranceEtb.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between text-amber-300">
+                    <span>Chebelew Subscription (Daily Fraction)</span>
+                    <span>-{profitability.subscriptionCostTodayEtb.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-slate-800 text-emerald-300 font-bold">
+                    <span>Break-Even Threshold Today</span>
+                    <span>{profitability.subscriptionBreakEvenTrips} trips required</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => setShowEditExpenses(!showEditExpenses)}
+                    className="text-[10px] text-brand-300 hover:text-brand-200 flex items-center gap-1 font-sans font-bold"
+                  >
+                    <Wrench className="w-3 h-3" />
+                    <span>{showEditExpenses ? 'Hide Expense Settings' : 'Adjust Expense Settings'}</span>
+                  </button>
+                </div>
+
+                {showEditExpenses && (
+                  <form onSubmit={handleSaveExpenses} className="bg-slate-800 p-3 rounded-xl border border-slate-700 space-y-2 text-xs font-sans">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block">Fuel Cost (ETB/km)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={editFuelCost}
+                          onChange={(e) => setEditFuelCost(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-600 rounded p-1 text-white text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block">Daily Maint. (ETB)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={editMaintenance}
+                          onChange={(e) => setEditMaintenance(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-600 rounded p-1 text-white text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold py-1.5 rounded text-[11px] transition"
+                    >
+                      Save Operating Expenses
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* Telebirr Balance & Withdrawal */}
             <div className="bg-gradient-to-r from-[#004c82] to-[#0070ba] text-white p-5 rounded-2xl shadow-md text-center">
               <span className="text-xs text-blue-100 block">Available Telebirr Balance</span>
               <div className="text-3xl font-extrabold text-white mt-1">
@@ -716,13 +997,6 @@ export const DriverView: React.FC<DriverViewProps> = ({
                   Withdraw
                 </button>
               </div>
-            </div>
-
-            <div className="text-xs text-slate-500 space-y-1">
-              <span className="font-bold text-slate-700 block">Payout Rules:</span>
-              <p>• Payouts processed 24/7 directly to Ethio Telecom Telebirr</p>
-              <p>• Minimum withdrawal: 100 ETB</p>
-              <p>• VAT & Platform commissions are settled automatically at ride completion</p>
             </div>
           </div>
         )}
