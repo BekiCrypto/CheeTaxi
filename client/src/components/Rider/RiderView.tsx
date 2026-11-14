@@ -35,6 +35,8 @@ import {
   Wind,
   VolumeX,
   Wallet,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { LocationSearchInput } from './LocationSearchInput';
@@ -160,6 +162,12 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyRides, setHistoryRides] = useState<Ride[]>([]);
   const [selectedReceiptRide, setSelectedReceiptRide] = useState<Ride | null>(null);
+
+  // Desktop Hierarchy Accordions & Delight Factor States
+  const [isCtaHovered, setIsCtaHovered] = useState(false);
+  const [showComfortAccordion, setShowComfortAccordion] = useState(false);
+  const [showScheduleAccordion, setShowScheduleAccordion] = useState(false);
+  const [showTaxAccordion, setShowTaxAccordion] = useState(false);
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [ticketCategory, setTicketCategory] = useState<'lost_item' | 'fare_dispute' | 'payment' | 'driver_behavior' | 'app_issue'>('lost_item');
@@ -504,13 +512,14 @@ export const RiderView: React.FC<RiderViewProps> = ({
   ];
 
   const selectedEstimate = estimates.find((e) => e.category === selectedCategory);
+  const isAmharic = language === 'am';
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-68px)] w-full overflow-hidden bg-slate-50">
-      {/* Left Control Panel / Booking Sheet */}
-      <div className="w-full lg:w-[440px] xl:w-[480px] bg-white border-r border-slate-200 flex flex-col h-full shadow-lg z-20 overflow-y-auto">
+      {/* Left Control Panel / Booking Sheet with Desktop Frosted Glass */}
+      <div className="w-full lg:w-[440px] xl:w-[480px] frosted-glass border-r border-white/60 flex flex-col h-full shadow-2xl z-20 overflow-y-auto">
         {/* Top Destination Selector */}
-        <div className="p-5 border-b border-slate-100 space-y-3.5 bg-gradient-to-b from-slate-50 to-white">
+        <div className="p-5 border-b border-slate-200/50 space-y-3.5 bg-white/50 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse" />
@@ -669,11 +678,17 @@ export const RiderView: React.FC<RiderViewProps> = ({
           </div>
         ) : !activeRide ? (
           <div className="p-5 space-y-5 flex-1">
-            {/* Vehicle Options */}
+            {/* Step 1: Order of Operations - Select Ride Category */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                {language === 'am' ? 'የመኪና ምርጫ' : 'Select Ride Category'}
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-bold">
+                    1
+                  </span>
+                  <span>{language === 'am' ? 'የመኪና ምርጫ' : 'Select Ride Category'}</span>
+                </label>
+                <span className="text-[10px] font-semibold text-slate-400">100% Direct Payout</span>
+              </div>
 
               <div className="space-y-2.5">
                 {estimates
@@ -728,16 +743,16 @@ export const RiderView: React.FC<RiderViewProps> = ({
               </div>
             </div>
 
-            {/* Section 3.1: Intelligent Multi-Provider Comparison & Configurable Offer Ranking */}
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-3.5">
+            {/* Step 2: Order of Operations - Multi-Provider Comparison & Configurable Offer Ranking */}
+            <div className="frosted-card rounded-2xl p-4 border border-white/60 shadow-sm space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                    <Sparkles className="w-4 h-4 text-amber-200" />
+                  <div className="w-7 h-7 rounded-lg bg-brand-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                    <span className="font-bold text-xs">2</span>
                   </div>
                   <div>
                     <span className="text-xs font-black text-slate-800 tracking-tight block">
-                      {language === 'am' ? 'የአቅራቢዎች ንፅፅር' : 'Multi-Provider Ride Comparison'}
+                      {language === 'am' ? 'የአቅራቢዎች ንፅፅር' : 'Compare Ride Options'}
                     </span>
                     <span className="text-[10px] text-slate-500 font-medium">
                       {language === 'am' ? 'የተረጋገጠ ዋጋ እና የጥራት ደረጃ' : '4-Mode Algorithmic Offer Ranking'}
@@ -918,38 +933,36 @@ export const RiderView: React.FC<RiderViewProps> = ({
               </div>
             </div>
 
-            {/* VAT Regulation 570/2025 Breakdown Notice */}
-            {selectedEstimate && (
-              <div className="bg-blue-50/60 rounded-xl p-3.5 border border-blue-100 text-xs space-y-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-blue-900">
-                  <Info className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                  <span>{t.vatRegulation}</span>
-                </div>
-                <div className="text-blue-800 text-[11px] leading-relaxed">
-                  {t.vatNotice}
-                </div>
-                <div className="flex justify-between pt-1 border-t border-blue-200/60 font-mono text-[11px] text-blue-950">
-                  <span>Fare: {selectedEstimate.fare.subtotal.toFixed(2)} ETB</span>
-                  <span className="font-bold text-emerald-700">
-                    +15% VAT: {selectedEstimate.fare.vatAmount.toFixed(2)} ETB
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Payment Method Selector */}
+            {/* Step 3: Order of Operations - Payment Method */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                {t.paymentMethod}
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-4 h-4 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-bold">
+                    3
+                  </span>
+                  <span>{t.paymentMethod}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowWalletModal(true)}
+                  className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <Wallet className="w-3.5 h-3.5" />
+                  <span>
+                    Wallet (
+                    {passengerWalletBalance !== null ? `${passengerWalletBalance.toFixed(0)} Br` : '0 Br'})
+                  </span>
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('TELEBIRR')}
-                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
                     paymentMethod === 'TELEBIRR'
-                      ? 'border-[#0070ba] bg-blue-50/50 text-[#0070ba]'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-[#0070ba] bg-blue-50/70 text-[#0070ba] shadow-xs'
+                      : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
                   }`}
                 >
                   <Smartphone className="w-4 h-4 text-[#0070ba]" />
@@ -959,10 +972,10 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('CASH')}
-                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
                     paymentMethod === 'CASH'
-                      ? 'border-emerald-600 bg-emerald-50/50 text-emerald-700'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-emerald-600 bg-emerald-50/70 text-emerald-700 shadow-xs'
+                      : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
                   }`}
                 >
                   <DollarSign className="w-4 h-4 text-emerald-600" />
@@ -972,10 +985,10 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('BANK_TRANSFER')}
-                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
                     paymentMethod === 'BANK_TRANSFER'
-                      ? 'border-purple-600 bg-purple-50/50 text-purple-700'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-purple-600 bg-purple-50/70 text-purple-700 shadow-xs'
+                      : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
                   }`}
                 >
                   <CreditCard className="w-4 h-4 text-purple-600" />
@@ -985,34 +998,304 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('CORPORATE_BILLING')}
-                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition ${
+                  className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
                     paymentMethod === 'CORPORATE_BILLING'
-                      ? 'border-amber-600 bg-amber-50/50 text-amber-700'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'border-amber-600 bg-amber-50/70 text-amber-700 shadow-xs'
+                      : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
                   }`}
                 >
                   <Building2 className="w-4 h-4 text-amber-600" />
-                  <span>Corporate Account</span>
+                  <span>Corporate Billing</span>
                 </button>
               </div>
 
               {paymentMethod === 'CORPORATE_BILLING' && (
-                <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
-                  <span>🏢 Billed to <strong>Ethiopian Airlines Commercial Fleet</strong></span>
+                <div className="p-2.5 bg-amber-50/90 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
+                  <span>
+                    🏢 Billed to <strong>Ethiopian Airlines Commercial Fleet</strong>
+                  </span>
                   <span className="font-mono font-bold text-amber-700">Allowance: 12,500 ETB</span>
                 </div>
               )}
             </div>
 
-            {/* Book Now Button */}
-            <button
-              onClick={handleRequestRide}
-              disabled={isCalculating}
-              className="w-full bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand-500/30 transition disabled:opacity-60"
-            >
-              <span>{t.bookNow}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {/* Collapsible Accordions - Fold Secondary Details */}
+            <div className="space-y-2 pt-2 border-t border-slate-200/60">
+              {/* Accordion 1: Airport Flights & Scheduled Transit */}
+              <div className="frosted-card rounded-xl border border-slate-200/80 overflow-hidden transition">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleAccordion((prev) => !prev)}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white/60 hover:bg-white/90 text-left transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <Plane className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-800">
+                      {isAmharic ? 'የቦሌ አየር ማረፊያ ቀጠሮ እና በረራ' : 'Airport Flight Tracking & Schedule'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {flightNumber ? (
+                      <span className="text-[10px] font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        Flight {flightNumber}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-slate-400">Optional</span>
+                    )}
+                    {showScheduleAccordion ? (
+                      <ChevronUp className="w-4 h-4 text-slate-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-500" />
+                    )}
+                  </div>
+                </button>
+
+                {showScheduleAccordion && (
+                  <div className="p-3.5 bg-white/40 border-t border-slate-100 space-y-3 animate-fade-in text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Flight Number
+                        </label>
+                        <input
+                          type="text"
+                          value={flightNumber}
+                          onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
+                          placeholder="e.g. ET-302"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-xs focus:ring-1 focus:ring-brand-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Terminal
+                        </label>
+                        <select
+                          value={airportTerminal}
+                          onChange={(e) => setAirportTerminal(e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs focus:ring-1 focus:ring-brand-500 outline-none"
+                        >
+                          <option value="Terminal 2 International">Terminal 2 (Intl)</option>
+                          <option value="Terminal 1 Domestic">Terminal 1 (Dom)</option>
+                          <option value="VIP Presidential Terminal">VIP Terminal</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Date
+                        </label>
+                        <input
+                          type="date"
+                          value={scheduledDate}
+                          onChange={(e) => setScheduledDate(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Time
+                        </label>
+                        <input
+                          type="time"
+                          value={scheduledTime}
+                          onChange={(e) => setScheduledTime(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-slate-500">
+                        Autonomous flight status tracker active
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleCreateScheduledRide(e as any)}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                      >
+                        Save Schedule
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Accordion 2: Ride Comfort & Accessibility */}
+              <div className="frosted-card rounded-xl border border-slate-200/80 overflow-hidden transition">
+                <button
+                  type="button"
+                  onClick={() => setShowComfortAccordion((prev) => !prev)}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white/60 hover:bg-white/90 text-left transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-brand-600" />
+                    <span className="text-xs font-bold text-slate-800">
+                      {isAmharic ? 'የምቾት እና ተደራሽነት ምርጫዎች' : 'Ride Comfort & Accessibility'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {comfortPreferences.acRequired ||
+                    comfortPreferences.quietRide ||
+                    comfortPreferences.extraLuggage ||
+                    comfortPreferences.femaleDriverPreference ? (
+                      <span className="text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200">
+                        Customized
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium text-slate-400">Standard</span>
+                    )}
+                    {showComfortAccordion ? (
+                      <ChevronUp className="w-4 h-4 text-slate-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-500" />
+                    )}
+                  </div>
+                </button>
+
+                {showComfortAccordion && (
+                  <div className="p-3.5 bg-white/40 border-t border-slate-100 space-y-2.5 animate-fade-in text-xs">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setComfortPreferences((prev) => ({ ...prev, acRequired: !prev.acRequired }))
+                        }
+                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
+                          comfortPreferences.acRequired
+                            ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <Wind className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="text-[11px]">Air Conditioning</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setComfortPreferences((prev) => ({ ...prev, quietRide: !prev.quietRide }))
+                        }
+                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
+                          comfortPreferences.quietRide
+                            ? 'bg-purple-50 border-purple-300 text-purple-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <VolumeX className="w-3.5 h-3.5 text-purple-500" />
+                        <span className="text-[11px]">Quiet Ride</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setComfortPreferences((prev) => ({
+                            ...prev,
+                            extraLuggage: !prev.extraLuggage,
+                          }))
+                        }
+                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
+                          comfortPreferences.extraLuggage
+                            ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <Luggage className="w-3.5 h-3.5 text-amber-500" />
+                        <span className="text-[11px]">Extra Luggage</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setComfortPreferences((prev) => ({
+                            ...prev,
+                            femaleDriverPreference: !prev.femaleDriverPreference,
+                          }))
+                        }
+                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
+                          comfortPreferences.femaleDriverPreference
+                            ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+                        <span className="text-[11px]">Female Driver</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Accordion 3: Tax Regulation & Zero Commission Policy */}
+              {selectedEstimate && (
+                <div className="frosted-card rounded-xl border border-slate-200/80 overflow-hidden transition">
+                  <button
+                    type="button"
+                    onClick={() => setShowTaxAccordion((prev) => !prev)}
+                    className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white/60 hover:bg-white/90 text-left transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 text-blue-600" />
+                      <span className="text-xs font-bold text-slate-800">
+                        {isAmharic ? 'የግብር ሕግ እና የ0% ኮሚሽን ማረጋገጫ' : 'Tax Law (Reg 570/2025) & 0% Guarantee'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        15% VAT Included
+                      </span>
+                      {showTaxAccordion ? (
+                        <ChevronUp className="w-4 h-4 text-slate-500" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-500" />
+                      )}
+                    </div>
+                  </button>
+
+                  {showTaxAccordion && (
+                    <div className="p-3.5 bg-blue-50/40 border-t border-blue-100 space-y-2 animate-fade-in text-[11px] text-blue-900">
+                      <p className="leading-relaxed">
+                        Chebelew operates under FDRE Council of Ministers Regulation No. 570/2025.
+                        Independent Chebelew drivers keep <strong>100% of their net fares</strong> with 0%
+                        platform commission deducted.
+                      </p>
+                      <div className="flex justify-between pt-1 border-t border-blue-200/60 font-mono text-[11px]">
+                        <span>Base Fare Subtotal: {selectedEstimate.fare.subtotal.toFixed(2)} ETB</span>
+                        <span className="font-bold text-emerald-700">
+                          +15% VAT: {selectedEstimate.fare.vatAmount.toFixed(2)} ETB
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Step 4: Primary Confirmation CTA Button with Delight Factor */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleRequestRide}
+                disabled={isCalculating}
+                onMouseEnter={() => setIsCtaHovered(true)}
+                onMouseLeave={() => setIsCtaHovered(false)}
+                className="w-full relative group overflow-hidden bg-gradient-to-r from-brand-600 via-brand-500 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 active:scale-[0.99] text-white font-extrabold py-4 px-5 rounded-2xl text-sm flex items-center justify-center gap-3 shadow-xl shadow-brand-500/25 transition-all duration-300 disabled:opacity-60 cursor-pointer"
+              >
+                {/* Glowing shimmer reflection */}
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out pointer-events-none" />
+
+                {/* Looping flying paper plane animation */}
+                <div className={`transition-all duration-300 ${isCtaHovered ? 'animate-plane-fly' : ''}`}>
+                  <Send className="w-4 h-4 fill-white text-white" />
+                </div>
+
+                {/* Celebratory win text transition on hover */}
+                <span className="tracking-tight transition-all duration-200 font-black text-sm">
+                  {isCtaHovered
+                    ? (isAmharic ? 'እንሂድ! 🚀' : "Let's Roll! 🚀")
+                    : (isAmharic ? 'ታክሲ አሁን እዘዝ • 100% ቀጥታ' : `${t.bookNow} • 100% Direct Payout`)}
+                </span>
+              </button>
+            </div>
           </div>
         ) : (
           /* Live Ride Status Card */

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Car,
   Shield,
@@ -8,9 +8,12 @@ import {
   Users,
   Layers,
   ChevronDown,
+  Search,
+  Command,
 } from 'lucide-react';
 import { Language, translations } from '../i18n/translations';
 import { UserRole } from '@shared/types';
+import { QuickActionsModal } from './Navigation/QuickActionsModal';
 
 interface NavbarProps {
   currentRole: 'rider' | 'driver' | 'admin' | 'split' | 'website';
@@ -30,9 +33,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeUserName,
 }) => {
   const t = translations[language];
+  const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
+
+  // Global Command+K shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsQuickActionsOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
-    <header className="h-[68px] bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between z-30 relative shadow-sm">
+    <header className="h-[68px] frosted-glass px-4 md:px-6 flex items-center justify-between z-30 relative shadow-xs">
       {/* Brand & Ethiopian Flag Accent */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => onRoleChange('rider')}>
@@ -56,6 +72,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </div>
         </div>
+
+        {/* Compact Search Widget with Command+K Shortcut */}
+        <button
+          type="button"
+          onClick={() => setIsQuickActionsOpen(true)}
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 hover:bg-white text-slate-500 hover:text-slate-800 border border-slate-200/90 hover:border-slate-300 shadow-2xs transition text-xs group cursor-pointer ml-2"
+          title="Quick Spotlight Actions (⌘K)"
+        >
+          <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-brand-600 transition" />
+          <span className="font-medium text-slate-600 group-hover:text-slate-900 text-[11px]">
+            {language === 'am' ? 'ፈልግ...' : 'Search places, actions...'}
+          </span>
+          <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-500 bg-white group-hover:bg-slate-50 rounded-md border border-slate-200 shadow-2xs">
+            <Command className="w-2.5 h-2.5" /> K
+          </span>
+        </button>
       </div>
 
       {/* Mobile Role Switcher Dropdown (< md) */}
@@ -194,6 +226,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="font-semibold text-slate-700">{activeUserName}</span>
         </div>
       </div>
+
+      {/* Spotlight Command+K Quick Actions Modal */}
+      <QuickActionsModal
+        isOpen={isQuickActionsOpen}
+        onClose={() => setIsQuickActionsOpen(false)}
+        onSelectRole={onRoleChange}
+        currentLanguage={language}
+      />
     </header>
   );
 };

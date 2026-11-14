@@ -413,8 +413,8 @@ export const DriverView: React.FC<DriverViewProps> = ({
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-68px)] w-full overflow-hidden bg-slate-50">
-      {/* Left Driver Control Panel */}
-      <div className="w-full lg:w-[420px] xl:w-[460px] bg-white border-r border-slate-200 flex flex-col h-full shadow-lg z-20 overflow-y-auto">
+      {/* Left Driver Control Panel with Desktop Frosted Glass */}
+      <div className="w-full lg:w-[420px] xl:w-[460px] frosted-glass border-r border-white/60 flex flex-col h-full shadow-2xl z-20 overflow-y-auto">
         {/* Driver Header */}
         <div className="p-5 border-b border-slate-100 bg-slate-900 text-white space-y-3.5">
           <div className="flex items-center justify-between">

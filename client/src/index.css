@@ -44,3 +44,64 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.28);
 }
+
+/* ========================================================
+   Desktop App Frosted Glass & Delight Factor Animations
+   ======================================================== */
+
+@keyframes planeFly {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  38% {
+    transform: translate(22px, -22px) scale(0.65) rotate(18deg);
+    opacity: 0;
+  }
+  42% {
+    transform: translate(-22px, 22px) scale(0.4) rotate(-18deg);
+    opacity: 0;
+  }
+  55% {
+    transform: translate(-10px, 10px) scale(0.8) rotate(-6deg);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-plane-fly {
+  animation: planeFly 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Frosted glass utilities for desktop app feel */
+.frosted-glass {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.frosted-glass-dark {
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.frosted-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+.frosted-card {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+}

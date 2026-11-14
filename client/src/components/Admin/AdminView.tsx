@@ -428,163 +428,186 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialT
           </div>
         </div>
 
-        {/* Tab Navigation - Guarded by RBAC Scope */}
-        <div className="flex gap-1.5 mt-4 text-xs font-bold overflow-x-auto pb-1">
-          {allowedTabs.includes('fleet') && (
-            <button
-              onClick={() => setActiveTab('fleet')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'fleet' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Car className="w-3.5 h-3.5" />
-              <span>{t.liveFleetMap}</span>
-            </button>
-          )}
+        {/* Tab Navigation - Clean Grouped Hierarchy with Scanability Icons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-4 pt-3 border-t border-slate-800 text-xs font-bold">
+          {/* Group 1: Operations & Dispatch */}
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+              Operations & Dispatch
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {allowedTabs.includes('fleet') && (
+                <button
+                  onClick={() => setActiveTab('fleet')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'fleet' ? 'bg-brand-500 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Car className="w-3.5 h-3.5" />
+                  <span>Fleet Map</span>
+                </button>
+              )}
+              {allowedTabs.includes('callcenter') && (
+                <button
+                  onClick={() => setActiveTab('callcenter')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'callcenter' ? 'bg-brand-500 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <PhoneCall className="w-3.5 h-3.5" />
+                  <span>9922 Dispatch</span>
+                </button>
+              )}
+              {allowedTabs.includes('scheduled') && (
+                <button
+                  onClick={() => setActiveTab('scheduled')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'scheduled' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-900 text-emerald-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <CalendarClock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Scheduled ({scheduledRides.length})</span>
+                </button>
+              )}
+              {allowedTabs.includes('deviations') && (
+                <button
+                  onClick={() => setActiveTab('deviations')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'deviations' ? 'bg-amber-600 text-white shadow-xs' : 'bg-slate-900 text-amber-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Compass className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Deviations ({deviations.filter((d) => d.status === 'FLAGGED').length})</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-          {allowedTabs.includes('callcenter') && (
-            <button
-              onClick={() => setActiveTab('callcenter')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'callcenter' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <PhoneCall className="w-3.5 h-3.5" />
-              <span>9922 Dispatch</span>
-            </button>
-          )}
+          {/* Group 2: Compliance & Drivers */}
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+              Compliance & Drivers
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {allowedTabs.includes('kyc') && (
+                <button
+                  onClick={() => setActiveTab('kyc')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'kyc' ? 'bg-brand-500 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>AI KYC ({kycQueue.length})</span>
+                </button>
+              )}
+              {allowedTabs.includes('subscriptions') && (
+                <button
+                  onClick={() => setActiveTab('subscriptions')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'subscriptions' ? 'bg-amber-500 text-slate-950 font-black shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                  <span>0% Subscriptions</span>
+                </button>
+              )}
+              {allowedTabs.includes('vat') && (
+                <button
+                  onClick={() => setActiveTab('vat')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'vat' ? 'bg-brand-500 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>VAT 570/2025</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-          {allowedTabs.includes('subscriptions') && (
-            <button
-              onClick={() => setActiveTab('subscriptions')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'subscriptions' ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-300" />
-              <span>0% Subscriptions</span>
-            </button>
-          )}
+          {/* Group 3: Enterprise & Partners */}
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+              Enterprise & Partners
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {allowedTabs.includes('corporate') && (
+                <button
+                  onClick={() => setActiveTab('corporate')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'corporate' ? 'bg-purple-600 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Briefcase className="w-3.5 h-3.5" />
+                  <span>Corporate Accounts</span>
+                </button>
+              )}
+              {allowedTabs.includes('providers') && (
+                <button
+                  onClick={() => setActiveTab('providers')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'providers' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>Partner Aggregators</span>
+                </button>
+              )}
+              {allowedTabs.includes('developer') && (
+                <button
+                  onClick={() => setActiveTab('developer')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'developer' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Developer API</span>
+                </button>
+              )}
+            </div>
+          </div>
 
-          {allowedTabs.includes('corporate') && (
-            <button
-              onClick={() => setActiveTab('corporate')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'corporate' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Briefcase className="w-3.5 h-3.5" />
-              <span>Corporate & Fleets</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('providers') && (
-            <button
-              onClick={() => setActiveTab('providers')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'providers' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span>Partner Fleet Aggregators</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('sos') && (
-            <button
-              onClick={() => setActiveTab('sos')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'sos' ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-800 text-rose-300 hover:bg-slate-700'
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-              <span>Safety SOS (991)</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('developer') && (
-            <button
-              onClick={() => setActiveTab('developer')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'developer' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>Developer API</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('kyc') && (
-            <button
-              onClick={() => setActiveTab('kyc')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'kyc' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>KYC ({kycQueue.length})</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('vat') && (
-            <button
-              onClick={() => setActiveTab('vat')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'vat' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>VAT 570/2025</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('tickets') && (
-            <button
-              onClick={() => setActiveTab('tickets')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'tickets' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <LifeBuoy className="w-3.5 h-3.5" />
-              <span>Tickets ({tickets.filter(t => t.status === 'OPEN').length})</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('tariffs') && (
-            <button
-              onClick={() => setActiveTab('tariffs')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'tariffs' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span>Tariff Rules</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('deviations') && (
-            <button
-              onClick={() => setActiveTab('deviations')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'deviations' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-amber-300 hover:bg-slate-700'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5 text-amber-400" />
-              <span>Route Deviations ({deviations.filter((d) => d.status === 'FLAGGED').length})</span>
-            </button>
-          )}
-
-          {allowedTabs.includes('scheduled') && (
-            <button
-              onClick={() => setActiveTab('scheduled')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap transition ${
-                activeTab === 'scheduled' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-emerald-300 hover:bg-slate-700'
-              }`}
-            >
-              <CalendarClock className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Airport & Scheduled ({scheduledRides.length})</span>
-            </button>
-          )}
+          {/* Group 4: Safety & Support */}
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 space-y-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+              Safety & System
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {allowedTabs.includes('sos') && (
+                <button
+                  onClick={() => setActiveTab('sos')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'sos' ? 'bg-rose-600 text-white animate-pulse shadow-xs' : 'bg-slate-900 text-rose-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Police SOS 991</span>
+                </button>
+              )}
+              {allowedTabs.includes('tickets') && (
+                <button
+                  onClick={() => setActiveTab('tickets')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'tickets' ? 'bg-brand-500 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <LifeBuoy className="w-3.5 h-3.5" />
+                  <span>Tickets ({tickets.filter((t) => t.status === 'OPEN').length})</span>
+                </button>
+              )}
+              {allowedTabs.includes('tariffs') && (
+                <button
+                  onClick={() => setActiveTab('tariffs')}
+                  className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition text-[11px] ${
+                    activeTab === 'tariffs' ? 'bg-brand-500 text-white shadow-xs' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Tariff Rules</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

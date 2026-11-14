@@ -174,7 +174,14 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 font-sans antialiased text-slate-900">
+    <div className="min-h-screen flex flex-col bg-slate-100 font-sans antialiased text-slate-900 relative selection:bg-brand-500 selection:text-white">
+      {/* Subtle ambient light mesh gradient seeping through frosted glass */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-75">
+        <div className="absolute -top-32 -left-32 w-[550px] h-[550px] bg-emerald-500/15 rounded-full blur-[110px]" />
+        <div className="absolute top-1/4 -right-32 w-[600px] h-[600px] bg-brand-500/18 rounded-full blur-[130px]" />
+        <div className="absolute -bottom-32 left-1/3 w-[550px] h-[550px] bg-amber-500/15 rounded-full blur-[110px]" />
+      </div>
+
       {currentModule !== 'website' && (
         <Navbar
           currentRole={currentModule}
@@ -186,7 +193,7 @@ export function App() {
         />
       )}
 
-      <main className="flex-1 overflow-hidden relative">
+      <main className="flex-1 overflow-hidden relative z-10">
         <Suspense fallback={<ModuleLoadingFallback label={currentModule.toUpperCase()} />}>
           {currentModule === 'rider' && (
             <RiderModule
