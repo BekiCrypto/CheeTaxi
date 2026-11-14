@@ -24,8 +24,10 @@ import {
   Building2,
   CreditCard,
   UserPlus,
+  ArrowUpDown,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
+import { LocationSearchInput } from './LocationSearchInput';
 import { TelebirrModal } from '../Payment/TelebirrModal';
 import { VatReceiptModal } from '../Payment/VatReceiptModal';
 import { RiderDeliveryPanel } from './RiderDeliveryPanel';
@@ -85,9 +87,11 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
 
-  // Live driver position for active ride
+  // Live driver position & calculated route for active ride
   const [activeDriverPos, setActiveDriverPos] = useState<[number, number] | undefined>(undefined);
   const [activeDriverHeading, setActiveDriverHeading] = useState<number>(0);
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
+  const [mapPickingMode, setMapPickingMode] = useState<'pickup' | 'destination' | null>(null);
 
   // Modals
   const [telebirrOrder, setTelebirrOrder] = useState<TelebirrOrder | null>(null);
@@ -177,6 +181,9 @@ export const RiderView: React.FC<RiderViewProps> = ({
       .then((data) => {
         if (data.estimates) {
           setEstimates(data.estimates);
+        }
+        if (data.routeCoordinates) {
+          setRouteCoordinates(data.routeCoordinates);
         }
       })
       .catch(console.error)
@@ -304,6 +311,53 @@ export const RiderView: React.FC<RiderViewProps> = ({
     }
   };
 
+  // Swap pickup & destination
+  const handleSwapLocations = () => {
+    const temp = pickup;
+    setPickup(destination);
+    setDestination(temp);
+  };
+
+  // Map click handler when in picking mode
+  const handleMapClick = (lat: number, lng: number) => {
+    if (!mapPickingMode) return;
+
+    let nearest = ADDIS_LANDMARKS[0];
+    let minD = Infinity;
+    for (const lm of ADDIS_LANDMARKS) {
+      const d = Math.hypot(lm.lat - lat, lm.lng - lng);
+      if (d < minD) {
+        minD = d;
+        nearest = lm;
+      }
+    }
+
+    const isClose = minD < 0.008; // ~800m
+    const point: LocationPoint = {
+      address: isClose ? `Near ${nearest.name}` : `Selected Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+      addressAm: isClose ? `${nearest.nameAm} አቅራቢያ` : `የተመረጠ ቦታ (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+      lat,
+      lng,
+    };
+
+    if (mapPickingMode === 'pickup') {
+      setPickup(point);
+    } else {
+      setDestination(point);
+    }
+    setMapPickingMode(null);
+  };
+
+  const POPULAR_CHIPS = [
+    { label: '✈️ Airport', labelAm: '✈️ አውሮፕላን ማረፊያ', id: 'bole_airport' },
+    { label: '🛍️ Edna Mall', labelAm: '🛍️ ኤድና ሞል', id: 'bole_medhanialem' },
+    { label: '🏢 Kazanchis', labelAm: '🏢 ካዛንቺስ', id: 'kazanchis_uneca' },
+    { label: '🏛️ Meskel Sq', labelAm: '🏛️ መስቀል አደባባይ', id: 'meskel_square' },
+    { label: '🏨 Skylight', labelAm: '🏨 ስካይላይት', id: 'skylight_hotel' },
+    { label: '☕ Piassa', labelAm: '☕ ፒያሳ', id: 'piassa_churchill' },
+    { label: '🏥 Tikur Anbessa', labelAm: '🏥 ጥቁር አንበሳ', id: 'tikur_anbessa' },
+  ];
+
   const selectedEstimate = estimates.find((e) => e.category === selectedCategory);
 
   return (
@@ -348,60 +402,72 @@ export const RiderView: React.FC<RiderViewProps> = ({
             </div>
           </div>
 
-          {/* Pickup Input */}
-          <div className="relative">
-            <div className="absolute left-3 top-3 text-emerald-600">
-              <MapPin className="w-4 h-4" />
+          {/* Pickup & Destination Interactive Search Inputs with Swap Control */}
+          <div className="relative space-y-2">
+            <LocationSearchInput
+              type="pickup"
+              value={pickup}
+              onChange={(pt) => setPickup(pt)}
+              onPickOnMap={() => setMapPickingMode('pickup')}
+              language={language}
+              placeholder={language === 'am' ? 'የመነሻ ቦታ ይምረጡ' : 'Set pickup location'}
+            />
+
+            {/* Floating Swap Button */}
+            <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10">
+              <button
+                type="button"
+                onClick={handleSwapLocations}
+                className="w-7 h-7 rounded-full bg-white shadow-md border border-slate-200 text-slate-600 hover:text-brand-600 hover:border-brand-300 flex items-center justify-center transition active:scale-90"
+                title="Swap Pickup & Destination"
+              >
+                <ArrowUpDown className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <select
-              value={pickup.address}
-              onChange={(e) => {
-                const landmark = ADDIS_LANDMARKS.find((l: AddisLandmark) => l.name === e.target.value);
-                if (landmark) {
-                  setPickup({
-                    address: landmark.name,
-                    addressAm: landmark.nameAm,
-                    lat: landmark.lat,
-                    lng: landmark.lng,
-                  });
-                }
-              }}
-              className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-            >
-              {ADDIS_LANDMARKS.map((l: AddisLandmark) => (
-                <option key={l.id} value={l.name}>
-                  {language === 'am' ? l.nameAm : l.name}
-                </option>
-              ))}
-            </select>
+
+            <LocationSearchInput
+              type="destination"
+              value={destination}
+              onChange={(pt) => setDestination(pt)}
+              onPickOnMap={() => setMapPickingMode('destination')}
+              language={language}
+              placeholder={language === 'am' ? 'የት መሄድ ይፈልጋሉ?' : 'Where to?'}
+            />
           </div>
 
-          {/* Destination Input */}
-          <div className="relative">
-            <div className="absolute left-3 top-3 text-rose-600">
-              <Navigation className="w-4 h-4" />
+          {/* Popular Landmark Quick Chips */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              {language === 'am' ? 'ተወዳጅ መዳረሻዎች' : 'Popular Destinations'}
+            </span>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {POPULAR_CHIPS.map((chip) => {
+                const landmark = ADDIS_LANDMARKS.find((l) => l.id === chip.id);
+                if (!landmark) return null;
+                const isCurrentDest = destination.address === landmark.name;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => {
+                      setDestination({
+                        address: landmark.name,
+                        addressAm: landmark.nameAm,
+                        lat: landmark.lat,
+                        lng: landmark.lng,
+                      });
+                    }}
+                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition ${
+                      isCurrentDest
+                        ? 'bg-brand-500 text-white border-brand-600 shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
+                    }`}
+                  >
+                    {language === 'am' ? chip.labelAm : chip.label}
+                  </button>
+                );
+              })}
             </div>
-            <select
-              value={destination.address}
-              onChange={(e) => {
-                const landmark = ADDIS_LANDMARKS.find((l: AddisLandmark) => l.name === e.target.value);
-                if (landmark) {
-                  setDestination({
-                    address: landmark.name,
-                    addressAm: landmark.nameAm,
-                    lat: landmark.lat,
-                    lng: landmark.lng,
-                  });
-                }
-              }}
-              className="w-full pl-9 pr-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-            >
-              {ADDIS_LANDMARKS.map((l: AddisLandmark) => (
-                <option key={l.id} value={l.name}>
-                  {language === 'am' ? l.nameAm : l.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Ride vs Delivery Mode Switcher */}
@@ -980,7 +1046,10 @@ export const RiderView: React.FC<RiderViewProps> = ({
           activeDriverLocation={activeDriverPos || (activeRide?.driver ? [activeRide.driver.currentLat, activeRide.driver.currentLng] : undefined)}
           activeDriverHeading={activeDriverHeading || (activeRide?.driver?.heading || 0)}
           activeDriverPlate={activeRide?.driver?.vehiclePlate}
-          routeCoordinates={activeRide?.routeCoordinates}
+          routeCoordinates={activeRide?.routeCoordinates || routeCoordinates}
+          onMapClick={handleMapClick}
+          pickingMode={mapPickingMode}
+          onCancelPicking={() => setMapPickingMode(null)}
         />
       </div>
 

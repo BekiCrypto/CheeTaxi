@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
+import { Plus, Minus, Crosshair, Maximize2 } from 'lucide-react';
 import L from 'leaflet';
 import { Driver, LocationPoint } from '@shared/types';
 
@@ -121,6 +122,78 @@ function BoundsManager({
   return null;
 }
 
+// Map Controls: Recenter, Zoom In/Out, and Fit Route Bounds
+function MapControls({
+  pickup,
+  destination,
+}: {
+  pickup?: LocationPoint;
+  destination?: LocationPoint;
+}) {
+  const map = useMap();
+
+  const handleRecenter = () => {
+    if (pickup) {
+      map.flyTo([pickup.lat, pickup.lng], 15, { duration: 0.8 });
+    } else {
+      map.flyTo([9.0105, 38.7615], 13, { duration: 0.8 });
+    }
+  };
+
+  const handleFitRoute = () => {
+    if (pickup && destination) {
+      const bounds = L.latLngBounds([
+        [pickup.lat, pickup.lng],
+        [destination.lat, destination.lng],
+      ]);
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    }
+  };
+
+  return (
+    <div className="absolute right-4 bottom-8 z-[1000] flex flex-col gap-2">
+      <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-lg border border-slate-200/80 p-1 flex flex-col divide-y divide-slate-100">
+        <button
+          type="button"
+          onClick={() => map.zoomIn()}
+          className="p-2 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+          title="Zoom In"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => map.zoomOut()}
+          className="p-2 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+          title="Zoom Out"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleRecenter}
+        className="p-2.5 bg-white/95 backdrop-blur-md hover:bg-slate-100 rounded-xl shadow-lg border border-slate-200/80 text-slate-700 transition flex items-center justify-center"
+        title="Recenter to Pickup Location"
+      >
+        <Crosshair className="w-4 h-4 text-brand-600" />
+      </button>
+
+      {pickup && destination && (
+        <button
+          type="button"
+          onClick={handleFitRoute}
+          className="p-2.5 bg-white/95 backdrop-blur-md hover:bg-slate-100 rounded-xl shadow-lg border border-slate-200/80 text-slate-700 transition flex items-center justify-center"
+          title="Fit Full Route"
+        >
+          <Maximize2 className="w-4 h-4 text-slate-700" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Map Click Handler
 function MapClickHandler({ onMapClick }: { onMapClick?: (lat: number, lng: number) => void }) {
   useMapEvents({
@@ -142,6 +215,8 @@ interface AddisMapProps {
   activeDriverPlate?: string;
   routeCoordinates?: [number, number][];
   onMapClick?: (lat: number, lng: number) => void;
+  pickingMode?: 'pickup' | 'destination' | null;
+  onCancelPicking?: () => void;
   className?: string;
   interactive?: boolean;
 }
@@ -155,6 +230,8 @@ export const AddisMap: React.FC<AddisMapProps> = ({
   activeDriverPlate,
   routeCoordinates = [],
   onMapClick,
+  pickingMode = null,
+  onCancelPicking,
   className = 'h-full w-full',
   interactive = true,
 }) => {
@@ -286,7 +363,44 @@ export const AddisMap: React.FC<AddisMapProps> = ({
             </Popup>
           </Marker>
         )}
+
+        {/* Interactive Floating Map Controls */}
+        <MapControls pickup={pickup} destination={destination} />
       </MapContainer>
+
+      {/* Top Live Taxis Badge */}
+      <div className="absolute top-4 right-4 z-[1000] pointer-events-none">
+        <div className="bg-slate-900/90 backdrop-blur-md text-white text-[11px] font-semibold px-3 py-1.5 rounded-full border border-slate-700 shadow-xl flex items-center gap-2 pointer-events-auto">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>{drivers.length || 5} Taxis Online</span>
+          <span className="text-slate-500">•</span>
+          <span className="text-brand-300">Addis Ababa</span>
+        </div>
+      </div>
+
+      {/* Map Picking Banner Indicator */}
+      {pickingMode && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] pointer-events-auto">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white border border-brand-500/50 shadow-2xl px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top">
+            <span className="w-2.5 h-2.5 rounded-full bg-brand-400 animate-ping" />
+            <span>
+              Tap anywhere on the map to set{' '}
+              <strong className="text-brand-300 uppercase">
+                {pickingMode === 'pickup' ? 'Pickup' : 'Destination'}
+              </strong>
+            </span>
+            {onCancelPicking && (
+              <button
+                type="button"
+                onClick={onCancelPicking}
+                className="ml-1 bg-white/20 hover:bg-white/30 text-white rounded-full px-2 py-0.5 text-[10px] font-normal transition"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

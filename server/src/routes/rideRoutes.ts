@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db/database.js';
-import { estimateRoadMetrics } from '../services/geoService.js';
+import { estimateRoadMetrics, generateRouteCoordinates } from '../services/geoService.js';
 import { getFareEstimates } from '../services/fareService.js';
 import { DispatchService } from '../services/dispatchService.js';
 import { Server as SocketIOServer } from 'socket.io';
@@ -20,11 +20,13 @@ export function createRideRouter(io: SocketIOServer) {
 
     const metrics = estimateRoadMetrics(pickup.lat, pickup.lng, destination.lat, destination.lng);
     const estimates = getFareEstimates(metrics.distanceKm, metrics.durationMinutes);
+    const routeCoordinates = generateRouteCoordinates(pickup.lat, pickup.lng, destination.lat, destination.lng, 24);
 
     return res.json({
       distanceKm: metrics.distanceKm,
       durationMinutes: metrics.durationMinutes,
       estimates,
+      routeCoordinates,
     });
   });
 
