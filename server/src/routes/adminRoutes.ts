@@ -12,7 +12,7 @@ import {
 } from '../services/fareService.js';
 import { Server as SocketIOServer } from 'socket.io';
 import { SystemMetrics, VatReportSummary, SystemSettings } from '../../../shared/types.js';
-import { requireAdminAuth } from '../middleware/adminAuth.js';
+import { requireAdminAuth, requirePermission } from '../middleware/adminAuth.js';
 
 export function createAdminRouter(io: SocketIOServer) {
   const router = Router();
@@ -107,7 +107,7 @@ export function createAdminRouter(io: SocketIOServer) {
   /**
    * Call Center Manual Phone Booking Dispatch
    */
-  router.post('/manual-dispatch', (req, res) => {
+  router.post('/manual-dispatch', requirePermission('manage_dispatch'), (req, res) => {
     const {
       callerPhone,
       callerName,
@@ -204,7 +204,7 @@ export function createAdminRouter(io: SocketIOServer) {
   /**
    * KYC Decision & Administrative Override
    */
-  router.post('/kyc/:driverId/decide', (req, res) => {
+  router.post('/kyc/:driverId/decide', requirePermission('manage_kyc'), (req, res) => {
     const { approved, action, notes, adminName = 'Almaz Tefera (Super Admin)' } = req.body;
     
     let status = 'pending';
@@ -257,7 +257,7 @@ export function createAdminRouter(io: SocketIOServer) {
   /**
    * Ethiopian Value Added Tax Regulation No. 570/2025 Remittance Report
    */
-  router.get('/vat-report', (req, res) => {
+  router.get('/vat-report', requirePermission('export_vat_reports'), (req, res) => {
     const completedTrips = db.prepare(`
       SELECT * FROM rides WHERE status = 'COMPLETED' ORDER BY created_at DESC
     `).all() as any[];
@@ -363,7 +363,7 @@ export function createAdminRouter(io: SocketIOServer) {
   /**
    * Resolve Support Ticket
    */
-  router.post('/tickets/:id/resolve', (req, res) => {
+  router.post('/tickets/:id/resolve', requirePermission('manage_tickets'), (req, res) => {
     const { notes } = req.body;
     db.prepare(`
       UPDATE support_tickets
@@ -381,7 +381,7 @@ export function createAdminRouter(io: SocketIOServer) {
     return res.json({ tariffs: getAllTariffs() });
   });
 
-  router.put('/tariffs', (req, res) => {
+  router.put('/tariffs', requirePermission('manage_tariffs'), (req, res) => {
     const { tariffs } = req.body;
     if (!tariffs || typeof tariffs !== 'object') {
       return res.status(400).json({ error: 'Tariffs payload object required' });
@@ -391,7 +391,7 @@ export function createAdminRouter(io: SocketIOServer) {
     return res.json({ success: true, tariffs: updated, message: 'Tariffs updated successfully' });
   });
 
-  router.post('/tariffs/reset', (req, res) => {
+  router.post('/tariffs/reset', requirePermission('manage_tariffs'), (req, res) => {
     const reset = resetTariffsToDefaults();
     io.to('admin:dispatch').emit('admin:tariffs_updated', reset);
     return res.json({ success: true, tariffs: reset, message: 'Tariffs restored to statutory defaults' });
@@ -404,7 +404,7 @@ export function createAdminRouter(io: SocketIOServer) {
     return res.json({ settings: getSystemSettings() });
   });
 
-  router.put('/settings', (req, res) => {
+  router.put('/settings', requirePermission('manage_tariffs'), (req, res) => {
     const { settings } = req.body;
     if (!settings || typeof settings !== 'object') {
       return res.status(400).json({ error: 'Settings payload object required' });

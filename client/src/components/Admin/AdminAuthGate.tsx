@@ -213,10 +213,10 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({ children }) => {
           </button>
         </form>
 
-        {/* Quick Demo Pre-fills for Testing */}
+        {/* Quick Demo Pre-fills for Testing with Granular RBAC */}
         <div className="pt-4 border-t border-slate-800/80 space-y-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block text-center">
-            Authorized Demo Profiles
+            Role-Based Demo Personnel (RBAC)
           </span>
           <div className="grid grid-cols-2 gap-2 text-[11px]">
             <button
@@ -227,18 +227,40 @@ export const AdminAuthGate: React.FC<AdminAuthGateProps> = ({ children }) => {
               <UserCheck className="w-3.5 h-3.5 text-brand-400 shrink-0" />
               <div className="truncate">
                 <div className="font-bold text-slate-200 truncate">Super Admin</div>
-                <div className="text-[10px] text-slate-500 truncate">Almaz Tefera</div>
+                <div className="text-[10px] text-slate-400 truncate">Almaz Tefera (Full Root)</div>
               </div>
             </button>
             <button
               type="button"
-              onClick={() => handleQuickPrefill('+251916778899', '9922')}
+              onClick={() => handleQuickPrefill('callcenter@chebelew.et', '9922')}
               className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition flex items-center gap-2"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <div className="truncate">
                 <div className="font-bold text-slate-200 truncate">Dispatcher</div>
-                <div className="text-[10px] text-slate-500 truncate">Call Center 9922</div>
+                <div className="text-[10px] text-slate-400 truncate">Dawit Bekele (9922 Dispatch)</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickPrefill('kyc@chebelew.et', '9922')}
+              className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition flex items-center gap-2"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <div className="truncate">
+                <div className="font-bold text-slate-200 truncate">KYC & Compliance</div>
+                <div className="text-[10px] text-slate-400 truncate">Meron Tadesse</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickPrefill('finance@chebelew.et', '9922')}
+              className="p-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left transition flex items-center gap-2"
+            >
+              <Lock className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <div className="truncate">
+                <div className="font-bold text-slate-200 truncate">Finance & Tax</div>
+                <div className="text-[10px] text-slate-400 truncate">Henok Girma (VAT 570)</div>
               </div>
             </button>
           </div>

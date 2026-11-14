@@ -12,6 +12,7 @@ import {
   searchAddisPlaces,
   reverseGeocodeAddis,
 } from '../services/geoService.js';
+import { ROLE_PERMISSIONS, activeAdminTokens, ADMIN_SESSION_SECRET } from '../middleware/adminAuth.js';
 
 describe('Chebelew End-to-End Enterprise Services', () => {
   beforeAll(() => {
@@ -362,6 +363,48 @@ describe('Chebelew End-to-End Enterprise Services', () => {
       // Near Bole Airport coordinates (8.9778, 38.7993)
       const loc = reverseGeocodeAddis(8.9780, 38.7990);
       expect(loc.address).toContain('Bole');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // 7. Granular RBAC & Access Separation
+  // --------------------------------------------------------------------------
+  describe('Granular Role-Based Access Control (RBAC)', () => {
+    it('should have complete permission matrices for all admin roles', () => {
+      expect(ROLE_PERMISSIONS.super_admin).toContain('manage_tariffs');
+      expect(ROLE_PERMISSIONS.super_admin).toContain('view_financials');
+      expect(ROLE_PERMISSIONS.super_admin).toContain('manage_dispatch');
+      expect(ROLE_PERMISSIONS.super_admin).toContain('manage_kyc');
+
+      // Dispatcher should have dispatch and SOS but NOT tariff management
+      expect(ROLE_PERMISSIONS.dispatcher).toContain('manage_dispatch');
+      expect(ROLE_PERMISSIONS.dispatcher).toContain('manage_sos');
+      expect(ROLE_PERMISSIONS.dispatcher).not.toContain('manage_tariffs');
+
+      // Compliance officer should have KYC but NOT dispatch or tariff editing
+      expect(ROLE_PERMISSIONS.compliance_officer).toContain('manage_kyc');
+      expect(ROLE_PERMISSIONS.compliance_officer).not.toContain('manage_tariffs');
+      expect(ROLE_PERMISSIONS.compliance_officer).not.toContain('manage_dispatch');
+
+      // Finance officer should have VAT reports and subscriptions but NOT live dispatch
+      expect(ROLE_PERMISSIONS.finance_officer).toContain('export_vat_reports');
+      expect(ROLE_PERMISSIONS.finance_officer).toContain('view_financials');
+      expect(ROLE_PERMISSIONS.finance_officer).not.toContain('manage_dispatch');
+      expect(ROLE_PERMISSIONS.finance_officer).not.toContain('manage_tariffs');
+    });
+
+    it('should configure verified tokens for all role personas', () => {
+      const superAdmin = activeAdminTokens.get(ADMIN_SESSION_SECRET);
+      expect(superAdmin?.role).toBe('super_admin');
+
+      const disp = activeAdminTokens.get('chebelew_disp_token_9922');
+      expect(disp?.role).toBe('dispatcher');
+
+      const kyc = activeAdminTokens.get('chebelew_kyc_token_9922');
+      expect(kyc?.role).toBe('compliance_officer');
+
+      const fin = activeAdminTokens.get('chebelew_fin_token_9922');
+      expect(fin?.role).toBe('finance_officer');
     });
   });
 });

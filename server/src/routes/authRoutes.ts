@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/database.js';
 import { User } from '../../../shared/types.js';
-import { activeAdminTokens, ADMIN_SESSION_SECRET } from '../middleware/adminAuth.js';
+import { activeAdminTokens, ADMIN_SESSION_SECRET, ROLE_PERMISSIONS } from '../middleware/adminAuth.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export const authRouter = Router();
@@ -110,20 +110,47 @@ authRouter.post('/admin/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid security passcode or PIN' });
   }
 
-  // Find user in database with administrative privileges
+  // Find user in database with administrative privileges or resolve role persona
   const admin = db.prepare(`
     SELECT * FROM users
-    WHERE (email = ? OR phone = ? OR email LIKE ? OR role = 'admin')
-    AND role IN ('admin', 'super_admin', 'platform_admin', 'dispatcher', 'city_manager')
+    WHERE (email = ? OR phone = ? OR email LIKE ?)
+    AND role IN ('admin', 'super_admin', 'platform_admin', 'dispatcher', 'city_manager', 'compliance_officer', 'finance_officer', 'fleet_manager')
     LIMIT 1
   `).get(emailOrPhone, emailOrPhone, `%${emailOrPhone}%`) as any;
 
-  const adminProfile = admin || {
-    id: 'user_almaz_admin',
-    name: 'Almaz Tefera',
-    email: 'dispatch@chebelew.et',
-    phone: '+251916778899',
-    role: 'super_admin',
+  let resolvedRole = admin?.role || 'super_admin';
+  let resolvedName = admin?.name || 'Almaz Tefera';
+  let resolvedId = admin?.id || 'user_almaz_admin';
+
+  if (!admin) {
+    if (emailOrPhone.includes('callcenter') || emailOrPhone.includes('disp')) {
+      resolvedRole = 'dispatcher';
+      resolvedName = 'Dawit Bekele';
+      resolvedId = 'user_dawit_disp';
+    } else if (emailOrPhone.includes('kyc') || emailOrPhone.includes('compliance')) {
+      resolvedRole = 'compliance_officer';
+      resolvedName = 'Meron Tadesse';
+      resolvedId = 'user_meron_kyc';
+    } else if (emailOrPhone.includes('fin') || emailOrPhone.includes('tax')) {
+      resolvedRole = 'finance_officer';
+      resolvedName = 'Henok Girma';
+      resolvedId = 'user_henok_fin';
+    } else if (emailOrPhone.includes('fleet') || emailOrPhone.includes('coop')) {
+      resolvedRole = 'fleet_manager';
+      resolvedName = 'Tadesse Alemu';
+      resolvedId = 'user_tadesse_fleet';
+    }
+  }
+
+  const permissions = (ROLE_PERMISSIONS as any)[resolvedRole] || ROLE_PERMISSIONS.super_admin;
+
+  const adminProfile = {
+    id: resolvedId,
+    name: resolvedName,
+    email: emailOrPhone.includes('@') ? emailOrPhone : 'dispatch@chebelew.et',
+    phone: emailOrPhone.startsWith('+') ? emailOrPhone : '+251916778899',
+    role: resolvedRole,
+    permissions,
   };
 
   const token = `cheb_adm_${uuidv4().substring(0, 16)}`;
@@ -132,13 +159,7 @@ authRouter.post('/admin/login', (req, res) => {
   return res.json({
     success: true,
     token,
-    admin: {
-      id: adminProfile.id,
-      name: adminProfile.name,
-      email: adminProfile.email,
-      phone: adminProfile.phone,
-      role: adminProfile.role || 'super_admin',
-    },
+    admin: adminProfile,
     message: 'Operational Admin authenticated successfully',
   });
 });

@@ -158,6 +158,21 @@ export function App() {
     }
   };
 
+  const getActiveUserName = () => {
+    if (currentModule === 'driver') return 'Ahmed Mohammed (Driver)';
+    if (currentModule === 'admin') {
+      try {
+        const cached = localStorage.getItem('chebelew_admin_user');
+        if (cached) {
+          const user = JSON.parse(cached);
+          return `${user.name} (${(user.role || 'Admin').replace('_', ' ')})`;
+        }
+      } catch (e) {}
+      return 'Almaz Tefera (Super Admin)';
+    }
+    return 'Leila Haile (Rider)';
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 font-sans antialiased text-slate-900">
       {currentModule !== 'website' && (
@@ -167,13 +182,7 @@ export function App() {
           language={language}
           onLanguageChange={setLanguage}
           onRunFastDemo={handleRunFastDemo}
-          activeUserName={
-            currentModule === 'driver'
-              ? 'Ahmed Mohammed (Driver)'
-              : currentModule === 'admin'
-              ? 'Almaz Tefera (Dispatcher)'
-              : 'Leila Haile (Rider)'
-          }
+          activeUserName={getActiveUserName()}
         />
       )}
 

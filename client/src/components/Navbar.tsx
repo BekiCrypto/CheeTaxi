@@ -65,75 +65,87 @@ export const Navbar: React.FC<NavbarProps> = ({
           onChange={(e) => onRoleChange(e.target.value as any)}
           className="bg-slate-100 text-slate-800 text-xs font-bold py-1.5 px-2.5 rounded-lg border border-slate-200 outline-hidden focus:ring-2 focus:ring-brand-500"
         >
-          <option value="rider">📱 {t.rider}</option>
-          <option value="driver">🚕 {t.driver}</option>
-          <option value="admin">🛡️ {t.admin}</option>
-          <option value="split">⚡ {t.splitMode}</option>
-          <option value="website">🌐 Public Portal</option>
+          <optgroup label="Customer Applications">
+            <option value="rider">📱 {t.rider}</option>
+            <option value="website">🌐 Public Portal</option>
+          </optgroup>
+          <optgroup label="Driver & Operations">
+            <option value="driver">🚕 {t.driver}</option>
+            <option value="admin">🔒 {t.admin} (Restricted)</option>
+            <option value="split">⚡ {t.splitMode}</option>
+          </optgroup>
         </select>
       </div>
 
-      {/* Role / Mode Switcher Pills */}
-      <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
-        <button
-          onClick={() => onRoleChange('rider')}
-          className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-            currentRole === 'rider'
-              ? 'bg-white text-brand-600 shadow-sm'
-              : 'hover:text-slate-900'
-          }`}
-        >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span>{t.rider}</span>
-        </button>
+      {/* Role / Module Switcher Pills - Strict Enterprise Separation */}
+      <div className="hidden md:flex items-center gap-2">
+        {/* Public & Customer Suite */}
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+          <button
+            onClick={() => onRoleChange('rider')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              currentRole === 'rider'
+                ? 'bg-white text-brand-600 shadow-sm'
+                : 'hover:text-slate-900'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span>{t.rider}</span>
+          </button>
 
-        <button
-          onClick={() => onRoleChange('driver')}
-          className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-            currentRole === 'driver'
-              ? 'bg-white text-brand-600 shadow-sm'
-              : 'hover:text-slate-900'
-          }`}
-        >
-          <Car className="w-3.5 h-3.5" />
-          <span>{t.driver}</span>
-        </button>
+          <button
+            onClick={() => onRoleChange('driver')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              currentRole === 'driver'
+                ? 'bg-white text-brand-600 shadow-sm'
+                : 'hover:text-slate-900'
+            }`}
+          >
+            <Car className="w-3.5 h-3.5" />
+            <span>{t.driver}</span>
+          </button>
 
-        <button
-          onClick={() => onRoleChange('admin')}
-          className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-            currentRole === 'admin'
-              ? 'bg-white text-brand-600 shadow-sm'
-              : 'hover:text-slate-900'
-          }`}
-        >
-          <Shield className="w-3.5 h-3.5" />
-          <span>{t.admin}</span>
-        </button>
+          <button
+            onClick={() => onRoleChange('website')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              currentRole === 'website'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'hover:text-slate-900 text-slate-700'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Public Portal</span>
+          </button>
+        </div>
 
-        <button
-          onClick={() => onRoleChange('split')}
-          className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-            currentRole === 'split'
-              ? 'bg-slate-900 text-white shadow-sm'
-              : 'hover:text-slate-900'
-          }`}
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>{t.splitMode}</span>
-        </button>
+        {/* Restricted Operations & Admin Suite */}
+        <div className="flex items-center bg-slate-900/90 text-white p-1 rounded-xl text-xs font-bold shadow-xs">
+          <button
+            onClick={() => onRoleChange('admin')}
+            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
+              currentRole === 'admin'
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Operational Control Center (Restricted to Authorized Staff)"
+          >
+            <Shield className="w-3.5 h-3.5 text-amber-400" />
+            <span>Control Center</span>
+          </button>
 
-        <button
-          onClick={() => onRoleChange('website')}
-          className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition ${
-            currentRole === 'website'
-              ? 'bg-brand-600 text-white shadow-sm'
-              : 'hover:text-slate-900 text-brand-700'
-          }`}
-        >
-          <Globe className="w-3.5 h-3.5" />
-          <span>Public Portal</span>
-        </button>
+          <button
+            onClick={() => onRoleChange('split')}
+            className={`px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition ${
+              currentRole === 'split'
+                ? 'bg-white/20 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Simultaneous Multi-Role Simulator"
+          >
+            <Layers className="w-3.5 h-3.5 text-brand-400" />
+            <span className="text-[11px]">Simulator</span>
+          </button>
+        </div>
       </div>
 
       {/* Right Actions: Demo, Language, User */}
