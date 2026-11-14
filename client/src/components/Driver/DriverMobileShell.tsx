@@ -450,12 +450,23 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                       <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs font-black border border-blue-500/30 flex items-center gap-1.5">
                         <Navigation className="w-3.5 h-3.5 animate-pulse" /> Step 1: En Route to Pickup
                       </span>
-                      <a
-                        href={`tel:${activeRide.riderPhone}`}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow active-press"
-                      >
-                        <Phone className="w-3.5 h-3.5" /> Call Passenger
-                      </a>
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${activeRide.pickup?.lat || 9.0105},${activeRide.pickup?.lng || 38.7615}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow active-press"
+                          title="Open Google Maps Navigation"
+                        >
+                          <Navigation className="w-3.5 h-3.5" /> Maps
+                        </a>
+                        <a
+                          href={`tel:${activeRide.riderPhone}`}
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow active-press"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Call
+                        </a>
+                      </div>
                     </div>
 
                     <div>
@@ -509,11 +520,22 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                     <div className="flex items-center justify-between">
                       <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black border border-emerald-500/30 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                        In Transit to Destination
+                        In Transit
                       </span>
-                      <span className="text-base font-black text-amber-400 font-mono">
-                        {activeRide.fare?.totalFare || 380} ETB
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${activeRide.destination?.lat || 9.0185},${activeRide.destination?.lng || 38.7705}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow active-press"
+                          title="Open Google Maps Navigation"
+                        >
+                          <Navigation className="w-3.5 h-3.5" /> Maps
+                        </a>
+                        <span className="text-base font-black text-amber-400 font-mono">
+                          {activeRide.fare?.totalFare || 380} ETB
+                        </span>
+                      </div>
                     </div>
 
                     <div>

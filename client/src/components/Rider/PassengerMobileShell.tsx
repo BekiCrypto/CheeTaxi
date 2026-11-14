@@ -94,6 +94,13 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
   // Rating State
   const [userRating, setUserRating] = useState(5);
   const [tipAmount, setTipAmount] = useState(20);
+  const [selectedFeedbackTags, setSelectedFeedbackTags] = useState<string[]>([]);
+
+  // Driver Instructions & Scheduling
+  const [pickupNotes, setPickupNotes] = useState('');
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleDateTime, setScheduleDateTime] = useState('');
+  const [flightNumber, setFlightNumber] = useState('');
 
   // Available Drivers for Map
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
@@ -287,6 +294,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
           providerId: selectedOffer?.providerId || 'chebelew',
           providerOfferId: selectedOffer?.id,
           fareEtb: selectedOffer?.estimatedFare || 240,
+          operatorNotes: pickupNotes || undefined,
         }),
       });
 
@@ -702,6 +710,24 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       <span className="text-[10px] text-emerald-400 font-bold">15% VAT Included</span>
                     </div>
 
+                    {/* Driver Pickup Instructions Input */}
+                    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <input
+                        type="text"
+                        value={pickupNotes}
+                        onChange={(e) => setPickupNotes(e.target.value)}
+                        placeholder="Pickup note (e.g. Gate 3, in front of Awash Bank)..."
+                        className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Waiting & Cancellation Policy */}
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                      <span>⏱️ Free cancel within 3m</span>
+                      <span>🛡️ 3 min free driver wait time</span>
+                    </div>
+
                     {/* Primary Confirmation CTA with Delight Hover Text & Flight Animation */}
                     <button
                       onClick={handleRequestRide}
@@ -883,12 +909,59 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={handleSubmitRating}
-                      className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-sm shadow-xl active-press"
-                    >
-                      Done & Close
-                    </button>
+                    {/* Feedback Tags */}
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                        Compliment & Feedback
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-1.5">
+                        {['🌟 Clean Car', '🛡️ Safe Driving', '⚡ Fast Route', '💬 Polite Driver', '🎵 Good Music', '❄️ Great A/C'].map((tag) => {
+                          const isTagSelected = selectedFeedbackTags.includes(tag);
+                          return (
+                            <button
+                              key={tag}
+                              onClick={() => {
+                                if (isTagSelected) {
+                                  setSelectedFeedbackTags(selectedFeedbackTags.filter((t) => t !== tag));
+                                } else {
+                                  setSelectedFeedbackTags([...selectedFeedbackTags, tag]);
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition active-press border ${
+                                isTagSelected
+                                  ? 'bg-amber-500/20 border-amber-500 text-amber-300 font-bold'
+                                  : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                              }`}
+                            >
+                              {tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          // Swap pickup and destination for return trip
+                          const prevPickup = pickup;
+                          setPickup(destination);
+                          setDestination(prevPickup);
+                          setActiveRide(null);
+                          setSheetState('OFFERS');
+                        }}
+                        className="py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-xl text-xs border border-slate-700 transition active-press"
+                      >
+                        🔄 Book Return Trip
+                      </button>
+
+                      <button
+                        onClick={handleSubmitRating}
+                        className="py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-xl active-press"
+                      >
+                        Done & Close
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
