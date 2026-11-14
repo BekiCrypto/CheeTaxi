@@ -53,6 +53,27 @@ class SoundEffects {
     this.playBeep(587.33, 'sine', 0.15); // D5
     setTimeout(() => this.playBeep(880, 'sine', 0.35), 160); // A5
   }
+
+  playDriverArrived() {
+    this.playBeep(659.25, 'sine', 0.18); // E5
+    setTimeout(() => this.playBeep(880, 'sine', 0.25), 160); // A5
+  }
+
+  playTripStarted() {
+    this.playBeep(440, 'triangle', 0.15); // A4
+    setTimeout(() => this.playBeep(659.25, 'sine', 0.2), 150); // E5
+  }
+
+  playDriverOnline() {
+    this.playBeep(440, 'sine', 0.12);
+    setTimeout(() => this.playBeep(554.37, 'sine', 0.12), 120);
+    setTimeout(() => this.playBeep(659.25, 'sine', 0.25), 240);
+  }
+
+  playSosAlert() {
+    this.playBeep(900, 'sawtooth', 0.3);
+    setTimeout(() => this.playBeep(1200, 'sawtooth', 0.35), 250);
+  }
 }
 
 export const sounds = new SoundEffects();

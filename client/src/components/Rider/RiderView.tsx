@@ -96,6 +96,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [tipValue, setTipValue] = useState(0);
+  const [quickNoteSent, setQuickNoteSent] = useState<string | null>(null);
 
   // Passenger Onboarding Flow
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -650,69 +651,210 @@ export const RiderView: React.FC<RiderViewProps> = ({
           /* Live Ride Status Card */
           <div className="p-5 space-y-5 flex-1 flex flex-col justify-between">
             <div className="space-y-4">
-              {/* Status Header */}
-              <div className="bg-slate-900 text-white p-4 rounded-xl space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-brand-300">TRIP ID: {activeRide.id}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-brand-500 text-white">
-                    {activeRide.status}
-                  </span>
-                </div>
-                <div className="text-base font-bold text-white pt-1">
-                  {activeRide.status === 'REQUESTED' && t.searchingDriver}
-                  {activeRide.status === 'ASSIGNED' && t.driverAssigned}
-                  {activeRide.status === 'ARRIVED' && t.driverArrived}
-                  {activeRide.status === 'IN_PROGRESS' && t.tripInProgress}
-                  {activeRide.status === 'COMPLETED' && t.tripCompleted}
-                </div>
-              </div>
+              {/* Uber Radar Search Animation when REQUESTED */}
+              {activeRide.status === 'REQUESTED' ? (
+                <div className="bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden space-y-4">
+                  {/* Concentric Animated Radar Rings */}
+                  <div className="relative w-32 h-32 flex items-center justify-center my-2">
+                    <div className="absolute inset-0 rounded-full border border-brand-500/30 animate-ping opacity-75" />
+                    <div className="absolute w-24 h-24 rounded-full border-2 border-brand-400/40 animate-pulse" />
+                    <div className="absolute w-16 h-16 rounded-full bg-brand-500/20 flex items-center justify-center" />
+                    <div className="relative z-10 w-12 h-12 rounded-full bg-brand-500 shadow-lg shadow-brand-500/50 flex items-center justify-center text-white">
+                      <Car className="w-6 h-6 animate-bounce" />
+                    </div>
+                  </div>
 
-              {/* Driver & Vehicle Details */}
-              {activeRide.driver && (
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={activeRide.driver.avatarUrl}
-                        alt={activeRide.driver.fullName}
-                        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
-                      />
-                      <div>
-                        <div className="font-bold text-sm text-slate-800">
-                          {activeRide.driver.fullName}
+                  <div>
+                    <h3 className="font-extrabold text-base text-white">Connecting with nearby taxis...</h3>
+                    <p className="text-xs text-slate-300 mt-1 max-w-[280px]">
+                      Broadcasting ride request to certified Chebelew drivers near {pickup.address.split(',')[0]}
+                    </p>
+                  </div>
+
+                  <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3.5 py-1.5 rounded-full text-xs font-semibold text-brand-300 border border-white/10">
+                    <Clock className="w-3.5 h-3.5 animate-spin" />
+                    <span>Estimated match: ~1-2 mins</span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Status Header */}
+                  <div className="bg-slate-900 text-white p-4 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono text-brand-300">TRIP ID: {activeRide.id}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-brand-500 text-white">
+                        {activeRide.status}
+                      </span>
+                    </div>
+                    <div className="text-base font-bold text-white pt-1">
+                      {activeRide.status === 'ASSIGNED' && t.driverAssigned}
+                      {activeRide.status === 'ARRIVED' && t.driverArrived}
+                      {activeRide.status === 'IN_PROGRESS' && t.tripInProgress}
+                      {activeRide.status === 'COMPLETED' && t.tripCompleted}
+                    </div>
+                  </div>
+
+                  {/* Uber 4-digit Safety PIN Badge */}
+                  {activeRide.status !== 'COMPLETED' && (
+                    <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold">
+                          <Shield className="w-4 h-4" />
                         </div>
-                        <div className="text-xs text-slate-500 flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                          <span>{activeRide.driver.rating}</span>
-                          <span>• {activeRide.driver.totalRides} trips</span>
+                        <div>
+                          <span className="text-[10px] uppercase font-black tracking-wider text-amber-700 block">4-Digit Boarding PIN</span>
+                          <span className="text-xs text-slate-600">Share with driver before boarding</span>
+                        </div>
+                      </div>
+                      <div className="font-mono text-lg font-black tracking-widest text-slate-900 bg-white px-3 py-1 rounded-lg border border-amber-300 shadow-sm">
+                        {activeRide.id.slice(-4).toUpperCase()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Driver & Vehicle Details */}
+                  {activeRide.driver && (
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={activeRide.driver.avatarUrl}
+                            alt={activeRide.driver.fullName}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
+                          />
+                          <div>
+                            <div className="font-bold text-sm text-slate-800">
+                              {activeRide.driver.fullName}
+                            </div>
+                            <div className="text-xs text-slate-500 flex items-center gap-1">
+                              <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                              <span>{activeRide.driver.rating}</span>
+                              <span>• {activeRide.driver.totalRides} trips</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <a
+                          href={`tel:${activeRide.driver.phone}`}
+                          className="p-2.5 bg-emerald-100 text-emerald-800 rounded-full hover:bg-emerald-200 transition"
+                          title={t.callDriver}
+                        >
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-slate-100 text-xs">
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">Vehicle</span>
+                          <span className="font-semibold text-slate-700">
+                            {activeRide.driver.vehicleMake} {activeRide.driver.vehicleModel}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[10px]">License Plate</span>
+                          <span className="font-mono font-bold text-slate-800">
+                            {activeRide.driver.vehiclePlate}
+                          </span>
                         </div>
                       </div>
                     </div>
+                  )}
 
-                    <a
-                      href={`tel:${activeRide.driver.phone}`}
-                      className="p-2.5 bg-emerald-100 text-emerald-800 rounded-full hover:bg-emerald-200 transition"
-                      title={t.callDriver}
-                    >
-                      <Phone className="w-4 h-4" />
-                    </a>
-                  </div>
+                  {/* Quick message chips to driver */}
+                  {(activeRide.status === 'ASSIGNED' || activeRide.status === 'ARRIVED') && (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-slate-500">Quick Note to Driver:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          'Waiting at main gate',
+                          'Wearing black jacket',
+                          'Have light luggage',
+                          'Please turn on AC',
+                        ].map((msg) => (
+                          <button
+                            key={msg}
+                            type="button"
+                            onClick={() => {
+                              setQuickNoteSent(msg);
+                              setTimeout(() => setQuickNoteSent(null), 3500);
+                            }}
+                            className="text-[11px] bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-700 font-medium py-1 px-2.5 rounded-full border border-slate-200 transition active:scale-95"
+                          >
+                            {msg}
+                          </button>
+                        ))}
+                      </div>
+                      {quickNoteSent && (
+                        <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>Sent to driver: &quot;{quickNoteSent}&quot;</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                  <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-slate-100 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Vehicle</span>
-                      <span className="font-semibold text-slate-700">
-                        {activeRide.driver.vehicleMake} {activeRide.driver.vehicleModel}
-                      </span>
+                  {/* Post-trip Rating & Tipping on COMPLETED */}
+                  {activeRide.status === 'COMPLETED' && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      <div className="text-center">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center mb-1">
+                          <CheckCircle className="w-6 h-6" />
+                        </div>
+                        <h4 className="font-bold text-sm text-slate-800">Trip Completed!</h4>
+                        <p className="text-xs text-slate-500">How was your trip with {activeRide.driver?.fullName || 'the driver'}?</p>
+                      </div>
+
+                      {/* Star Rating */}
+                      <div className="flex justify-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setRatingValue(star)}
+                            className="p-1 hover:scale-110 transition"
+                          >
+                            <Star
+                              className={`w-6 h-6 ${
+                                star <= ratingValue
+                                  ? 'text-amber-500 fill-amber-500'
+                                  : 'text-slate-300'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Tip Selector */}
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-500 block mb-1.5 text-center">Add Driver Tip (Optional):</span>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[0, 20, 50, 100].map((tip) => (
+                            <button
+                              key={tip}
+                              type="button"
+                              onClick={() => setTipValue(tip)}
+                              className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition ${
+                                tipValue === tip
+                                  ? 'bg-brand-500 text-white border-brand-600 shadow'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              {tip === 0 ? 'No Tip' : `${tip} ETB`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleSubmitRating}
+                        className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 rounded-lg text-xs transition"
+                      >
+                        Submit Rating & Tip
+                      </button>
                     </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">License Plate</span>
-                      <span className="font-mono font-bold text-slate-800">
-                        {activeRide.driver.vehiclePlate}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
 
               {/* Live Fare & Payment Status */}
@@ -1064,10 +1206,10 @@ export const RiderView: React.FC<RiderViewProps> = ({
         </div>
       )}
 
-      {/* Tax receipt for selected historic ride if opened */}
-      {selectedReceiptRide && (
+      {/* Tax receipt for selected historic ride or active completed ride */}
+      {(selectedReceiptRide || (activeRide && showReceiptModal)) && (
         <VatReceiptModal
-          ride={selectedReceiptRide}
+          ride={selectedReceiptRide || activeRide!}
           isOpen={showReceiptModal}
           onClose={() => {
             setShowReceiptModal(false);

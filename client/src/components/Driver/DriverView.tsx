@@ -242,12 +242,14 @@ export const DriverView: React.FC<DriverViewProps> = ({
   const handleArrived = () => {
     if (!activeRide || !socket) return;
     socket.emit('ride:arrived', { rideId: activeRide.id });
+    sounds.playDriverArrived();
   };
 
   // Transition: Start trip
   const handleStartTrip = () => {
     if (!activeRide || !socket) return;
     socket.emit('ride:start', { rideId: activeRide.id });
+    sounds.playTripStarted();
   };
 
   // Transition: Complete trip
@@ -772,6 +774,40 @@ export const DriverView: React.FC<DriverViewProps> = ({
 
       {/* Right Map Canvas */}
       <div className="flex-1 h-full relative">
+        {/* Uber-style Turn-by-Turn Navigation HUD Overlay */}
+        {activeRide && (
+          <div className="absolute top-4 left-4 right-4 z-30 max-w-lg mx-auto bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center justify-between gap-3 animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 border border-brand-500/30 flex items-center justify-center font-bold">
+                <Navigation className="w-5 h-5 text-brand-400 rotate-45" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>
+                    {activeRide.status === 'ASSIGNED' && 'Navigate to Pickup'}
+                    {activeRide.status === 'ARRIVED' && 'At Pickup Location (Wait for Rider)'}
+                    {activeRide.status === 'IN_PROGRESS' && 'Navigating to Destination'}
+                    {activeRide.status === 'COMPLETED' && 'Trip Completed'}
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                </div>
+                <div className="text-[11px] text-slate-300 truncate max-w-[260px]">
+                  {activeRide.status === 'ASSIGNED' || activeRide.status === 'ARRIVED'
+                    ? activeRide.pickup.address
+                    : activeRide.destination.address}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right pl-3 border-l border-slate-800">
+              <span className="text-[10px] text-slate-400 block font-mono">EST. ETA</span>
+              <span className="text-sm font-black text-emerald-400 font-mono">
+                {activeRide.durationMinutes || 8} min
+              </span>
+            </div>
+          </div>
+        )}
+
         <AddisMap
           pickup={activeRide?.pickup}
           destination={activeRide?.destination}

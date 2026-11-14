@@ -18,8 +18,8 @@ function createCarIcon(heading: number = 0, color: string = '#149d9f', label?: s
     html: `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%);">
         ${label ? `<div style="background: rgba(15, 23, 42, 0.88); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9999px; white-space: nowrap; margin-bottom: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);">${label}</div>` : ''}
-        <div style="width: 34px; height: 34px; background: ${color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.35); border: 2.5px solid #ffffff; transform: rotate(${heading}deg); transition: transform 0.3s ease;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <div style="width: 32px; height: 32px; background: ${color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.35); border: 2px solid #ffffff; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
             <circle cx="7" cy="17" r="2"/>
             <circle cx="17" cy="17" r="2"/>
@@ -27,8 +27,34 @@ function createCarIcon(heading: number = 0, color: string = '#149d9f', label?: s
         </div>
       </div>
     `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+  });
+}
+
+// Active Assigned Taxi Marker with Halo Glow & Smooth Rotation
+function createActiveTaxiIcon(heading: number = 0, label: string = 'Your Taxi') {
+  return L.divIcon({
+    className: 'active-taxi-marker',
+    html: `
+      <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%);">
+        <div style="background: #0f172a; color: #f59e0b; font-size: 11px; font-weight: 800; font-family: monospace; padding: 2px 8px; border-radius: 9999px; white-space: nowrap; margin-bottom: 3px; box-shadow: 0 4px 12px rgba(0,0,0,0.35); border: 1.5px solid #f59e0b; display: flex; align-items: center; gap: 4px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+          ${label}
+        </div>
+        <div style="position: relative;">
+          <div style="width: 38px; height: 38px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45); border: 2.5px solid #f59e0b; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+              <circle cx="7" cy="17" r="2"/>
+              <circle cx="17" cy="17" r="2"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    `,
+    iconSize: [38, 38],
+    iconAnchor: [19, 19],
   });
 }
 
@@ -159,8 +185,8 @@ export const AddisMap: React.FC<AddisMapProps> = ({
         className="h-full w-full"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           maxZoom={19}
         />
 
@@ -251,7 +277,7 @@ export const AddisMap: React.FC<AddisMapProps> = ({
         {activeDriverLocation && (
           <Marker
             position={activeDriverLocation}
-            icon={createCarIcon(activeDriverHeading, '#f59e0b', activeDriverPlate || 'Your Taxi')}
+            icon={createActiveTaxiIcon(activeDriverHeading, activeDriverPlate || 'Your Taxi')}
           >
             <Popup>
               <div className="text-xs font-bold text-amber-700">
