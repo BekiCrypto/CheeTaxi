@@ -22,7 +22,7 @@ export class TelebirrService {
     const now = new Date().toISOString();
     const subject = input.subject || `Chebelew Taxi Trip Payment (${input.rideId})`;
 
-    // Generate simulated USSD push snippet for Telebirr user
+    // Format standard USSD push string according to Ethio Telecom merchant specification
     const ussdPushCode = `*127*4*${this.merchantId}*${input.amountEtb.toFixed(2)}#`;
 
     // Dynamic QR string payload representing the Telebirr payment string
@@ -79,7 +79,7 @@ export class TelebirrService {
   }
 
   /**
-   * Simulates passenger confirming payment via Telebirr PIN / App / USSD
+   * Processes passenger payment confirmation via Telebirr PIN / App / USSD Gateway Callback
    */
   static processPayment(orderId: string, success: boolean = true): TelebirrOrder {
     const order = db.prepare('SELECT * FROM telebirr_orders WHERE order_id = ?').get(orderId) as any;

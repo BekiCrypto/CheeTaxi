@@ -137,7 +137,46 @@ providerRouter.post('/test-ping/:id', async (req, res) => {
 });
 
 /**
- * Mock order dispatch simulation
+ * Live Partner Order Dispatch Orchestration
+ */
+providerRouter.post('/dispatch/:id', async (req, res) => {
+  const providerId = req.params.id as AggregatorProviderId;
+  const {
+    pickupAddress = 'Bole Medhanialem, Addis Ababa',
+    pickupLat,
+    pickupLng,
+    destinationAddress = 'Meskel Square, Addis Ababa',
+    destinationLat,
+    destinationLng,
+    vehicleCategory = 'sedan',
+    passengerName = 'Abebe Bikila',
+    passengerPhone = '+251911998877',
+    fareEtb = 350.0,
+    idempotencyKey,
+  } = req.body;
+
+  try {
+    const dispatchResult = await ProviderAggregatorService.dispatchPartnerOrder(providerId, {
+      pickupAddress,
+      pickupLat,
+      pickupLng,
+      destinationAddress,
+      destinationLat,
+      destinationLng,
+      vehicleCategory,
+      passengerName,
+      passengerPhone,
+      fareEtb,
+      idempotencyKey,
+    });
+    return res.json(dispatchResult);
+  } catch (err: any) {
+    return res.status(400).json({ error: err.message || 'Dispatch orchestration failed' });
+  }
+});
+
+/**
+ * Backwards-compatible mock-dispatch alias
  */
 providerRouter.post('/mock-dispatch/:id', async (req, res) => {
   const providerId = req.params.id as AggregatorProviderId;
@@ -151,7 +190,7 @@ providerRouter.post('/mock-dispatch/:id', async (req, res) => {
   } = req.body;
 
   try {
-    const dispatchResult = await ProviderAggregatorService.simulateMockDispatch(providerId, {
+    const dispatchResult = await ProviderAggregatorService.dispatchPartnerOrder(providerId, {
       pickupAddress,
       destinationAddress,
       vehicleCategory,
@@ -161,7 +200,7 @@ providerRouter.post('/mock-dispatch/:id', async (req, res) => {
     });
     return res.json(dispatchResult);
   } catch (err: any) {
-    return res.status(400).json({ error: err.message || 'Dispatch simulation failed' });
+    return res.status(400).json({ error: err.message || 'Dispatch failed' });
   }
 });
 

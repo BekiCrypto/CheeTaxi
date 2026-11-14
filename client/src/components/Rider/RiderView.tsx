@@ -368,6 +368,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
   // Request a ride
   const handleRequestRide = async () => {
     try {
+      const selectedOffer = marketplaceOffers.find((o) => o.id === selectedOfferId);
       const res = await fetch('/api/rides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -379,6 +380,9 @@ export const RiderView: React.FC<RiderViewProps> = ({
           destination,
           vehicleCategory: selectedCategory,
           paymentMethod,
+          providerId: selectedOffer?.providerId || 'chebelew',
+          providerOfferId: selectedOffer?.id,
+          fareEtb: selectedOffer?.estimatedFare,
         }),
       });
 

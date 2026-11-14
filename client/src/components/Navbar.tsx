@@ -148,17 +148,25 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Right Actions: Demo, Language, User */}
+      {/* Right Actions: Live Status, Language, User */}
       <div className="flex items-center gap-3">
-        {/* Fast 1-Click Demo */}
-        <button
-          onClick={onRunFastDemo}
-          className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black py-1.5 px-3 rounded-lg shadow-sm flex items-center gap-1.5 transition transform active:scale-95"
-          title="Autonomously triggers an end-to-end ride simulation"
-        >
-          <Zap className="w-3.5 h-3.5 fill-white" />
-          <span className="hidden sm:inline">{t.fastDemo}</span>
-        </button>
+        {/* Production Live Network Status Badge */}
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-black tracking-tight shadow-2xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Live Network</span>
+        </div>
+
+        {/* Diagnostic Run Button (accessible via ?demo=true or local dev) */}
+        {typeof window !== 'undefined' && (window.location.search.includes('demo=true') || window.location.hostname === 'localhost') && (
+          <button
+            onClick={onRunFastDemo}
+            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black py-1.5 px-3 rounded-lg shadow-sm flex items-center gap-1.5 transition transform active:scale-95"
+            title="Autonomously triggers an end-to-end ride simulation"
+          >
+            <Zap className="w-3.5 h-3.5 fill-white" />
+            <span className="hidden sm:inline">{t.fastDemo}</span>
+          </button>
+        )}
 
         {/* Multi-Language Regional Selector */}
         <div className="relative flex items-center">

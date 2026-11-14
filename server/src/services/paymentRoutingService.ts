@@ -785,8 +785,12 @@ export class PaymentRoutingService {
     `).run(now, input.rideId);
 
     // Credit driver
-    const ride = db.prepare('SELECT driver_id, fare_json FROM rides WHERE id = ?').get(input.rideId) as any;
+    const ride = db.prepare('SELECT * FROM rides WHERE id = ?').get(input.rideId) as any;
+    let driver: any = null;
+    let driverRails: DriverPaymentRails | null = null;
     if (ride && ride.driver_id) {
+      driver = db.prepare('SELECT * FROM drivers WHERE id = ?').get(ride.driver_id) as any;
+      driverRails = this.getDriverRails(ride.driver_id);
       const fare = JSON.parse(ride.fare_json || '{}');
       const payout = fare.driverNetPayout || input.amountEtb;
       db.prepare(`
@@ -796,10 +800,100 @@ export class PaymentRoutingService {
       `).run(payout, ride.driver_id);
     }
 
+    // Generate legal Ethiopian tax compliance audit record (15% VAT - FDRE Reg 570/2025)
+    const taxConfig = this.getTaxRoutingConfig();
+    const vatAmount = Math.round(((input.amountEtb * 15) / 115) * 100) / 100;
+    const subtotal = Math.round((input.amountEtb - vatAmount) * 100) / 100;
+
+    let taxRecipientAccount = `${taxConfig.authorityAccountName} (${taxConfig.authorityAccountNumber})`;
+    if (taxConfig.taxRoutingMode === 'DRIVER') {
+      taxRecipientAccount = driverRails
+        ? (driverRails.primaryRail === 'TELEBIRR' ? driverRails.telebirrPhone : driverRails.cbeAccountNumber)
+        : 'Driver Direct Tax Withholding';
+    } else if (taxConfig.taxRoutingMode === 'PLATFORM') {
+      taxRecipientAccount = `Platform Escrow (${taxConfig.platformCbeAccount})`;
+    }
+
+    const complianceReference = `ET-TAX-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const auditId = `audit_${uuidv4().substring(0, 8)}`;
+
+    const auditRecord: PaymentAuditRecord = {
+      id: auditId,
+      orderId: txId,
+      rideId: input.rideId,
+      riderId: input.userId,
+      driverId: ride?.driver_id || undefined,
+      amountEtb: input.amountEtb,
+      fareSubtotalEtb: subtotal,
+      vatAmountEtb: vatAmount,
+      paymentMethod: 'WALLET',
+      routingDestination: 'PLATFORM_ESCROW',
+      driverRailUsed: driverRails
+        ? {
+            railType: driverRails.primaryRail,
+            accountIdentifier:
+              driverRails.primaryRail === 'TELEBIRR'
+                ? driverRails.telebirrPhone
+                : driverRails.cbeAccountNumber,
+            accountName:
+              driverRails.primaryRail === 'TELEBIRR'
+                ? driverRails.telebirrAccountName || driver?.full_name || ''
+                : driverRails.cbeAccountName || driver?.full_name || '',
+          }
+        : undefined,
+      platformRailUsed: {
+        merchantId: taxConfig.platformTelebirrMerchantId,
+        merchantName: taxConfig.platformTelebirrMerchantName,
+      },
+      taxRoutingDestination: taxConfig.taxRoutingMode,
+      taxAmountEtb: vatAmount,
+      taxRecipientAccount,
+      complianceReference,
+      status: 'SETTLED',
+      timestamp: now,
+    };
+
+    db.prepare(`
+      INSERT INTO payment_audit_records (
+        id, order_id, ride_id, rider_id, driver_id, amount_etb, fare_subtotal_etb,
+        vat_amount_etb, payment_method, routing_destination, driver_rail_json,
+        platform_rail_json, tax_routing_destination, tax_amount_etb,
+        tax_recipient_account, compliance_reference, status, timestamp
+      ) VALUES (
+        @id, @order_id, @ride_id, @rider_id, @driver_id, @amount_etb, @fare_subtotal_etb,
+        @vat_amount_etb, @payment_method, @routing_destination, @driver_rail_json,
+        @platform_rail_json, @tax_routing_destination, @tax_amount_etb,
+        @tax_recipient_account, @compliance_reference, 'SETTLED', @timestamp
+      )
+    `).run({
+      id: auditId,
+      order_id: txId,
+      ride_id: input.rideId,
+      rider_id: input.userId,
+      driver_id: ride?.driver_id || null,
+      amount_etb: input.amountEtb,
+      fare_subtotal_etb: subtotal,
+      vat_amount_etb: vatAmount,
+      payment_method: 'WALLET',
+      routing_destination: 'PLATFORM_ESCROW',
+      driver_rail_json: driverRails ? JSON.stringify(driverRails) : null,
+      platform_rail_json: JSON.stringify({
+        merchantId: taxConfig.platformTelebirrMerchantId,
+        merchantName: taxConfig.platformTelebirrMerchantName,
+        cbeAccount: taxConfig.platformCbeAccount,
+      }),
+      tax_routing_destination: taxConfig.taxRoutingMode,
+      tax_amount_etb: vatAmount,
+      tax_recipient_account: taxRecipientAccount,
+      compliance_reference: complianceReference,
+      timestamp: now,
+    });
+
     return {
       success: true,
       wallet: this.getPassengerWallet(input.userId),
       transaction: tx,
+      auditRecord,
     };
   }
 

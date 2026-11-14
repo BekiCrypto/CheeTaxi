@@ -269,6 +269,8 @@ export interface Ride {
   isManualDispatch?: boolean;
   operatorNotes?: string;
   corporateId?: string;
+  providerId?: AggregatorProviderId;
+  partnerOrderId?: string;
   countryCode: string;
   createdAt: string;
   updatedAt: string;

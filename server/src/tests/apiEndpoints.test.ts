@@ -256,9 +256,9 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(pingRes.body.latencyMs).toBeGreaterThan(0);
     expect(pingRes.body.httpStatus).toBe(200);
 
-    // 4. Test Mock Dispatch Simulation
+    // 4. Test Live Partner Dispatch Orchestration & Legacy Alias
     const dispatchRes = await request(app)
-      .post('/api/providers/mock-dispatch/ride')
+      .post('/api/providers/dispatch/ride')
       .send({
         pickupAddress: 'Bole Medhanialem',
         destinationAddress: 'Meskel Square',

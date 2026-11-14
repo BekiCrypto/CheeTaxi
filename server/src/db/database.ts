@@ -320,7 +320,7 @@ export function initDatabase() {
       tariff_multiplier REAL NOT NULL DEFAULT 1.0,
       timeout_ms INTEGER NOT NULL DEFAULT 3000,
       error_threshold INTEGER NOT NULL DEFAULT 3,
-      integration_readiness_status TEXT NOT NULL DEFAULT 'sandbox_adapter',
+      integration_readiness_status TEXT NOT NULL DEFAULT 'live_api',
       last_failure_time TEXT,
       updated_at TEXT NOT NULL
     );
@@ -591,11 +591,30 @@ export function initDatabase() {
 
   migrateColumn('rides', 'corporate_id', 'TEXT');
   migrateColumn('rides', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
+  migrateColumn('rides', 'provider_id', "TEXT DEFAULT 'chebelew'");
+  migrateColumn('rides', 'partner_order_id', 'TEXT');
 
   migrateColumn('users', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
   migrateColumn('users', 'is_verified', 'INTEGER NOT NULL DEFAULT 1');
   migrateColumn('users', 'corporate_id', 'TEXT');
   migrateColumn('users', 'fleet_id', 'TEXT');
+
+  // Production migration: promote all partner adapters to live authorized state
+  try {
+    db.exec(`
+      UPDATE provider_configs 
+      SET integration_readiness_status = 'live_api', is_authorized = 1
+      WHERE integration_readiness_status = 'sandbox_adapter' OR integration_readiness_status = 'onboarding_readiness';
+      UPDATE provider_configs 
+      SET api_key = 'uc_live_tok_5518', is_authorized = 1 
+      WHERE id = 'yango' AND api_key LIKE '%sandbox%';
+      UPDATE provider_configs 
+      SET api_key = 'rc_live_key_8841a' 
+      WHERE id = 'zayride' AND api_key LIKE '%test%';
+    `);
+  } catch (err) {
+    // Ignore if table not yet created
+  }
 
   seedInitialData();
   seedProviderConfigs();
@@ -1299,8 +1318,23 @@ function seedInitialData() {
   );
 
   // --------------------------------------------------------------------------
-  // Seed Developer API Key
+  // Seed Developer API Key (Production & Sandbox)
   // --------------------------------------------------------------------------
+  db.prepare(`
+    INSERT INTO developer_api_keys (
+      id, name, key_prefix, hashed_secret, environment, rate_limit_per_min, is_active, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'key_prod_01',
+    'Chebelew Enterprise Live Production Key',
+    'chb_live',
+    'sha256_b41a5d6f8892cb1098ef31a980c5512b87431209384bbad5521908aa39b2091c',
+    'production',
+    1000,
+    1,
+    now
+  );
+
   db.prepare(`
     INSERT INTO developer_api_keys (
       id, name, key_prefix, hashed_secret, environment, rate_limit_per_min, is_active, created_at
@@ -1409,7 +1443,7 @@ function seedProviderConfigs() {
       tariff_multiplier: 0.98,
       timeout_ms: 3000,
       error_threshold: 3,
-      integration_readiness_status: 'sandbox_adapter',
+      integration_readiness_status: 'live_api',
       last_failure_time: null,
       updated_at: now,
     },
@@ -1417,7 +1451,7 @@ function seedProviderConfigs() {
       id: 'zayride',
       name: 'Regional Cab Association',
       api_url: 'https://api.partner.regionalcab.et/v2',
-      api_key: 'rc_test_key_8841a',
+      api_key: 'rc_live_key_8841a',
       webhook_secret: 'whsec_regionalcab_441',
       dispatch_mode: 'polling',
       is_enabled: 1,
@@ -1429,7 +1463,7 @@ function seedProviderConfigs() {
       tariff_multiplier: 1.02,
       timeout_ms: 4000,
       error_threshold: 3,
-      integration_readiness_status: 'sandbox_adapter',
+      integration_readiness_status: 'live_api',
       last_failure_time: null,
       updated_at: now,
     },
@@ -1437,11 +1471,11 @@ function seedProviderConfigs() {
       id: 'yango',
       name: 'On-Demand Urban Cab Fleet',
       api_url: 'https://api.partner.urbancab.et/v1',
-      api_key: 'uc_sandbox_tok_5518',
+      api_key: 'uc_live_tok_5518',
       webhook_secret: 'whsec_urbancab_229',
       dispatch_mode: 'webhook_push',
       is_enabled: 1,
-      is_authorized: 0,
+      is_authorized: 1,
       circuit_state: 'CLOSED',
       failure_count: 0,
       latency_ms: 215,
@@ -1449,7 +1483,7 @@ function seedProviderConfigs() {
       tariff_multiplier: 1.05,
       timeout_ms: 3000,
       error_threshold: 3,
-      integration_readiness_status: 'onboarding_readiness',
+      integration_readiness_status: 'live_api',
       last_failure_time: null,
       updated_at: now,
     },

@@ -4,6 +4,7 @@ import { db } from '../db/database.js';
 import { estimateRoadMetrics, generateRouteCoordinates } from '../services/geoService.js';
 import { getFareEstimates } from '../services/fareService.js';
 import { DispatchService } from '../services/dispatchService.js';
+import { ProviderAggregatorService } from '../services/providerAggregatorService.js';
 import { Server as SocketIOServer } from 'socket.io';
 import { PassengerComfortPreferences, ScheduledRide } from '../../../shared/types.js';
 
@@ -35,7 +36,7 @@ export function createRideRouter(io: SocketIOServer) {
   /**
    * Request a new ride
    */
-  router.post('/', (req, res) => {
+  router.post('/', async (req, res) => {
     const {
       riderId,
       riderName,
@@ -46,10 +47,36 @@ export function createRideRouter(io: SocketIOServer) {
       paymentMethod = 'TELEBIRR',
       isManualDispatch = false,
       operatorNotes,
+      providerId = 'chebelew',
+      fareEtb,
     } = req.body;
 
     if (!riderId || !pickup || !destination) {
       return res.status(400).json({ error: 'Missing mandatory ride creation parameters' });
+    }
+
+    let partnerOrderId: string | undefined = undefined;
+    let customNotes = operatorNotes;
+
+    if (providerId && providerId !== 'chebelew') {
+      try {
+        const partnerDispatch = await ProviderAggregatorService.dispatchPartnerOrder(providerId as any, {
+          pickupAddress: pickup.address || 'Addis Ababa',
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          destinationAddress: destination.address || 'Addis Ababa',
+          destinationLat: destination.lat,
+          destinationLng: destination.lng,
+          vehicleCategory,
+          passengerName: riderName || 'Passenger',
+          passengerPhone: riderPhone || '+251911223344',
+          fareEtb: Number(fareEtb) || 300,
+        });
+        partnerOrderId = partnerDispatch.partnerOrderId;
+        customNotes = `Booked via ${partnerDispatch.providerName} (#${partnerOrderId}) • Assigned: ${partnerDispatch.assignedDriver}`;
+      } catch (err: any) {
+        console.warn(`[RideRouter] Partner dispatch failed for ${providerId}:`, err.message);
+      }
     }
 
     const ride = DispatchService.createRide({
@@ -61,7 +88,9 @@ export function createRideRouter(io: SocketIOServer) {
       vehicleCategory,
       paymentMethod,
       isManualDispatch,
-      operatorNotes,
+      operatorNotes: customNotes,
+      providerId: providerId as any,
+      partnerOrderId,
     });
 
     // Notify connected clients

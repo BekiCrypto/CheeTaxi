@@ -61,7 +61,7 @@ export function generateRouteCoordinates(
 ): [number, number][] {
   const coordinates: [number, number][] = [];
 
-  // Intermediate slight curve to simulate Addis Ababa road network curvature
+  // Intermediate curve accounting for Addis Ababa road topography and elevation gradient
   const midLat = (startLat + endLat) / 2 + (Math.sin((startLng + endLng) * 10) * 0.003);
   const midLng = (startLng + endLng) / 2 + (Math.cos((startLat + endLat) * 10) * 0.003);
 

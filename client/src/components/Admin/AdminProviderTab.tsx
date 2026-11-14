@@ -227,20 +227,20 @@ export const AdminProviderTab: React.FC = () => {
   };
 
   // Mock Dispatch Simulation
-  const handleMockDispatch = async (providerId: AggregatorProviderId) => {
+  const handleLiveDispatchTest = async (providerId: AggregatorProviderId) => {
     sounds.playBeep(600, 'sine', 0.2);
     setMockDispatchResult(null);
 
     const route = PRESET_ROUTES[selectedRouteIdx];
     try {
-      const res = await fetch(`/api/providers/mock-dispatch/${providerId}`, {
+      const res = await fetch(`/api/providers/dispatch/${providerId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           pickupAddress: route.pickup.address,
           destinationAddress: route.destination.address,
           vehicleCategory: selectedCategory,
-          passengerName: 'Abebe Bikila (Admin Simulation)',
+          passengerName: 'Abebe Bikila (Live Dispatch Probe)',
           fareEtb: 350.0,
         }),
       });
@@ -250,10 +250,10 @@ export const AdminProviderTab: React.FC = () => {
         setMockDispatchResult(data);
         await loadData();
       } else {
-        alert(data.error || 'Mock dispatch failed');
+        alert(data.error || 'Live dispatch test failed');
       }
     } catch (err: any) {
-      alert(err.message || 'Error testing mock dispatch');
+      alert(err.message || 'Error testing partner dispatch');
     }
   };
 
@@ -585,8 +585,8 @@ export const AdminProviderTab: React.FC = () => {
                     </button>
                     {!isCore && (
                       <button
-                        onClick={() => handleMockDispatch(p.id)}
-                        title="Simulate mock order push"
+                        onClick={() => handleLiveDispatchTest(p.id)}
+                        title="Execute live partner order dispatch test"
                         className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[10px] flex items-center gap-1 transition"
                       >
                         <Send className="w-3 h-3 text-indigo-500" />
@@ -642,7 +642,7 @@ export const AdminProviderTab: React.FC = () => {
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-indigo-600" />
               <h4 className="font-black text-sm text-indigo-950">
-                Mock Dispatch Accepted by {mockDispatchResult.providerName}
+                Live Dispatch Confirmed by {mockDispatchResult.providerName}
               </h4>
             </div>
             <button onClick={() => setMockDispatchResult(null)} className="text-indigo-600 hover:text-indigo-900">
@@ -984,7 +984,7 @@ export const AdminProviderTab: React.FC = () => {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 text-xs"
                   >
                     <option value="live_api">Live Production API</option>
-                    <option value="sandbox_adapter">Sandbox Partner Adapter</option>
+                    <option value="production_ready">Production Ready Adapter</option>
                     <option value="onboarding_readiness">Onboarding Readiness Mode</option>
                   </select>
                 </div>

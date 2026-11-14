@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/database.js';
-import { Driver, LocationPoint, Ride, VehicleCategory, PaymentMethod } from '../../../shared/types.js';
+import { Driver, LocationPoint, Ride, VehicleCategory, PaymentMethod, AggregatorProviderId } from '../../../shared/types.js';
 import { calculateHaversineDistance, estimateRoadMetrics, generateRouteCoordinates } from './geoService.js';
 import { calculateFare } from './fareService.js';
 
@@ -15,6 +15,9 @@ export interface CreateRideInput {
   isManualDispatch?: boolean;
   operatorNotes?: string;
   driverId?: string; // Optional direct manual assignment
+  providerId?: AggregatorProviderId;
+  partnerOrderId?: string;
+  providerOfferId?: string;
 }
 
 export class DispatchService {
@@ -136,11 +139,11 @@ export class DispatchService {
       INSERT INTO rides (
         id, rider_id, rider_name, rider_phone, driver_id, pickup_json, destination_json,
         vehicle_category, distance_km, duration_min, fare_json, payment_method, payment_status,
-        status, route_coords_json, is_manual_dispatch, operator_notes, created_at, updated_at
+        status, route_coords_json, is_manual_dispatch, operator_notes, provider_id, partner_order_id, created_at, updated_at
       ) VALUES (
         @id, @riderId, @riderName, @riderPhone, @driverId, @pickupJson, @destinationJson,
         @vehicleCategory, @distanceKm, @durationMin, @fareJson, @paymentMethod, 'PENDING',
-        @status, @routeCoordsJson, @isManualDispatch, @operatorNotes, @createdAt, @updatedAt
+        @status, @routeCoordsJson, @isManualDispatch, @operatorNotes, @providerId, @partnerOrderId, @createdAt, @updatedAt
       )
     `);
 
@@ -161,6 +164,8 @@ export class DispatchService {
       routeCoordsJson: JSON.stringify(routeCoordinates),
       isManualDispatch: input.isManualDispatch ? 1 : 0,
       operatorNotes: input.operatorNotes || null,
+      providerId: input.providerId || 'chebelew',
+      partnerOrderId: input.partnerOrderId || null,
       createdAt: now,
       updatedAt: now,
     });
@@ -264,6 +269,8 @@ export class DispatchService {
           : undefined,
       isManualDispatch: Boolean(row.is_manual_dispatch),
       operatorNotes: row.operator_notes,
+      providerId: row.provider_id || 'chebelew',
+      partnerOrderId: row.partner_order_id || undefined,
       countryCode: row.country_code || 'ET',
       createdAt: row.created_at,
       updatedAt: row.updated_at,

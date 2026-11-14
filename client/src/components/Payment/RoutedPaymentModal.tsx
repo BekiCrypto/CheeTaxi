@@ -120,25 +120,9 @@ export const RoutedPaymentModal: React.FC<RoutedPaymentModalProps> = ({
         if (!res.ok) throw new Error(data.error || 'Wallet payment failed');
 
         sounds.playPaymentSuccess();
-        const dummyAudit: PaymentAuditRecord = {
-          id: `audit_${Date.now()}`,
-          orderId: routedOrder.orderId,
-          rideId: ride.id,
-          riderId: userId,
-          amountEtb: routedOrder.amountEtb,
-          fareSubtotalEtb: routedOrder.fareSubtotalEtb,
-          vatAmountEtb: routedOrder.vatAmountEtb,
-          paymentMethod: 'WALLET',
-          routingDestination: routedOrder.routingDestination,
-          taxRoutingDestination: routedOrder.taxRouting.destination,
-          taxAmountEtb: routedOrder.vatAmountEtb,
-          taxRecipientAccount: 'Passenger Wallet Settlement',
-          complianceReference: `ET-TAX-2026-${Math.floor(100000 + Math.random() * 900000)}`,
-          status: 'SETTLED',
-          timestamp: new Date().toISOString(),
-        };
-        setAuditRecord(dummyAudit);
-        onSuccess(dummyAudit);
+        const settledAudit = data.auditRecord;
+        setAuditRecord(settledAudit);
+        onSuccess(settledAudit);
       } else {
         // Standard routed payment confirm
         const res = await fetch('/api/payment/confirm', {
