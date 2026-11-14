@@ -286,4 +286,36 @@ describe('Chebelew REST API Endpoints & Operational Flows', () => {
     expect(Array.isArray(logsRes.body.logs)).toBe(true);
     expect(logsRes.body.logs.length).toBeGreaterThan(0);
   });
+
+  it('Admin Security: /api/auth/admin/login and /verify should protect executive console', async () => {
+    // 1. Invalid PIN should be rejected
+    const badLogin = await request(app)
+      .post('/api/auth/admin/login')
+      .send({ emailOrPhone: 'dispatch@chebelew.et', passwordOrPin: 'wrongpin' });
+    expect(badLogin.status).toBe(401);
+
+    // 2. Valid PIN should authenticate and return session token
+    const goodLogin = await request(app)
+      .post('/api/auth/admin/login')
+      .send({ emailOrPhone: 'dispatch@chebelew.et', passwordOrPin: '9922' });
+    expect(goodLogin.status).toBe(200);
+    expect(goodLogin.body.success).toBe(true);
+    expect(goodLogin.body.token).toBeDefined();
+    expect(goodLogin.body.admin).toBeDefined();
+
+    // 3. Verify valid token
+    const verifyRes = await request(app)
+      .get('/api/auth/admin/verify')
+      .set('Authorization', `Bearer ${goodLogin.body.token}`);
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.valid).toBe(true);
+    expect(verifyRes.body.admin.role).toBeDefined();
+
+    // 4. Invalid token verification
+    const invalidVerify = await request(app)
+      .get('/api/auth/admin/verify')
+      .set('Authorization', 'Bearer invalid_random_token');
+    expect(invalidVerify.status).toBe(401);
+    expect(invalidVerify.body.valid).toBe(false);
+  });
 });

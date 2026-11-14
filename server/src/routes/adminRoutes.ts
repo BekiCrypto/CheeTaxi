@@ -12,9 +12,13 @@ import {
 } from '../services/fareService.js';
 import { Server as SocketIOServer } from 'socket.io';
 import { SystemMetrics, VatReportSummary, SystemSettings } from '../../../shared/types.js';
+import { requireAdminAuth } from '../middleware/adminAuth.js';
 
 export function createAdminRouter(io: SocketIOServer) {
   const router = Router();
+
+  // Protect all operations endpoints with Admin Authentication
+  router.use(requireAdminAuth);
 
   /**
    * Operations Dashboard KPIs & Metrics

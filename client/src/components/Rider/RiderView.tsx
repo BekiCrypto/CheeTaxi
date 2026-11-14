@@ -23,11 +23,13 @@ import {
   Package,
   Building2,
   CreditCard,
+  UserPlus,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { TelebirrModal } from '../Payment/TelebirrModal';
 import { VatReceiptModal } from '../Payment/VatReceiptModal';
 import { RiderDeliveryPanel } from './RiderDeliveryPanel';
+import { PassengerOnboardingModal } from '../Onboarding/PassengerOnboardingModal';
 import { ADDIS_LANDMARKS, AddisLandmark } from '@shared/landmarks';
 import {
   Driver,
@@ -94,6 +96,9 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [ratingValue, setRatingValue] = useState(5);
   const [tipValue, setTipValue] = useState(0);
+
+  // Passenger Onboarding Flow
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
 
   // History & Support Modals
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -312,6 +317,15 @@ export const RiderView: React.FC<RiderViewProps> = ({
               {t.whereTo}
             </h2>
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowOnboardingModal(true)}
+                className="p-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+                title={language === 'am' ? 'የተሳፋሪ መገለጫ ይመዝገቡ' : 'Onboard Profile'}
+              >
+                <UserPlus className="w-3.5 h-3.5 text-brand-600" />
+                <span className="hidden sm:inline">{language === 'am' ? 'መገለጫ ማዋቀር' : 'Onboard Profile'}</span>
+              </button>
               <button
                 type="button"
                 onClick={loadHistory}
@@ -1061,6 +1075,15 @@ export const RiderView: React.FC<RiderViewProps> = ({
           }}
         />
       )}
+      {/* Passenger Onboarding Flow Modal */}
+      <PassengerOnboardingModal
+        isOpen={showOnboardingModal}
+        onClose={() => setShowOnboardingModal(false)}
+        onComplete={() => {
+          setShowOnboardingModal(false);
+        }}
+        language={language}
+      />
     </div>
   );
 };

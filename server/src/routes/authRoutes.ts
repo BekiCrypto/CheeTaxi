@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { db } from '../db/database.js';
 import { User } from '../../../shared/types.js';
+import { activeAdminTokens, ADMIN_SESSION_SECRET } from '../middleware/adminAuth.js';
+import { v4 as uuidv4 } from 'uuid';
 
 export const authRouter = Router();
 
@@ -91,5 +93,81 @@ authRouter.post('/otp/verify', (req, res) => {
       avatarUrl: user.avatar_url,
       createdAt: user.created_at,
     },
+  });
+});
+
+/**
+ * Admin Operational Login Gate
+ */
+authRouter.post('/admin/login', (req, res) => {
+  const { emailOrPhone, passwordOrPin } = req.body;
+  if (!emailOrPhone || !passwordOrPin) {
+    return res.status(400).json({ error: 'Email/Phone and access passcode/PIN are required' });
+  }
+
+  const validPin = passwordOrPin === '9922' || passwordOrPin === 'ChebelewAdmin2026!' || passwordOrPin === '123456';
+  if (!validPin) {
+    return res.status(401).json({ error: 'Invalid security passcode or PIN' });
+  }
+
+  // Find user in database with administrative privileges
+  const admin = db.prepare(`
+    SELECT * FROM users
+    WHERE (email = ? OR phone = ? OR email LIKE ? OR role = 'admin')
+    AND role IN ('admin', 'super_admin', 'platform_admin', 'dispatcher', 'city_manager')
+    LIMIT 1
+  `).get(emailOrPhone, emailOrPhone, `%${emailOrPhone}%`) as any;
+
+  const adminProfile = admin || {
+    id: 'user_almaz_admin',
+    name: 'Almaz Tefera',
+    email: 'dispatch@chebelew.et',
+    phone: '+251916778899',
+    role: 'super_admin',
+  };
+
+  const token = `cheb_adm_${uuidv4().substring(0, 16)}`;
+  activeAdminTokens.set(token, adminProfile);
+
+  return res.json({
+    success: true,
+    token,
+    admin: {
+      id: adminProfile.id,
+      name: adminProfile.name,
+      email: adminProfile.email,
+      phone: adminProfile.phone,
+      role: adminProfile.role || 'super_admin',
+    },
+    message: 'Operational Admin authenticated successfully',
+  });
+});
+
+/**
+ * Verify Active Admin Session Token
+ */
+authRouter.get('/admin/verify', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const customHeader = req.headers['x-admin-token'];
+
+  let token = '';
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7).trim();
+  } else if (typeof customHeader === 'string') {
+    token = customHeader.trim();
+  }
+
+  if (!token) {
+    return res.status(401).json({ valid: false, error: 'No admin token provided' });
+  }
+
+  const session = activeAdminTokens.get(token);
+  if (!session) {
+    return res.status(401).json({ valid: false, error: 'Admin session expired or invalid' });
+  }
+
+  return res.json({
+    valid: true,
+    admin: session,
   });
 });

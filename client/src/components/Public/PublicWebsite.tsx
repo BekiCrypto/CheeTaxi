@@ -42,6 +42,10 @@ import {
   Share2,
 } from 'lucide-react';
 import { Language } from '../../i18n/translations';
+import { PassengerOnboardingModal } from '../Onboarding/PassengerOnboardingModal';
+import { DriverOnboardingModal } from '../Onboarding/DriverOnboardingModal';
+import { PartnerOnboardingModal } from '../Onboarding/PartnerOnboardingModal';
+import { CorporateOnboardingModal } from '../Onboarding/CorporateOnboardingModal';
 
 interface PublicWebsiteProps {
   language: Language;
@@ -89,6 +93,10 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
   }, [initialPageId]);
 
   const [activeMenuDropdown, setActiveMenuDropdown] = useState<string | null>(null);
+  const [showPassengerModal, setShowPassengerModal] = useState(false);
+  const [showDriverModal, setShowDriverModal] = useState(false);
+  const [showPartnerModal, setShowPartnerModal] = useState(false);
+  const [showCorporateModal, setShowCorporateModal] = useState(false);
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [ticketIdCreated, setTicketIdCreated] = useState<string | null>(null);
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
@@ -1156,9 +1164,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* ======================================================== */}
         {currentPage === 'passengers' && (
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Passengers & Riders</h2>
-              <p className="text-xs text-slate-500 mt-1">Reliable, affordable, and safe transportation across Addis Ababa.</p>
+            <div className="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Passengers & Riders</h2>
+                <p className="text-xs text-slate-500 mt-1">Reliable, affordable, and safe transportation across Addis Ababa.</p>
+              </div>
+              <button
+                onClick={() => setShowPassengerModal(true)}
+                className="px-4 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Register Passenger Profile</span>
+              </button>
             </div>
             <div className="space-y-4 text-xs text-slate-600 leading-relaxed">
               <p>
@@ -1187,9 +1204,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* ======================================================== */}
         {currentPage === 'drivers' && (
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Drivers (0% Commission)</h2>
-              <p className="text-xs text-slate-500 mt-1">Own your business. Keep 100% of your earnings.</p>
+            <div className="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Drivers (0% Commission)</h2>
+                <p className="text-xs text-slate-500 mt-1">Own your business. Keep 100% of your earnings.</p>
+              </div>
+              <button
+                onClick={() => setShowDriverModal(true)}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
+              >
+                <Car className="w-4 h-4" />
+                <span>Apply as Driver (AI KYC)</span>
+              </button>
             </div>
             <div className="space-y-4 text-xs text-slate-600 leading-relaxed">
               <p>
@@ -1207,9 +1233,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* ======================================================== */}
         {currentPage === 'subscriptions' && (
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Driver Subscription Plans</h2>
-              <p className="text-xs text-slate-500 mt-1">Affordable, predictable plans for full-time and part-time drivers.</p>
+            <div className="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Driver Subscription Plans</h2>
+                <p className="text-xs text-slate-500 mt-1">Affordable, predictable plans for full-time and part-time drivers.</p>
+              </div>
+              <button
+                onClick={() => setShowDriverModal(true)}
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
+              >
+                <Zap className="w-4 h-4" />
+                <span>Choose Plan & Onboard</span>
+              </button>
             </div>
             <div className="grid md:grid-cols-3 gap-4 text-xs">
               <div className="p-5 rounded-2xl border-2 border-slate-200 space-y-3">
@@ -1236,9 +1271,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* ======================================================== */}
         {currentPage === 'fleets' && (
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Fleets & Taxi Cooperatives</h2>
-              <p className="text-xs text-slate-500 mt-1">Enterprise management tools for fleet owners and taxi associations.</p>
+            <div className="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Fleets & Taxi Cooperatives</h2>
+                <p className="text-xs text-slate-500 mt-1">Enterprise management tools for fleet owners and taxi associations.</p>
+              </div>
+              <button
+                onClick={() => setShowPartnerModal(true)}
+                className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Register Taxi Cooperative</span>
+              </button>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               Empower your cooperative with multi-vehicle telemetry, centralized Telebirr payout disbursements, and automated vehicle inspection scheduling.
@@ -1251,9 +1295,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* ======================================================== */}
         {currentPage === 'corporate' && (
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Corporate Mobility Accounts</h2>
-              <p className="text-xs text-slate-500 mt-1">Seamless business travel management with monthly consolidated billing.</p>
+            <div className="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Corporate Mobility Accounts</h2>
+                <p className="text-xs text-slate-500 mt-1">Seamless business travel management with monthly consolidated billing.</p>
+              </div>
+              <button
+                onClick={() => setShowCorporateModal(true)}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Open Corporate Account</span>
+              </button>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               Over 50+ Ethiopian enterprises, embassies, and NGOs use Chebelew Corporate to manage employee ride allowances, midnight safety escorts, and 15% VAT deductible receipts.
@@ -1281,9 +1334,18 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
         {/* ======================================================== */}
         {currentPage === 'partners' && (
           <div className="bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-            <div className="border-b pb-4">
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Aggregator Partner Program</h2>
-              <p className="text-xs text-slate-500 mt-1">Open ecosystem integration for licensed mobility operators.</p>
+            <div className="border-b pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900">Aggregator Partner Program</h2>
+                <p className="text-xs text-slate-500 mt-1">Open ecosystem integration for licensed mobility operators.</p>
+              </div>
+              <button
+                onClick={() => setShowPartnerModal(true)}
+                className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Join Partner Program</span>
+              </button>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               Chebelew is designed as an open aggregator that complements licensed taxi operators, municipal taxi cooperatives, and regional metered fleets. Through standardized technical integration agreements, authorized fleet operators gain access to incremental passenger demand while riders enjoy one unified booking experience.
@@ -1620,6 +1682,47 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
           </div>
         </div>
       </footer>
+
+      {/* Onboarding Modals for Public Website */}
+      <PassengerOnboardingModal
+        isOpen={showPassengerModal}
+        onClose={() => setShowPassengerModal(false)}
+        onComplete={() => {
+          setShowPassengerModal(false);
+          onNavigateToApp('rider');
+        }}
+        language={language}
+      />
+
+      <DriverOnboardingModal
+        isOpen={showDriverModal}
+        onClose={() => setShowDriverModal(false)}
+        onComplete={() => {
+          setShowDriverModal(false);
+          onNavigateToApp('driver');
+        }}
+        language={language}
+      />
+
+      <PartnerOnboardingModal
+        isOpen={showPartnerModal}
+        onClose={() => setShowPartnerModal(false)}
+        onComplete={() => {
+          setShowPartnerModal(false);
+          alert('Cooperative registration received. Our operations team will reach out within 24 business hours.');
+        }}
+        language={language}
+      />
+
+      <CorporateOnboardingModal
+        isOpen={showCorporateModal}
+        onClose={() => setShowCorporateModal(false)}
+        onComplete={() => {
+          setShowCorporateModal(false);
+          alert('Corporate account request submitted. Our enterprise account executive will activate your credit line within 24 business hours.');
+        }}
+        language={language}
+      />
     </div>
   );
 };

@@ -21,6 +21,7 @@ import {
   Briefcase,
   Radio,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Driver, Ride, SystemMetrics, VatReportSummary, VehicleCategory, SupportTicket } from '@shared/types';
@@ -36,9 +37,21 @@ import { AdminTariffSettingsTab } from './AdminTariffSettingsTab';
 interface AdminViewProps {
   language: Language;
   socket: any;
+  initialTab?: string;
+  adminSession?: {
+    token: string;
+    admin: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+    };
+    onLogout: () => void;
+  };
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ language, socket, initialTab, adminSession }) => {
   const t = translations[language];
 
   const [activeTab, setActiveTab] = useState<
@@ -78,16 +91,23 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [dispatchSuccessMsg, setDispatchSuccessMsg] = useState<string | null>(null);
 
-  // Fetch metrics & fleet
+  // Fetch metrics & fleet with admin authentication
+  const authHeaders: Record<string, string> = adminSession?.token
+    ? {
+        Authorization: `Bearer ${adminSession.token}`,
+        'x-admin-token': adminSession.token,
+      }
+    : {};
+
   const loadDashboardData = () => {
-    fetch('/api/admin/metrics')
+    fetch('/api/admin/metrics', { headers: authHeaders })
       .then((res) => res.json())
       .then((data) => {
         if (data.metrics) setMetrics(data.metrics);
       })
       .catch(console.error);
 
-    fetch('/api/admin/live-map')
+    fetch('/api/admin/live-map', { headers: authHeaders })
       .then((res) => res.json())
       .then((data) => {
         if (data.drivers) setDrivers(data.drivers);
@@ -95,14 +115,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
       })
       .catch(console.error);
 
-    fetch('/api/admin/kyc-queue')
+    fetch('/api/admin/kyc-queue', { headers: authHeaders })
       .then((res) => res.json())
       .then((data) => {
         if (data.pendingDrivers) setKycQueue(data.pendingDrivers);
       })
       .catch(console.error);
 
-    fetch('/api/admin/vat-report')
+    fetch('/api/admin/vat-report', { headers: authHeaders })
       .then((res) => res.json())
       .then((data) => {
         if (data.summary) setVatSummary(data.summary);
@@ -110,14 +130,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
       })
       .catch(console.error);
 
-    fetch('/api/admin/tickets')
+    fetch('/api/admin/tickets', { headers: authHeaders })
       .then((res) => res.json())
       .then((data) => {
         if (data.tickets) setTickets(data.tickets);
       })
       .catch(console.error);
 
-    fetch('/api/admin/tariffs')
+    fetch('/api/admin/tariffs', { headers: authHeaders })
       .then((res) => res.json())
       .then((data) => {
         if (data.tariffs) setTariffs(data.tariffs);
@@ -288,28 +308,52 @@ export const AdminView: React.FC<AdminViewProps> = ({ language, socket }) => {
             </p>
           </div>
 
-          {metrics && (
-            <div className="flex items-center gap-4 text-xs font-mono">
-              <div className="bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
-                <span className="text-slate-400 block text-[10px]">ACTIVE FLEET</span>
-                <span className="text-white font-bold text-sm">
-                  {metrics.onlineDriversCount} Online / {metrics.activeDriversCount} Total
-                </span>
+          <div className="flex items-center gap-4">
+            {metrics && (
+              <div className="flex items-center gap-4 text-xs font-mono">
+                <div className="bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
+                  <span className="text-slate-400 block text-[10px]">ACTIVE FLEET</span>
+                  <span className="text-white font-bold text-sm">
+                    {metrics.onlineDriversCount} Online / {metrics.activeDriversCount} Total
+                  </span>
+                </div>
+                <div className="bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
+                  <span className="text-slate-400 block text-[10px]">TODAY'S GMV</span>
+                  <span className="text-emerald-400 font-bold text-sm">
+                    {metrics.todayGmvEtb.toFixed(2)} ETB
+                  </span>
+                </div>
+                <div className="bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
+                  <span className="text-slate-400 block text-[10px]">15% VAT REMITTED</span>
+                  <span className="text-amber-400 font-bold text-sm">
+                    {metrics.todayVatCollectedEtb.toFixed(2)} ETB
+                  </span>
+                </div>
               </div>
-              <div className="bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
-                <span className="text-slate-400 block text-[10px]">TODAY'S GMV</span>
-                <span className="text-emerald-400 font-bold text-sm">
-                  {metrics.todayGmvEtb.toFixed(2)} ETB
-                </span>
+            )}
+
+            {adminSession && (
+              <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
+                <div className="text-right hidden sm:block">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5 justify-end">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span>{adminSession.admin.name}</span>
+                  </div>
+                  <span className="text-[10px] text-amber-400 uppercase font-mono tracking-wider">
+                    {adminSession.admin.role.replace('_', ' ')}
+                  </span>
+                </div>
+                <button
+                  onClick={adminSession.onLogout}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] font-bold border border-rose-500/30 transition flex items-center gap-1 cursor-pointer"
+                  title="Lock Console & Sign Out"
+                >
+                  <Lock className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Lock & Sign Out</span>
+                </button>
               </div>
-              <div className="bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
-                <span className="text-slate-400 block text-[10px]">15% VAT REMITTED</span>
-                <span className="text-amber-400 font-bold text-sm">
-                  {metrics.todayVatCollectedEtb.toFixed(2)} ETB
-                </span>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Tab Navigation */}
