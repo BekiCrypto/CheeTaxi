@@ -826,16 +826,6 @@ export const RiderView: React.FC<RiderViewProps> = ({
     setMapPickingMode(null);
   };
 
-  const POPULAR_CHIPS = [
-    { label: '✈️ Airport', labelAm: '✈️ አውሮፕላን ማረፊያ', id: 'bole_airport' },
-    { label: '🛍️ Edna Mall', labelAm: '🛍️ ኤድና ሞል', id: 'bole_medhanialem' },
-    { label: '🏢 Kazanchis', labelAm: '🏢 ካዛንቺስ', id: 'kazanchis_uneca' },
-    { label: '🏛️ Meskel Sq', labelAm: '🏛️ መስቀል አደባባይ', id: 'meskel_square' },
-    { label: '🏨 Skylight', labelAm: '🏨 ስካይላይት', id: 'skylight_hotel' },
-    { label: '☕ Piassa', labelAm: '☕ ፒያሳ', id: 'piassa_churchill' },
-    { label: '🏥 Tikur Anbessa', labelAm: '🏥 ጥቁር አንበሳ', id: 'tikur_anbessa' },
-  ];
-
   const fallbackEstimates: FareEstimate[] = [
     {
       category: 'sedan',
@@ -1016,41 +1006,6 @@ export const RiderView: React.FC<RiderViewProps> = ({
               language={language}
               placeholder={language === 'am' ? 'የት መሄድ ይፈልጋሉ?' : 'Where to?'}
             />
-          </div>
-
-          {/* Popular Landmark Quick Chips */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              {language === 'am' ? 'ተወዳጅ መዳረሻዎች' : 'Popular Destinations'}
-            </span>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-              {POPULAR_CHIPS.map((chip) => {
-                const landmark = ADDIS_LANDMARKS.find((l) => l.id === chip.id);
-                if (!landmark) return null;
-                const isCurrentDest = destination.address === landmark.name;
-                return (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    onClick={() => {
-                      setDestination({
-                        address: landmark.name,
-                        addressAm: landmark.nameAm,
-                        lat: landmark.lat,
-                        lng: landmark.lng,
-                      });
-                    }}
-                    className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition ${
-                      isCurrentDest
-                        ? 'bg-brand-500 text-white border-brand-600 shadow-xs'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
-                    }`}
-                  >
-                    {language === 'am' ? chip.labelAm : chip.label}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           {/* Ride vs Delivery Mode Switcher */}

@@ -1,8 +1,19 @@
 import React, { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from 'react-leaflet';
-import { Plus, Minus, Crosshair, Maximize2 } from 'lucide-react';
+import { Plus, Minus, Crosshair, Maximize2, Star } from 'lucide-react';
 import L from 'leaflet';
 import { Driver, LocationPoint } from '@shared/types';
+import { ADDIS_LANDMARKS } from '@shared/landmarks';
+
+const POPULAR_MAP_RECOMMENDATIONS = [
+  { id: 'bole_airport', label: '✈️ Airport' },
+  { id: 'bole_medhanialem', label: '🛍️ Edna Mall' },
+  { id: 'kazanchis_uneca', label: '🏢 Kazanchis' },
+  { id: 'meskel_square', label: '🏛️ Meskel Sq' },
+  { id: 'skylight_hotel', label: '🏨 Skylight' },
+  { id: 'piassa_churchill', label: '☕ Piassa' },
+  { id: 'tikur_anbessa', label: '🏥 Tikur Anbessa' },
+];
 
 // Fix leaflet default icon issue in bundlers
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -399,9 +410,9 @@ export const AddisMap: React.FC<AddisMapProps> = ({
         </div>
       </div>
 
-      {/* Map Picking Banner Indicator */}
+      {/* Map Picking Banner & Popular Recommendations */}
       {pickingMode && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] pointer-events-auto">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] pointer-events-auto flex flex-col items-center gap-2 max-w-[94vw]">
           <div className="bg-slate-900/95 backdrop-blur-md text-white border border-brand-500/50 shadow-2xl px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2.5 animate-in slide-in-from-top">
             <span className="w-2.5 h-2.5 rounded-full bg-brand-400 animate-ping" />
             <span>
@@ -414,11 +425,36 @@ export const AddisMap: React.FC<AddisMapProps> = ({
               <button
                 type="button"
                 onClick={onCancelPicking}
-                className="ml-1 bg-white/20 hover:bg-white/30 text-white rounded-full px-2 py-0.5 text-[10px] font-normal transition"
+                className="ml-1 bg-white/20 hover:bg-white/30 text-white rounded-full px-2 py-0.5 text-[10px] font-normal transition cursor-pointer"
               >
                 Cancel
               </button>
             )}
+          </div>
+
+          {/* Popular Destination Recommendations Bar on Map */}
+          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-1 px-2.5 border border-slate-200/90 shadow-xl flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full animate-in fade-in slide-in-from-top-1">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 px-1 shrink-0">
+              <Star className="w-3 h-3 text-amber-500 fill-amber-400" />
+              <span>Popular:</span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              {POPULAR_MAP_RECOMMENDATIONS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => {
+                    const landmark = ADDIS_LANDMARKS.find((l) => l.id === chip.id);
+                    if (landmark && onMapClick) {
+                      onMapClick(landmark.lat, landmark.lng);
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-50 hover:bg-brand-50 text-slate-700 hover:text-brand-700 border border-slate-200 hover:border-brand-300 transition shrink-0 cursor-pointer shadow-2xs"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
