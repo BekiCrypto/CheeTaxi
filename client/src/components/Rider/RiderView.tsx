@@ -169,6 +169,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
   const [isVehiclesExpanded, setIsVehiclesExpanded] = useState(false);
+  const [isHudMinimized, setIsHudMinimized] = useState(false);
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [ticketCategory, setTicketCategory] = useState<'lost_item' | 'fare_dispute' | 'payment' | 'driver_behavior' | 'app_issue'>('lost_item');
@@ -516,11 +517,28 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const isAmharic = language === 'am';
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-68px)] w-full overflow-hidden bg-slate-50">
-      {/* Floating Left Control Panel / Booking Sheet with Desktop Frosted Glass */}
-      <div className="w-full lg:w-[420px] xl:w-[450px] frosted-glass border-r lg:border border-white/60 flex flex-col h-full lg:h-[calc(100vh-92px)] lg:m-3 lg:rounded-3xl shadow-2xl z-20 overflow-hidden">
-        {/* Top Destination Selector */}
-        <div className="p-4 border-b border-slate-200/50 space-y-3 bg-white/50 backdrop-blur-md">
+    <div className="relative h-full w-full overflow-hidden bg-slate-100">
+      {/* 100% Edge-to-Edge Full-Screen Interactive Addis Ababa Map (Visible on Both Screens) */}
+      <div className="absolute inset-0 z-0 w-full h-full">
+        <AddisMap
+          pickup={pickup}
+          destination={destination}
+          drivers={availableDrivers}
+          activeDriverLocation={activeDriverPos || (activeRide?.driver ? [activeRide.driver.currentLat, activeRide.driver.currentLng] : undefined)}
+          activeDriverHeading={activeDriverHeading || (activeRide?.driver?.heading || 0)}
+          activeDriverPlate={activeRide?.driver?.vehiclePlate}
+          routeCoordinates={activeRide?.routeCoordinates || routeCoordinates}
+          onMapClick={handleMapClick}
+          pickingMode={mapPickingMode}
+          onCancelPicking={() => setMapPickingMode(null)}
+        />
+      </div>
+
+      {!activeRide ? (
+        /* Screen 1: Booking & Route Selection Floating Panel */
+        <div className="absolute top-3 bottom-3 left-3 w-[calc(100%-24px)] sm:w-[420px] xl:w-[440px] frosted-glass rounded-3xl border border-white/70 shadow-2xl z-20 flex flex-col overflow-hidden backdrop-blur-xl">
+          {/* Top Destination Selector */}
+          <div className="p-4 border-b border-slate-200/50 space-y-3 bg-white/60 backdrop-blur-md">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse" />
@@ -663,9 +681,9 @@ export const RiderView: React.FC<RiderViewProps> = ({
           </div>
         </div>
 
-        {/* Content based on Active Ride status or Delivery Mode */}
+        {/* Content based on Delivery Mode or Booking Mode */}
         {riderMode === 'deliveries' ? (
-          <div className="p-5 flex-1">
+          <div className="p-5 flex-1 overflow-y-auto no-scrollbar">
             <RiderDeliveryPanel
               currentRiderId={currentRiderId}
               currentRiderName={currentRiderName}
@@ -675,7 +693,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
               language={language}
             />
           </div>
-        ) : !activeRide ? (
+        ) : (
           <div className="p-4 space-y-4 flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar">
             <div className="space-y-3">
               {/* Vehicle Category Selector (Collapsible - Single Selected Hero Card / Unfold on Tap) */}
@@ -909,9 +927,81 @@ export const RiderView: React.FC<RiderViewProps> = ({
               </div>
             </div>
           </div>
-        ) : (
-          /* Live Ride Status Card */
-          <div className="p-5 space-y-5 flex-1 flex flex-col justify-between">
+        )}
+      </div>
+    ) : (
+        /* Screen 2: Active Ride Live HUD Floating Over Full-Screen Map */
+        <div className={`absolute top-3 left-3 right-3 sm:right-auto sm:w-[400px] xl:w-[420px] z-20 frosted-glass rounded-3xl border border-white/80 shadow-2xl overflow-hidden animate-slide-up flex flex-col transition-all duration-300 backdrop-blur-xl ${
+          isHudMinimized ? 'max-h-auto' : 'max-h-[calc(100%-24px)]'
+        }`}>
+          {/* Live HUD Header with Minimize / Expand toggle */}
+          <div className="p-3.5 bg-slate-900/95 text-white flex items-center justify-between border-b border-slate-800 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                {activeRide.status === 'REQUESTED'
+                  ? (isAmharic ? 'አቅራቢያ ያሉ ታክሲዎችን በመፈለግ ላይ...' : 'Connecting Nearby Taxis...')
+                  : activeRide.status === 'ASSIGNED'
+                  ? (isAmharic ? 'አሽከርካሪ ወደ እርስዎ እየመጣ ነው' : 'Driver Heading to You')
+                  : activeRide.status === 'ARRIVED'
+                  ? (isAmharic ? 'አሽከርካሪ ደርሷል (ይሳፈሩ)' : 'Driver Arrived (Board Now)')
+                  : activeRide.status === 'IN_PROGRESS'
+                  ? (isAmharic ? 'ጉዞ በሂደት ላይ' : 'Trip in Progress')
+                  : activeRide.status === 'COMPLETED'
+                  ? (isAmharic ? 'ጉዞው ተጠናቋል' : 'Trip Completed')
+                  : activeRide.status}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsHudMinimized(!isHudMinimized)}
+              className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-slate-200 flex items-center gap-1 transition cursor-pointer"
+              title={isHudMinimized ? "Expand Ride Details" : "Minimize to View Full Map"}
+            >
+              {isHudMinimized ? (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>Expand ▴</span>
+                </>
+              ) : (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Map View ▾</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Minimized Pill */}
+          {isHudMinimized ? (
+            <div
+              onClick={() => setIsHudMinimized(false)}
+              className="p-3 bg-white/95 text-xs font-bold flex items-center justify-between cursor-pointer hover:bg-white transition"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow">
+                  {activeRide.driver?.fullName ? activeRide.driver.fullName.charAt(0) : '🚗'}
+                </div>
+                <div>
+                  <div className="font-extrabold text-slate-900 text-xs">
+                    {activeRide.driver?.fullName || (isAmharic ? 'አሽከርካሪ' : 'Driver')}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    {activeRide.driver?.vehiclePlate || 'ETA ~3 mins'}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono font-black text-emerald-700 text-sm">
+                  {activeRide.fare.totalFare.toFixed(0)} ETB
+                </div>
+                <span className="text-[10px] text-brand-600 font-bold underline">Tap to view</span>
+              </div>
+            </div>
+          ) : (
+            /* Full Live HUD Content */
+            <div className="p-4 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
             <div className="space-y-4">
               {/* Uber Radar Search Animation when REQUESTED */}
               {activeRide.status === 'REQUESTED' ? (
@@ -1234,22 +1324,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
           </div>
         )}
       </div>
-
-      {/* Right Map Canvas */}
-      <div className="flex-1 h-full relative">
-        <AddisMap
-          pickup={pickup}
-          destination={destination}
-          drivers={availableDrivers}
-          activeDriverLocation={activeDriverPos || (activeRide?.driver ? [activeRide.driver.currentLat, activeRide.driver.currentLng] : undefined)}
-          activeDriverHeading={activeDriverHeading || (activeRide?.driver?.heading || 0)}
-          activeDriverPlate={activeRide?.driver?.vehiclePlate}
-          routeCoordinates={activeRide?.routeCoordinates || routeCoordinates}
-          onMapClick={handleMapClick}
-          pickingMode={mapPickingMode}
-          onCancelPicking={() => setMapPickingMode(null)}
-        />
-      </div>
+    )}
 
       {/* Telebirr Payment Modal */}
       {telebirrOrder && (

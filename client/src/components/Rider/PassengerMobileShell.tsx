@@ -494,6 +494,8 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                   ? 'max-h-[88vh]'
                   : sheetState === 'EXPLORE'
                   ? 'max-h-[38vh]'
+                  : sheetState === 'ACTIVE_RIDE'
+                  ? 'max-h-[44vh]'
                   : 'max-h-[62vh]'
               } pb-20`}
             >
@@ -909,9 +911,19 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                           {activeRide.status === 'ASSIGNED' ? 'Driver Heading to You' : activeRide.status}
                         </span>
                       </div>
-                      <span className="text-[11px] font-mono text-slate-400">
-                        Ride #{activeRide.id.slice(0, 8)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsSheetExpanded(!isSheetExpanded)}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 flex items-center gap-1 active-press"
+                          title={isSheetExpanded ? "Switch to Map View" : "View Full Details"}
+                        >
+                          {isSheetExpanded ? '▾ Map View' : '▴ Details'}
+                        </button>
+                        <span className="text-[11px] font-mono text-slate-400">
+                          #{activeRide.id.slice(0, 6)}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Driver Card with Verified Photo & Plate */}
