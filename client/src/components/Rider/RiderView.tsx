@@ -169,6 +169,9 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
   const [isVehiclesExpanded, setIsVehiclesExpanded] = useState(false);
+  const [isOffersExpanded, setIsOffersExpanded] = useState(false);
+  const [isPreferencesExpanded, setIsPreferencesExpanded] = useState(false);
+  const [isTripDetailsExpanded, setIsTripDetailsExpanded] = useState(false);
   const [isHudMinimized, setIsHudMinimized] = useState(false);
 
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -513,7 +516,84 @@ export const RiderView: React.FC<RiderViewProps> = ({
     { label: '🏥 Tikur Anbessa', labelAm: '🏥 ጥቁር አንበሳ', id: 'tikur_anbessa' },
   ];
 
-  const selectedEstimate = estimates.find((e) => e.category === selectedCategory);
+  const fallbackEstimates: FareEstimate[] = [
+    {
+      category: 'sedan',
+      displayName: 'Chebelew Standard',
+      displayNameAm: 'ቼበለው ስታንዳርድ (ሴዳን)',
+      description: 'Toyota Corolla / Vitz / Dzire - 4 passenger seats with A/C',
+      descriptionAm: 'ቶዮታ ኮሮላ / ቪትዝ / ዲዛየር - 4 መቀመጫ ከአየር ማቀዝቀዣ ጋር',
+      capacity: 4,
+      etaMinutes: 3,
+      fare: {
+        baseFare: 100,
+        distanceKm: 6.2,
+        distanceFare: 62,
+        durationMinutes: 14,
+        timeFare: 30,
+        subtotal: 192,
+        vatRate: 0.15,
+        vatAmount: 28.8,
+        totalFare: 192,
+        platformCommission: 0,
+        platformTakeRate: 0,
+        telebirrFee: 0,
+        driverNetPayout: 192,
+      },
+    },
+    {
+      category: 'comfort',
+      displayName: 'Chebelew Comfort',
+      displayNameAm: 'ቼበለው ኮምፈርት (ቪአይፒ)',
+      description: 'Hyundai Elantra / Camry / RAV4 - Premium business comfort',
+      descriptionAm: 'ሂዩንዳይ ኤላንትራ / ካምሪ / ራቭ4 - ከፍተኛ ምቾት',
+      capacity: 4,
+      etaMinutes: 5,
+      fare: {
+        baseFare: 160,
+        distanceKm: 6.2,
+        distanceFare: 110,
+        durationMinutes: 14,
+        timeFare: 71,
+        subtotal: 341,
+        vatRate: 0.15,
+        vatAmount: 51.15,
+        totalFare: 341,
+        platformCommission: 0,
+        platformTakeRate: 0,
+        telebirrFee: 0,
+        driverNetPayout: 341,
+      },
+    },
+    {
+      category: 'minivan',
+      displayName: 'Chebelew XL',
+      displayNameAm: 'ቼበለው ኤክስኤል (ሚኒቫን)',
+      description: 'Toyota Avanza / Noah - 7 seats for groups and airport luggage',
+      descriptionAm: 'ቶዮታ አቫንዛ / ኖህ - 7 መቀመጫ ለቤተሰብና ሻንጣ',
+      capacity: 7,
+      etaMinutes: 6,
+      fare: {
+        baseFare: 140,
+        distanceKm: 6.2,
+        distanceFare: 85,
+        durationMinutes: 14,
+        timeFare: 47,
+        subtotal: 272,
+        vatRate: 0.15,
+        vatAmount: 40.8,
+        totalFare: 272,
+        platformCommission: 0,
+        platformTakeRate: 0,
+        telebirrFee: 0,
+        driverNetPayout: 272,
+      },
+    },
+  ];
+
+  const nonPartnerEstimates = estimates.filter((e) => !e.isAggregatedPartner);
+  const displayEstimates = nonPartnerEstimates.length > 0 ? nonPartnerEstimates : fallbackEstimates;
+  const selectedEstimate = displayEstimates.find((e) => e.category === selectedCategory) || displayEstimates[0];
   const isAmharic = language === 'am';
 
   return (
@@ -694,187 +774,232 @@ export const RiderView: React.FC<RiderViewProps> = ({
             />
           </div>
         ) : (
-          <div className="p-4 space-y-4 flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar">
-            <div className="space-y-3">
-              {/* Vehicle Category Selector (Collapsible - Single Selected Hero Card / Unfold on Tap) */}
-              <div className="frosted-card rounded-2xl border border-white/60 shadow-xs overflow-hidden transition-all">
-                {!isVehiclesExpanded ? (
-                  /* Collapsed State: Single Compact Selected Vehicle Row (~54px) */
-                  <button
-                    type="button"
-                    onClick={() => setIsVehiclesExpanded(true)}
-                    className="w-full p-3 bg-white/80 hover:bg-white text-left transition flex items-center justify-between cursor-pointer group"
-                    title={isAmharic ? 'የመኪና ምርጫን ለመቀየር ይጫኑ' : 'Click to change vehicle category'}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-brand-500 text-white flex items-center justify-center shadow-xs">
-                        <Car className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-xs text-slate-900">
-                            {selectedEstimate?.displayName || 'Chebelew Standard'}
-                          </span>
-                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
-                            0% Fee
-                          </span>
+          <div className="p-3.5 space-y-3 flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar">
+            <div className="space-y-2.5">
+              {/* Vehicle Category Selector (Yango Style - Visible & Selectable in 1-Tap) */}
+              <div className="space-y-1.5">
+                {displayEstimates.map((est) => {
+                  const isSelected = selectedCategory === est.category;
+                  return (
+                    <button
+                      key={est.category}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategory(est.category as VehicleCategory);
+                        const matchingOffer = marketplaceOffers.find(
+                          (o) => o.providerId === 'chebelew' && o.vehicleCategory === est.category
+                        );
+                        if (matchingOffer) setSelectedOfferId(matchingOffer.id);
+                      }}
+                      className={`w-full p-2.5 rounded-2xl border-2 transition-all flex items-center justify-between text-left cursor-pointer group ${
+                        isSelected
+                          ? 'border-amber-500 bg-amber-50/80 shadow-xs ring-2 ring-amber-500/20'
+                          : 'border-slate-200/80 bg-white/90 hover:bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition shadow-2xs ${
+                            isSelected
+                              ? 'bg-amber-500 text-slate-950 font-black'
+                              : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                          }`}
+                        >
+                          <Car className="w-5 h-5" />
                         </div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                          <span>⏱️ ~{selectedEstimate?.etaMinutes || 3}m away</span>
-                          <span>•</span>
-                          <span className="flex items-center gap-0.5">
-                            <Users className="w-3 h-3" /> {selectedEstimate?.capacity || 4} seats
-                          </span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-xs text-slate-900">{est.displayName}</span>
+                            {isSelected ? (
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full border border-emerald-200">
+                                0% Fee
+                              </span>
+                            ) : (
+                              <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.2 rounded-full">
+                                {est.capacity} seats
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                            <span>⏱️ ~{est.etaMinutes || 3}m away</span>
+                            <span>•</span>
+                            <span>{est.category === 'comfort' ? 'VIP A/C' : est.category === 'minivan' ? 'Luggage & 7 Seats' : 'Fast Sedan'}</span>
+                          </div>
                         </div>
                       </div>
+
+                      <div className="text-right flex items-center gap-2">
+                        <div>
+                          <div className="text-sm font-black text-slate-900 font-mono">
+                            {est.fare.totalFare.toFixed(0)} <span className="text-[10px] font-semibold text-slate-500">ETB</span>
+                          </div>
+                          <span className="text-[9px] text-slate-400 block font-medium">Fixed Upfront</span>
+                        </div>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-xs">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Yango-Level Collapsible: 5 Fleet Quotes & Algorithmic Ranking */}
+              <div className="rounded-2xl border border-slate-200/90 bg-white/90 backdrop-blur-md shadow-xs overflow-hidden transition-all duration-300">
+                <button
+                  type="button"
+                  onClick={() => setIsOffersExpanded(!isOffersExpanded)}
+                  className="w-full p-2.5 flex items-center justify-between text-left hover:bg-slate-50 transition cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-xs">
+                      <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black text-slate-900">
+                          {isAmharic ? 'የታክሲ ማህበራት ዋጋ ንፅፅር' : 'Compare 5 Fleet Quotes'}
+                        </span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.2 rounded-full border border-emerald-200">
+                          Best: {marketplaceOffers[0]?.estimatedFare || 185} ETB
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Meter Cab • Municipal Co-op • 0% Direct Match
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-brand-700 bg-brand-50 group-hover:bg-brand-100 px-2 py-0.5 rounded-lg border border-brand-200/80 transition">
+                    <span>{isOffersExpanded ? (isAmharic ? 'አሳጥር' : 'Fold') : (isAmharic ? 'ንፅፅር' : 'Compare')}</span>
+                    {isOffersExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </div>
+                </button>
+
+                {isOffersExpanded && (
+                  <div className="p-3 pt-1 border-t border-slate-100 space-y-2 animate-fade-in bg-slate-50/50">
+                    <div className="grid grid-cols-4 gap-1 p-1 bg-slate-200/70 rounded-xl text-[10px] font-bold text-center">
+                      {[
+                        { mode: 'best_value', label: isAmharic ? 'ምርጥ' : 'Best' },
+                        { mode: 'cheapest', label: isAmharic ? 'ቅናሽ' : 'Cheap' },
+                        { mode: 'fastest_pickup', label: isAmharic ? 'ፈጣን' : 'Fast' },
+                        { mode: 'premium_comfort', label: isAmharic ? 'ምቾት' : 'Comfort' },
+                      ].map((item) => (
+                        <button
+                          key={item.mode}
+                          type="button"
+                          onClick={() => setComparisonMode(item.mode as any)}
+                          className={`py-1 rounded-lg transition ${
+                            comparisonMode === item.mode
+                              ? 'bg-white text-slate-900 shadow-xs font-black'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <div className="text-sm font-black text-slate-900 font-mono">
-                          {selectedEstimate?.fare.totalFare.toFixed(0) || 192}{' '}
-                          <span className="text-[10px] font-semibold text-slate-500">ETB</span>
-                        </div>
-                        <span className="text-[9px] text-slate-400 block font-medium">Fixed Upfront</span>
-                      </div>
-                      <div className="flex items-center gap-0.5 text-[10px] font-bold text-brand-700 bg-brand-50 group-hover:bg-brand-100 px-2 py-1 rounded-lg border border-brand-200/80 transition">
-                        <span>{isAmharic ? 'ቀይር' : 'Change'}</span>
-                        <ChevronDown className="w-3 h-3" />
-                      </div>
-                    </div>
-                  </button>
-                ) : (
-                  /* Expanded State: All Vehicle Categories with Instant Selection */
-                  <div className="p-3 bg-white/95 space-y-2 animate-fade-in">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                        {isAmharic ? 'የመኪና ምርጫ' : 'Select Vehicle Class'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsVehiclesExpanded(false)}
-                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-0.5 cursor-pointer"
-                      >
-                        <span>{isAmharic ? 'አሳጥር' : 'Fold'}</span>
-                        <ChevronUp className="w-3 h-3" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {estimates
-                        .filter((e) => !e.isAggregatedPartner)
-                        .map((est) => {
-                          const isSelected = selectedCategory === est.category;
-                          return (
-                            <button
-                              key={est.category}
-                              type="button"
-                              onClick={() => {
-                                setSelectedCategory(est.category);
-                                const matchingOffer = marketplaceOffers.find(
-                                  (o) => o.providerId === 'chebelew' && o.vehicleCategory === est.category
-                                );
-                                if (matchingOffer) setSelectedOfferId(matchingOffer.id);
-                                setIsVehiclesExpanded(false);
-                              }}
-                              className={`w-full p-2.5 rounded-xl border-2 transition-all flex items-center justify-between text-left cursor-pointer group ${
-                                isSelected
-                                  ? 'border-brand-500 bg-brand-50/70 shadow-sm ring-1 ring-brand-500/20'
-                                  : 'border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <div
-                                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
-                                    isSelected
-                                      ? 'bg-brand-500 text-white shadow-xs'
-                                      : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
-                                  }`}
-                                >
-                                  <Car className="w-4 h-4" />
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto no-scrollbar">
+                      {marketplaceOffers.slice(0, 5).map((offer) => {
+                        const isSelected = selectedOfferId === offer.id;
+                        const isChebelew = offer.providerId === 'chebelew';
+                        return (
+                          <div
+                            key={offer.id}
+                            onClick={() => setSelectedOfferId(offer.id)}
+                            className={`p-2 rounded-xl border transition flex items-center justify-between cursor-pointer ${
+                              isSelected
+                                ? 'border-amber-500 bg-amber-50/80 shadow-xs ring-1 ring-amber-500/30'
+                                : 'border-slate-200/80 bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs font-black text-amber-500">★ {offer.driverRating || 4.8}</div>
+                              <div>
+                                <div className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                                  <span>{offer.providerName}</span>
+                                  {isChebelew && (
+                                    <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">0% Fee</span>
+                                  )}
                                 </div>
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-extrabold text-xs text-slate-900">{est.displayName}</span>
-                                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
-                                      0% Fee
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                                    <span>⏱️ ~{est.etaMinutes}m away</span>
-                                    <span>•</span>
-                                    <span>{est.capacity} seats</span>
-                                  </div>
+                                <div className="text-[10px] text-slate-400">
+                                  ⏱️ ETA: {offer.estimatedPickupMinutes}m • 🏁 {offer.estimatedJourneyMinutes}m trip
                                 </div>
                               </div>
-
-                              <div className="text-right">
-                                <div className="text-xs font-black text-slate-900 font-mono">
-                                  {est.fare.totalFare.toFixed(0)} <span className="text-[9px] font-semibold text-slate-500">ETB</span>
-                                </div>
-                                <span className="text-[9px] text-slate-400 block font-medium">Fixed Upfront</span>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs font-mono font-black text-slate-900">
+                                {offer.estimatedFare} <span className="text-[9px] font-semibold text-slate-500">ETB</span>
                               </div>
-                            </button>
-                          );
-                        })}
+                              <div className="text-[9px] text-slate-400 font-medium">Score: {offer.scoreBreakdown?.totalOfferScore?.toFixed(0) || 85}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCompareModal(true)}
+                      className="w-full py-1 text-[11px] font-bold text-brand-600 hover:text-brand-700 text-center"
+                    >
+                      Open Full 4-Mode Offer Analyzer →
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Quick Settings Bar - Sleek Single Horizontal Row */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-                {/* Payment Pill */}
+              {/* Yango-Level Payment & Options Bar */}
+              <div className="flex items-center gap-1.5 text-xs">
+                {/* Payment Method Pill */}
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(true)}
-                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl font-bold text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
-                  title="Change Payment Method"
+                  className="flex-1 p-2 bg-white/90 hover:bg-white border border-slate-200/90 rounded-2xl flex items-center justify-between font-bold text-slate-800 transition shadow-2xs cursor-pointer group"
+                  title="Select Payment Method"
                 >
-                  <CreditCard className="w-3.5 h-3.5 text-brand-600" />
-                  <span className="max-w-[125px] truncate">
-                    {paymentMethod === 'TELEBIRR'
-                      ? 'Telebirr (1,058 Br)'
-                      : paymentMethod === 'CASH'
-                      ? 'Cash to Driver'
-                      : paymentMethod === 'BANK_TRANSFER'
-                      ? 'CBE Birr'
-                      : 'Corporate'}
-                  </span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <CreditCard className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[9px] text-slate-400 uppercase tracking-wider block">Payment</span>
+                      <span className="text-xs font-extrabold text-slate-900 line-clamp-1">
+                        {paymentMethod === 'TELEBIRR'
+                          ? 'Telebirr (1,058 Br)'
+                          : paymentMethod === 'CASH'
+                          ? 'Cash to Driver'
+                          : paymentMethod === 'BANK_TRANSFER'
+                          ? 'CBE Birr / Bank'
+                          : 'Corporate'}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
                 </button>
 
-                {/* Compare Multi-Provider Quotes Pill */}
-                <button
-                  type="button"
-                  onClick={() => setShowCompareModal(true)}
-                  className="px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 border border-brand-200/80 rounded-xl font-bold text-brand-800 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
-                  title="Compare all authorized taxi network quotes"
-                >
-                  <Sliders className="w-3.5 h-3.5 text-brand-600" />
-                  <span>Compare ({marketplaceOffers.length || 5})</span>
-                </button>
-
-                {/* Comfort Preferences Pill */}
+                {/* Ride Comfort & Options */}
                 <button
                   type="button"
                   onClick={() => setShowComfortModal(true)}
-                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl font-bold text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
-                  title="Ride Options & Comfort Preferences"
+                  className="p-2 bg-white/90 hover:bg-white border border-slate-200/90 rounded-2xl flex items-center gap-1.5 font-bold text-slate-700 transition shadow-2xs cursor-pointer"
+                  title="Ride Comfort Preferences & Silent Trip"
                 >
-                  <Wind className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Options</span>
+                  <Sliders className="w-4 h-4 text-brand-600" />
+                  <span className="hidden sm:inline">Options</span>
                 </button>
 
-                {/* Schedule Advance Trip Pill */}
+                {/* Schedule Advance Trip */}
                 <button
                   type="button"
                   onClick={() => setShowScheduleModal(true)}
-                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl font-bold text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
-                  title="Schedule Advance Trip & Flight Tracking"
+                  className="p-2 bg-white/90 hover:bg-white border border-slate-200/90 rounded-2xl flex items-center gap-1.5 font-bold text-slate-700 transition shadow-2xs cursor-pointer"
+                  title="Schedule Trip & Flight Tracking"
                 >
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Schedule</span>
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  <span className="hidden sm:inline">Schedule</span>
                 </button>
               </div>
             </div>
@@ -887,24 +1012,28 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 disabled={isCalculating}
                 onMouseEnter={() => setIsCtaHovered(true)}
                 onMouseLeave={() => setIsCtaHovered(false)}
-                className="w-full relative group overflow-hidden bg-gradient-to-r from-brand-600 via-brand-500 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-2xl text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-brand-500/25 transition-all duration-300 disabled:opacity-60 cursor-pointer"
+                className="w-full relative group overflow-hidden bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 active:scale-[0.99] text-slate-950 font-black py-3.5 px-4 rounded-2xl text-sm flex items-center justify-between shadow-xl shadow-amber-500/25 transition-all duration-300 disabled:opacity-60 cursor-pointer"
               >
                 {/* Glowing shimmer reflection */}
-                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out pointer-events-none" />
+                <div className="absolute inset-0 bg-white/25 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out pointer-events-none" />
 
-                {/* Flying paper plane animation */}
-                <div className={`transition-all duration-300 ${isCtaHovered ? 'animate-plane-fly' : ''}`}>
-                  <Send className="w-4 h-4 fill-white text-white" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-slate-950 text-white flex items-center justify-center shadow-xs">
+                    <Car className="w-4 h-4 text-amber-400 fill-amber-400" />
+                  </div>
+                  <span className="tracking-tight font-black text-sm text-slate-950">
+                    {isAmharic
+                      ? `${selectedEstimate?.displayName || 'ስታንዳርድ'} እዘዝ`
+                      : `Request ${selectedEstimate?.displayName || 'Standard'}`}
+                  </span>
                 </div>
 
-                {/* Celebratory win text transition on hover */}
-                <span className="tracking-tight transition-all duration-200 font-black text-sm">
-                  {isCtaHovered
-                    ? (isAmharic ? 'እንሂድ! 🚀' : "Let's Roll! 🚀")
-                    : (isAmharic
-                        ? `${selectedEstimate?.displayName || 'ታክሲ'} እዘዝ • ${selectedEstimate?.fare.totalFare.toFixed(0) || 192} ETB`
-                        : `Request ${selectedEstimate?.displayName || 'Chebelew'} • ${selectedEstimate?.fare.totalFare.toFixed(0) || 192} ETB`)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-base font-black text-slate-950">
+                    {selectedEstimate?.fare.totalFare.toFixed(0) || 192} ETB
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-950 group-hover:translate-x-0.5 transition-transform" />
+                </div>
               </button>
 
               {/* Ultra-Clean Micro-Trust Line */}
@@ -1209,29 +1338,58 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 </>
               )}
 
-              {/* Live Fare & Payment Status */}
-              <div className="p-3.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Total Fare</span>
-                  <span className="text-base font-extrabold text-slate-900">
-                    {activeRide.fare.totalFare.toFixed(2)} ETB
-                  </span>
-                  <span className="text-[10px] text-emerald-600 block">Inc. 15% VAT</span>
-                </div>
+              {/* Yango-Level Collapsible Trip Fare Breakdown */}
+              <div className="rounded-xl border border-slate-200/90 bg-white/95 overflow-hidden transition-all shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsTripDetailsExpanded(!isTripDetailsExpanded)}
+                  className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition cursor-pointer"
+                >
+                  <div className="text-left">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Fare Breakdown</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-black text-slate-900 font-mono">
+                        {activeRide.fare.totalFare.toFixed(2)} ETB
+                      </span>
+                      <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                        0% Commission
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                    <span>{isTripDetailsExpanded ? 'Hide' : 'Details'}</span>
+                    {isTripDetailsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </div>
+                </button>
 
-                <div className="text-right">
-                  <span className="text-slate-400 block text-[10px]">Payment</span>
-                  <span className="font-bold text-slate-800 uppercase">
-                    {activeRide.paymentMethod}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold block ${
-                      activeRide.paymentStatus === 'PAID' ? 'text-emerald-600' : 'text-amber-600'
-                    }`}
-                  >
-                    {activeRide.paymentStatus === 'PAID' ? '✓ PAID' : 'PENDING'}
-                  </span>
-                </div>
+                {isTripDetailsExpanded && (
+                  <div className="p-3 pt-1 border-t border-slate-100 space-y-1.5 text-[11px] animate-fade-in bg-slate-50/50">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Base Pickup Fare</span>
+                      <span className="font-mono">{activeRide.fare.baseFare?.toFixed(2) || '100.00'} ETB</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Distance ({activeRide.fare.distanceKm?.toFixed(1) || 6.2} km)</span>
+                      <span className="font-mono">{activeRide.fare.distanceFare?.toFixed(2) || '62.00'} ETB</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Time ({activeRide.fare.durationMinutes || 14} mins)</span>
+                      <span className="font-mono">{activeRide.fare.timeFare?.toFixed(2) || '30.00'} ETB</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600 pt-1 border-t border-slate-200">
+                      <span>Subtotal</span>
+                      <span className="font-mono">{activeRide.fare.subtotal?.toFixed(2) || '192.00'} ETB</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 font-semibold">
+                      <span>15% VAT (Reg 570/2025 Included)</span>
+                      <span className="font-mono">{activeRide.fare.vatAmount?.toFixed(2) || '28.80'} ETB</span>
+                    </div>
+                    <div className="flex justify-between text-slate-900 font-extrabold pt-1 border-t border-slate-300">
+                      <span>Total Fare</span>
+                      <span className="font-mono">{activeRide.fare.totalFare.toFixed(2)} ETB</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Safety & SOS Bar */}
