@@ -163,14 +163,11 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [historyRides, setHistoryRides] = useState<Ride[]>([]);
   const [selectedReceiptRide, setSelectedReceiptRide] = useState<Ride | null>(null);
 
-  // Desktop Hierarchy Accordions & Delight Factor States
+  // Delight Factor & Minimal Modal States
   const [isCtaHovered, setIsCtaHovered] = useState(false);
-  const [showComfortAccordion, setShowComfortAccordion] = useState(false);
-  const [showScheduleAccordion, setShowScheduleAccordion] = useState(false);
-  const [showTaxAccordion, setShowTaxAccordion] = useState(false);
-  const [showCategoryAccordion, setShowCategoryAccordion] = useState(false);
-  const [showCompareAccordion, setShowCompareAccordion] = useState(false);
-  const [showPaymentAccordion, setShowPaymentAccordion] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTaxModal, setShowTaxModal] = useState(false);
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [ticketCategory, setTicketCategory] = useState<'lost_item' | 'fare_dispute' | 'payment' | 'driver_behavior' | 'app_issue'>('lost_item');
@@ -519,8 +516,8 @@ export const RiderView: React.FC<RiderViewProps> = ({
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-68px)] w-full overflow-hidden bg-slate-50">
-      {/* Left Control Panel / Booking Sheet with Desktop Frosted Glass */}
-      <div className="w-full lg:w-[440px] xl:w-[480px] frosted-glass border-r border-white/60 flex flex-col h-full shadow-2xl z-20 overflow-y-auto">
+      {/* Floating Left Control Panel / Booking Sheet with Desktop Frosted Glass */}
+      <div className="w-full lg:w-[420px] xl:w-[450px] frosted-glass border-r lg:border border-white/60 flex flex-col h-full lg:h-[calc(100vh-92px)] lg:m-3 lg:rounded-3xl shadow-2xl z-20 overflow-hidden">
         {/* Top Destination Selector */}
         <div className="p-4 border-b border-slate-200/50 space-y-3 bg-white/50 backdrop-blur-md">
           <div className="flex items-center justify-between">
@@ -678,31 +675,10 @@ export const RiderView: React.FC<RiderViewProps> = ({
             />
           </div>
         ) : !activeRide ? (
-          <div className="p-5 space-y-5 flex-1">
-            {/* Step 1: Select Ride Category - Collapsible / Compact Strip */}
-            <div className="frosted-card rounded-2xl p-3.5 border border-white/60 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-bold">
-                    1
-                  </span>
-                  <span>{language === 'am' ? 'የመኪና ምርጫ' : 'Select Ride Category'}</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold text-emerald-600">100% Direct Payout</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowCategoryAccordion(!showCategoryAccordion)}
-                    className="text-[10px] text-brand-600 hover:text-brand-700 font-bold flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <span>{showCategoryAccordion ? (isAmharic ? 'አሳጥር' : 'Fold') : (isAmharic ? 'ዝርዝር' : 'Details')}</span>
-                    {showCategoryAccordion ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Horizontal 3-pill category selector */}
-              <div className="grid grid-cols-3 gap-1.5">
+          <div className="p-4 space-y-4 flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar">
+            <div className="space-y-3">
+              {/* Ride Class Options (Sleek Scannable Cards - Uber / Yango Style) */}
+              <div className="space-y-2">
                 {estimates
                   .filter((e) => !e.isAggregatedPartner)
                   .map((est) => {
@@ -711,620 +687,133 @@ export const RiderView: React.FC<RiderViewProps> = ({
                       <button
                         key={est.category}
                         type="button"
-                        onClick={() => setSelectedCategory(est.category)}
-                        className={`p-2.5 rounded-xl border-2 transition text-center flex flex-col items-center justify-between cursor-pointer ${
+                        onClick={() => {
+                          setSelectedCategory(est.category);
+                          const matchingOffer = marketplaceOffers.find(
+                            (o) => o.providerId === 'chebelew' && o.vehicleCategory === est.category
+                          );
+                          if (matchingOffer) setSelectedOfferId(matchingOffer.id);
+                        }}
+                        className={`w-full p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between text-left cursor-pointer group ${
                           isSelected
-                            ? 'border-brand-500 bg-brand-50/70 shadow-xs ring-1 ring-brand-500/30'
-                            : 'border-slate-200/80 hover:border-slate-300 bg-white/80'
+                            ? 'border-brand-500 bg-brand-50/70 shadow-sm ring-1 ring-brand-500/20'
+                            : 'border-slate-200/80 bg-white/80 hover:bg-white hover:border-slate-300'
                         }`}
                       >
-                        <Car className={`w-5 h-5 ${isSelected ? 'text-brand-600' : 'text-slate-500'}`} />
-                        <span className="text-[11px] font-bold text-slate-800 mt-1 line-clamp-1">
-                          {est.displayName.split(' ')[1] || est.displayName}
-                        </span>
-                        <span className="text-xs font-black text-slate-900 mt-0.5">
-                          {est.fare.totalFare.toFixed(0)} <span className="text-[9px] font-normal text-slate-500">ETB</span>
-                        </span>
-                        <span className="text-[9px] text-slate-500 flex items-center gap-0.5 mt-0.5">
-                          <Users className="w-2.5 h-2.5" /> {est.capacity} • ~{est.etaMinutes}m
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-xl flex items-center justify-center transition ${
+                              isSelected
+                                ? 'bg-brand-500 text-white shadow-xs'
+                                : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                            }`}
+                          >
+                            <Car className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-xs text-slate-900">
+                                {est.displayName}
+                              </span>
+                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                                0% Fee
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                              <span>⏱️ ~{est.etaMinutes}m away</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-0.5">
+                                <Users className="w-3 h-3" /> {est.capacity} seats
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-sm font-black text-slate-900 font-mono">
+                            {est.fare.totalFare.toFixed(0)}{' '}
+                            <span className="text-[10px] font-semibold text-slate-500">ETB</span>
+                          </div>
+                          <span className="text-[9px] text-slate-400 block font-medium">
+                            Fixed Upfront
+                          </span>
+                        </div>
                       </button>
                     );
                   })}
               </div>
 
-              {/* Collapsible Descriptions */}
-              {showCategoryAccordion && (
-                <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/60 space-y-1.5 text-xs animate-fade-in">
-                  {estimates
-                    .filter((e) => !e.isAggregatedPartner)
-                    .map((est) => (
-                      <div key={est.category} className="flex justify-between items-center text-[11px] text-slate-600">
-                        <strong className="text-slate-800">{est.displayName}:</strong>
-                        <span className="text-slate-500">{est.description}</span>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            {/* Step 2: Multi-Provider Comparison & 4-Mode Ranking (Collapsible Accordion) */}
-            <div className="frosted-card rounded-2xl border border-white/60 shadow-xs overflow-hidden">
-              {/* Hero Selected Provider Preview Card */}
-              {(() => {
-                const activeOffer = marketplaceOffers.find((o) => o.id === selectedOfferId) || marketplaceOffers[0];
-                const isChebelew = !activeOffer || activeOffer.providerId === 'chebelew';
-
-                return (
-                  <div className="p-3.5 bg-white/70 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-bold">
-                          2
-                        </span>
-                        <span>{language === 'am' ? 'የአቅራቢዎች ንፅፅር' : 'Compare Ride Options'}</span>
-                      </label>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setShowComfortModal(true)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg transition shadow-2xs"
-                          title="Customize Comfort Preferences"
-                        >
-                          <Sliders className="w-3 h-3 text-brand-600" />
-                          <span>{language === 'am' ? 'ምቾት' : 'Comfort'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowScheduleModal(true)}
-                          className="flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg transition shadow-2xs"
-                          title="Schedule Advance Trip"
-                        >
-                          <Plane className="w-3 h-3 text-emerald-600" />
-                          <span>{language === 'am' ? 'ቀጠሮ' : 'Schedule'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Active Selected Offer Pill */}
-                    {activeOffer && (
-                      <div className="p-2.5 rounded-xl border border-brand-500/30 bg-gradient-to-r from-brand-50/50 via-white to-brand-50/30 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs shadow-xs ${
-                            isChebelew ? 'bg-brand-500 text-white' : 'bg-slate-700 text-white'
-                          }`}>
-                            {isChebelew ? 'ቼ' : (activeOffer.providerName.charAt(0) || 'P')}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-xs text-slate-900">{activeOffer.providerName}</span>
-                              {isChebelew && (
-                                <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
-                                  0% FEE
-                                </span>
-                              )}
-                              {activeOffer.driverRating && (
-                                <span className="text-[10px] text-amber-600 font-semibold">
-                                  ★ {activeOffer.driverRating.toFixed(1)}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-500">
-                              ⏱️ ETA {activeOffer.estimatedPickupMinutes}m • {activeOffer.estimatedJourneyMinutes}m trip
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-sm font-black text-slate-900 font-mono">
-                            {activeOffer.estimatedFare.toFixed(0)} ETB
-                          </span>
-                          <span className="text-[9px] text-slate-400 block font-medium">
-                            {activeOffer.isConfirmedPrice ? 'Fixed Upfront' : 'Est. Meter'}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Accordion Toggle Bar */}
-                    <button
-                      type="button"
-                      onClick={() => setShowCompareAccordion(!showCompareAccordion)}
-                      className="w-full py-2 px-3 bg-slate-100/80 hover:bg-slate-200/80 rounded-xl flex items-center justify-between text-xs font-bold text-slate-700 transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <Sliders className="w-3.5 h-3.5 text-brand-600" />
-                        <span>
-                          {showCompareAccordion
-                            ? (isAmharic ? 'የአቅራቢዎች ንፅፅር አሳጥር' : 'Fold Comparison Options')
-                            : (isAmharic
-                                ? `ሁሉንም ${marketplaceOffers.length} አቅራቢዎች አወዳድር`
-                                : `Compare All ${marketplaceOffers.length} Provider Quotes & 4-Mode Ranking`)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-mono text-brand-700 font-bold">
-                          from {Math.min(...marketplaceOffers.map((o) => o.estimatedFare || 185))} ETB
-                        </span>
-                        {showCompareAccordion ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
-                        ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                        )}
-                      </div>
-                    </button>
-                  </div>
-                );
-              })()}
-
-              {/* Foldable Content: 4-Mode Ranking and Provider Offer Stream */}
-              {showCompareAccordion && (
-                <div className="p-3.5 pt-0 border-t border-slate-100 bg-white/40 space-y-2.5 animate-fade-in">
-                  {/* 4-Mode Filter Tabs */}
-                  <div className="grid grid-cols-4 gap-1 p-1 bg-slate-200/60 rounded-xl text-[10px] font-bold">
-                    {[
-                      { mode: 'best_value', label: isAmharic ? 'ምርጥ ዋጋ' : 'Best Value' },
-                      { mode: 'cheapest', label: isAmharic ? 'ቅናሽ' : 'Cheapest' },
-                      { mode: 'fastest_pickup', label: isAmharic ? 'ፈጣን' : 'Fastest' },
-                      { mode: 'premium_comfort', label: isAmharic ? 'ምቾት' : 'Comfort' },
-                    ].map((item) => (
-                      <button
-                        key={item.mode}
-                        type="button"
-                        onClick={() => setComparisonMode(item.mode as any)}
-                        className={`py-1 rounded-lg transition text-center cursor-pointer ${
-                          comparisonMode === item.mode
-                            ? 'bg-white text-brand-700 shadow-xs font-black'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* All Provider Offers Stream */}
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
-                    {marketplaceOffers.map((offer) => {
-                      const isSelected = selectedOfferId === offer.id;
-                      const isChebelew = offer.providerId === 'chebelew';
-
-                      return (
-                        <div
-                          key={offer.id}
-                          onClick={() => {
-                            if (offer.isAvailable) {
-                              setSelectedOfferId(offer.id);
-                              if (isChebelew) setSelectedCategory('sedan');
-                            }
-                          }}
-                          className={`p-2.5 rounded-xl border transition cursor-pointer relative ${
-                            !offer.isAvailable
-                              ? 'bg-slate-100/70 border-slate-200 opacity-60 cursor-not-allowed'
-                              : isSelected
-                              ? 'bg-brand-50/60 border-brand-500 shadow-xs ring-1 ring-brand-500/30'
-                              : 'bg-white border-slate-200/80 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
-                                <span>{offer.providerName}</span>
-                                {isChebelew && (
-                                  <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">
-                                    0% FEE
-                                  </span>
-                                )}
-                                {offer.driverRating && (
-                                  <span className="text-[10px] text-amber-600 font-semibold">
-                                    ★ {offer.driverRating.toFixed(1)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-slate-500">
-                                ⏱️ {offer.estimatedPickupMinutes}m away • 🏁 {offer.estimatedJourneyMinutes}m trip
-                              </div>
-                            </div>
-
-                            <div className="text-right">
-                              <span className="text-xs font-black text-slate-900 font-mono">
-                                {offer.estimatedFare.toFixed(0)} ETB
-                              </span>
-                              <span className="text-[8px] text-slate-400 block font-medium">
-                                {offer.isConfirmedPrice ? 'Fixed Price' : 'Est. Meter'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Step 3: Payment Method - Collapsible Accordion */}
-            <div className="frosted-card rounded-2xl border border-white/60 shadow-xs overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setShowPaymentAccordion(!showPaymentAccordion)}
-                className="w-full p-3.5 flex items-center justify-between bg-white/70 hover:bg-white/90 text-left transition cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-brand-500 text-white text-[10px] flex items-center justify-center font-bold">
-                    3
-                  </span>
-                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    {t.paymentMethod}:
-                  </span>
-                  <span className="text-xs font-bold text-brand-700">
+              {/* Quick Settings Bar - Sleek Single Horizontal Row */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+                {/* Payment Pill */}
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl font-bold text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
+                  title="Change Payment Method"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-brand-600" />
+                  <span className="max-w-[125px] truncate">
                     {paymentMethod === 'TELEBIRR'
-                      ? 'Telebirr Digital Wallet'
+                      ? 'Telebirr (1,058 Br)'
                       : paymentMethod === 'CASH'
-                      ? 'Cash Payment'
+                      ? 'Cash to Driver'
                       : paymentMethod === 'BANK_TRANSFER'
-                      ? 'CBE Birr / Bank'
-                      : 'Corporate Billing'}
+                      ? 'CBE Birr'
+                      : 'Corporate'}
                   </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    {passengerWalletBalance !== null ? `${passengerWalletBalance.toFixed(0)} Br` : 'Wallet'}
-                  </span>
-                  {showPaymentAccordion ? (
-                    <ChevronUp className="w-4 h-4 text-slate-500" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-500" />
-                  )}
-                </div>
-              </button>
-
-              {showPaymentAccordion && (
-                <div className="p-3.5 pt-0 border-t border-slate-100 bg-white/40 space-y-2 animate-fade-in text-xs">
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('TELEBIRR');
-                        setShowPaymentAccordion(false);
-                      }}
-                      className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
-                        paymentMethod === 'TELEBIRR'
-                          ? 'border-[#0070ba] bg-blue-50/70 text-[#0070ba] shadow-xs'
-                          : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
-                      }`}
-                    >
-                      <Smartphone className="w-4 h-4 text-[#0070ba]" />
-                      <span>{t.telebirr}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('CASH');
-                        setShowPaymentAccordion(false);
-                      }}
-                      className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
-                        paymentMethod === 'CASH'
-                          ? 'border-emerald-600 bg-emerald-50/70 text-emerald-700 shadow-xs'
-                          : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
-                      }`}
-                    >
-                      <DollarSign className="w-4 h-4 text-emerald-600" />
-                      <span>{t.cash}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('BANK_TRANSFER');
-                        setShowPaymentAccordion(false);
-                      }}
-                      className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
-                        paymentMethod === 'BANK_TRANSFER'
-                          ? 'border-purple-600 bg-purple-50/70 text-purple-700 shadow-xs'
-                          : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
-                      }`}
-                    >
-                      <CreditCard className="w-4 h-4 text-purple-600" />
-                      <span>CBE Birr / Bank</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMethod('CORPORATE_BILLING');
-                        setShowPaymentAccordion(false);
-                      }}
-                      className={`p-2.5 rounded-xl border-2 flex items-center justify-center gap-1.5 font-bold transition cursor-pointer ${
-                        paymentMethod === 'CORPORATE_BILLING'
-                          ? 'border-amber-600 bg-amber-50/70 text-amber-700 shadow-xs'
-                          : 'border-slate-200/80 bg-white/70 text-slate-600 hover:bg-white'
-                      }`}
-                    >
-                      <Building2 className="w-4 h-4 text-amber-600" />
-                      <span>Corporate Billing</span>
-                    </button>
-                  </div>
-
-                  {paymentMethod === 'CORPORATE_BILLING' && (
-                    <div className="p-2.5 bg-amber-50/90 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-center justify-between">
-                      <span>
-                        🏢 Billed to <strong>Ethiopian Airlines Commercial Fleet</strong>
-                      </span>
-                      <span className="font-mono font-bold text-amber-700">Allowance: 12,500 ETB</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Collapsible Accordions - Fold Secondary Details */}
-            <div className="space-y-2 pt-2 border-t border-slate-200/60">
-              {/* Accordion 1: Airport Flights & Scheduled Transit */}
-              <div className="frosted-card rounded-xl border border-slate-200/80 overflow-hidden transition">
-                <button
-                  type="button"
-                  onClick={() => setShowScheduleAccordion((prev) => !prev)}
-                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white/60 hover:bg-white/90 text-left transition"
-                >
-                  <div className="flex items-center gap-2">
-                    <Plane className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold text-slate-800">
-                      {isAmharic ? 'የቦሌ አየር ማረፊያ ቀጠሮ እና በረራ' : 'Airport Flight Tracking & Schedule'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {flightNumber ? (
-                      <span className="text-[10px] font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        Flight {flightNumber}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-medium text-slate-400">Optional</span>
-                    )}
-                    {showScheduleAccordion ? (
-                      <ChevronUp className="w-4 h-4 text-slate-500" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                    )}
-                  </div>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
                 </button>
 
-                {showScheduleAccordion && (
-                  <div className="p-3.5 bg-white/40 border-t border-slate-100 space-y-3 animate-fade-in text-xs">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Flight Number
-                        </label>
-                        <input
-                          type="text"
-                          value={flightNumber}
-                          onChange={(e) => setFlightNumber(e.target.value.toUpperCase())}
-                          placeholder="e.g. ET-302"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-mono text-xs focus:ring-1 focus:ring-brand-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Terminal
-                        </label>
-                        <select
-                          value={airportTerminal}
-                          onChange={(e) => setAirportTerminal(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs focus:ring-1 focus:ring-brand-500 outline-none"
-                        >
-                          <option value="Terminal 2 International">Terminal 2 (Intl)</option>
-                          <option value="Terminal 1 Domestic">Terminal 1 (Dom)</option>
-                          <option value="VIP Presidential Terminal">VIP Terminal</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Date
-                        </label>
-                        <input
-                          type="date"
-                          value={scheduledDate}
-                          onChange={(e) => setScheduledDate(e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                          Time
-                        </label>
-                        <input
-                          type="time"
-                          value={scheduledTime}
-                          onChange={(e) => setScheduledTime(e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs outline-none"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[10px] text-slate-500">
-                        Autonomous flight status tracker active
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleCreateScheduledRide(e as any)}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-xs"
-                      >
-                        Save Schedule
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Accordion 2: Ride Comfort & Accessibility */}
-              <div className="frosted-card rounded-xl border border-slate-200/80 overflow-hidden transition">
+                {/* Compare Multi-Provider Quotes Pill */}
                 <button
                   type="button"
-                  onClick={() => setShowComfortAccordion((prev) => !prev)}
-                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white/60 hover:bg-white/90 text-left transition"
+                  onClick={() => setShowCompareModal(true)}
+                  className="px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 border border-brand-200/80 rounded-xl font-bold text-brand-800 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
+                  title="Compare all authorized taxi network quotes"
                 >
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-brand-600" />
-                    <span className="text-xs font-bold text-slate-800">
-                      {isAmharic ? 'የምቾት እና ተደራሽነት ምርጫዎች' : 'Ride Comfort & Accessibility'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {comfortPreferences.acRequired ||
-                    comfortPreferences.quietRide ||
-                    comfortPreferences.extraLuggage ||
-                    comfortPreferences.femaleDriverPreference ? (
-                      <span className="text-[10px] font-bold text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200">
-                        Customized
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-medium text-slate-400">Standard</span>
-                    )}
-                    {showComfortAccordion ? (
-                      <ChevronUp className="w-4 h-4 text-slate-500" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                    )}
-                  </div>
+                  <Sliders className="w-3.5 h-3.5 text-brand-600" />
+                  <span>Compare ({marketplaceOffers.length || 5})</span>
                 </button>
 
-                {showComfortAccordion && (
-                  <div className="p-3.5 bg-white/40 border-t border-slate-100 space-y-2.5 animate-fade-in text-xs">
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setComfortPreferences((prev) => ({ ...prev, acRequired: !prev.acRequired }))
-                        }
-                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
-                          comfortPreferences.acRequired
-                            ? 'bg-blue-50 border-blue-300 text-blue-900 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        <Wind className="w-3.5 h-3.5 text-blue-500" />
-                        <span className="text-[11px]">Air Conditioning</span>
-                      </button>
+                {/* Comfort Preferences Pill */}
+                <button
+                  type="button"
+                  onClick={() => setShowComfortModal(true)}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl font-bold text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
+                  title="Ride Options & Comfort Preferences"
+                >
+                  <Wind className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Options</span>
+                </button>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setComfortPreferences((prev) => ({ ...prev, quietRide: !prev.quietRide }))
-                        }
-                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
-                          comfortPreferences.quietRide
-                            ? 'bg-purple-50 border-purple-300 text-purple-900 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        <VolumeX className="w-3.5 h-3.5 text-purple-500" />
-                        <span className="text-[11px]">Quiet Ride</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setComfortPreferences((prev) => ({
-                            ...prev,
-                            extraLuggage: !prev.extraLuggage,
-                          }))
-                        }
-                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
-                          comfortPreferences.extraLuggage
-                            ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        <Luggage className="w-3.5 h-3.5 text-amber-500" />
-                        <span className="text-[11px]">Extra Luggage</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setComfortPreferences((prev) => ({
-                            ...prev,
-                            femaleDriverPreference: !prev.femaleDriverPreference,
-                          }))
-                        }
-                        className={`p-2 rounded-lg border flex items-center gap-2 transition ${
-                          comfortPreferences.femaleDriverPreference
-                            ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600'
-                        }`}
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
-                        <span className="text-[11px]">Female Driver</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                {/* Schedule Advance Trip Pill */}
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleModal(true)}
+                  className="px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl font-bold text-slate-700 flex items-center gap-1.5 transition shadow-2xs cursor-pointer flex-shrink-0"
+                  title="Schedule Advance Trip & Flight Tracking"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Schedule</span>
+                </button>
               </div>
-
-              {/* Accordion 3: Tax Regulation & Zero Commission Policy */}
-              {selectedEstimate && (
-                <div className="frosted-card rounded-xl border border-slate-200/80 overflow-hidden transition">
-                  <button
-                    type="button"
-                    onClick={() => setShowTaxAccordion((prev) => !prev)}
-                    className="w-full px-3.5 py-2.5 flex items-center justify-between bg-white/60 hover:bg-white/90 text-left transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Info className="w-4 h-4 text-blue-600" />
-                      <span className="text-xs font-bold text-slate-800">
-                        {isAmharic ? 'የግብር ሕግ እና የ0% ኮሚሽን ማረጋገጫ' : 'Tax Law (Reg 570/2025) & 0% Guarantee'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        15% VAT Included
-                      </span>
-                      {showTaxAccordion ? (
-                        <ChevronUp className="w-4 h-4 text-slate-500" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4 text-slate-500" />
-                      )}
-                    </div>
-                  </button>
-
-                  {showTaxAccordion && (
-                    <div className="p-3.5 bg-blue-50/40 border-t border-blue-100 space-y-2 animate-fade-in text-[11px] text-blue-900">
-                      <p className="leading-relaxed">
-                        Chebelew operates under FDRE Council of Ministers Regulation No. 570/2025.
-                        Independent Chebelew drivers keep <strong>100% of their net fares</strong> with 0%
-                        platform commission deducted.
-                      </p>
-                      <div className="flex justify-between pt-1 border-t border-blue-200/60 font-mono text-[11px]">
-                        <span>Base Fare Subtotal: {selectedEstimate.fare.subtotal.toFixed(2)} ETB</span>
-                        <span className="font-bold text-emerald-700">
-                          +15% VAT: {selectedEstimate.fare.vatAmount.toFixed(2)} ETB
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Step 4: Primary Confirmation CTA Button with Delight Factor */}
-            <div className="pt-2">
+            {/* Bottom Booking CTA & Micro-Trust Bar */}
+            <div className="pt-2 space-y-2 border-t border-slate-200/60">
               <button
                 type="button"
                 onClick={handleRequestRide}
                 disabled={isCalculating}
                 onMouseEnter={() => setIsCtaHovered(true)}
                 onMouseLeave={() => setIsCtaHovered(false)}
-                className="w-full relative group overflow-hidden bg-gradient-to-r from-brand-600 via-brand-500 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 active:scale-[0.99] text-white font-extrabold py-4 px-5 rounded-2xl text-sm flex items-center justify-center gap-3 shadow-xl shadow-brand-500/25 transition-all duration-300 disabled:opacity-60 cursor-pointer"
+                className="w-full relative group overflow-hidden bg-gradient-to-r from-brand-600 via-brand-500 to-emerald-600 hover:from-brand-500 hover:to-emerald-500 active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-2xl text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-brand-500/25 transition-all duration-300 disabled:opacity-60 cursor-pointer"
               >
                 {/* Glowing shimmer reflection */}
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out pointer-events-none" />
 
-                {/* Looping flying paper plane animation */}
+                {/* Flying paper plane animation */}
                 <div className={`transition-all duration-300 ${isCtaHovered ? 'animate-plane-fly' : ''}`}>
                   <Send className="w-4 h-4 fill-white text-white" />
                 </div>
@@ -1333,9 +822,30 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 <span className="tracking-tight transition-all duration-200 font-black text-sm">
                   {isCtaHovered
                     ? (isAmharic ? 'እንሂድ! 🚀' : "Let's Roll! 🚀")
-                    : (isAmharic ? 'ታክሲ አሁን እዘዝ • 100% ቀጥታ' : `${t.bookNow} • 100% Direct Payout`)}
+                    : (isAmharic
+                        ? `${selectedEstimate?.displayName || 'ታክሲ'} እዘዝ • ${selectedEstimate?.fare.totalFare.toFixed(0) || 192} ETB`
+                        : `Request ${selectedEstimate?.displayName || 'Chebelew'} • ${selectedEstimate?.fare.totalFare.toFixed(0) || 192} ETB`)}
                 </span>
               </button>
+
+              {/* Ultra-Clean Micro-Trust Line */}
+              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 font-medium">
+                <span className="flex items-center gap-1 text-emerald-600 font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  0% Commission
+                </span>
+                <span>•</span>
+                <span>100% to Driver</span>
+                <span>•</span>
+                <button
+                  type="button"
+                  onClick={() => setShowTaxModal(true)}
+                  className="text-brand-600 hover:text-brand-700 underline font-semibold flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>VAT 570/2025</span>
+                  <Info className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -2170,6 +1680,323 @@ export const RiderView: React.FC<RiderViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Intelligent Multi-Provider Quotes Comparison Modal */}
+      {showCompareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 shadow-2xl border border-slate-200/80 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">
+                    {isAmharic ? 'የአቅራቢዎች ንፅፅር' : 'Compare Taxi Network Quotes'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {isAmharic ? '4-ደረጃ ስልታዊ ንፅፅር እና ፈቃድ ያላቸው ታክሲዎች' : '4-Mode algorithmic ranking across authorized networks'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCompareModal(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 4-Mode Filter Tabs */}
+            <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+              {[
+                { mode: 'best_value', label: isAmharic ? 'ምርጥ ዋጋ' : 'Best Value' },
+                { mode: 'cheapest', label: isAmharic ? 'ቅናሽ' : 'Cheapest' },
+                { mode: 'fastest_pickup', label: isAmharic ? 'ፈጣን' : 'Fastest' },
+                { mode: 'premium_comfort', label: isAmharic ? 'ምቾት' : 'Comfort' },
+              ].map((item) => (
+                <button
+                  key={item.mode}
+                  type="button"
+                  onClick={() => setComparisonMode(item.mode as any)}
+                  className={`py-1.5 rounded-lg transition text-center cursor-pointer ${
+                    comparisonMode === item.mode
+                      ? 'bg-white text-brand-700 shadow-xs font-black'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Provider List */}
+            <div className="space-y-2">
+              {marketplaceOffers.map((offer) => {
+                const isSelected = selectedOfferId === offer.id;
+                const isChebelew = offer.providerId === 'chebelew';
+
+                return (
+                  <div
+                    key={offer.id}
+                    onClick={() => {
+                      if (offer.isAvailable) {
+                        setSelectedOfferId(offer.id);
+                        if (isChebelew) setSelectedCategory('sedan');
+                        setShowCompareModal(false);
+                      }
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between ${
+                      !offer.isAvailable
+                        ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                        : isSelected
+                        ? 'bg-brand-50/70 border-brand-500 shadow-sm ring-1 ring-brand-500/20'
+                        : 'bg-white border-slate-200/80 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-xs ${
+                          isChebelew ? 'bg-brand-500 text-white' : 'bg-slate-700 text-white'
+                        }`}
+                      >
+                        {isChebelew ? 'ቼ' : (offer.providerName.charAt(0) || 'P')}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-xs text-slate-900">
+                            {offer.providerName}
+                          </span>
+                          {isChebelew && (
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                              0% FEE
+                            </span>
+                          )}
+                          {offer.driverRating && (
+                            <span className="text-[11px] text-amber-600 font-bold">
+                              ★ {offer.driverRating.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                          <span>⏱️ ~{offer.estimatedPickupMinutes}m pickup</span>
+                          <span>•</span>
+                          <span>🏁 {offer.estimatedJourneyMinutes}m trip</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-sm font-black text-slate-900 font-mono">
+                        {offer.estimatedFare.toFixed(0)}{' '}
+                        <span className="text-[10px] font-semibold text-slate-500">ETB</span>
+                      </div>
+                      <span className="text-[9px] text-slate-400 block font-medium">
+                        {offer.isConfirmedPrice ? 'Fixed Price' : 'Estimated Meter'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCompareModal(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Rail Selector Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">{t.paymentMethod}</h3>
+                  <p className="text-[11px] text-slate-500">100% Direct driver payout rails</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMethod('TELEBIRR');
+                  setShowPaymentModal(false);
+                }}
+                className={`w-full p-3.5 rounded-2xl border-2 flex items-center justify-between text-left transition cursor-pointer ${
+                  paymentMethod === 'TELEBIRR'
+                    ? 'border-[#0070ba] bg-blue-50/70 shadow-xs'
+                    : 'border-slate-200/80 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-[#0070ba] flex items-center justify-center">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-xs text-slate-900 block">{t.telebirr}</span>
+                    <span className="text-[11px] text-slate-500">Official Ethio Telecom Gateway</span>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  {passengerWalletBalance !== null ? `${passengerWalletBalance.toFixed(0)} Br` : 'Active'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMethod('CASH');
+                  setShowPaymentModal(false);
+                }}
+                className={`w-full p-3.5 rounded-2xl border-2 flex items-center justify-between text-left transition cursor-pointer ${
+                  paymentMethod === 'CASH'
+                    ? 'border-emerald-600 bg-emerald-50/70 shadow-xs'
+                    : 'border-slate-200/80 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-xs text-slate-900 block">{t.cash}</span>
+                    <span className="text-[11px] text-slate-500">Direct physical payment to driver</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-slate-500">0% Comm.</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMethod('BANK_TRANSFER');
+                  setShowPaymentModal(false);
+                }}
+                className={`w-full p-3.5 rounded-2xl border-2 flex items-center justify-between text-left transition cursor-pointer ${
+                  paymentMethod === 'BANK_TRANSFER'
+                    ? 'border-purple-600 bg-purple-50/70 shadow-xs'
+                    : 'border-slate-200/80 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-xs text-slate-900 block">CBE Birr / Bank</span>
+                    <span className="text-[11px] text-slate-500">Direct account-to-account transfer</span>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPaymentMethod('CORPORATE_BILLING');
+                  setShowPaymentModal(false);
+                }}
+                className={`w-full p-3.5 rounded-2xl border-2 flex items-center justify-between text-left transition cursor-pointer ${
+                  paymentMethod === 'CORPORATE_BILLING'
+                    ? 'border-amber-600 bg-amber-50/70 shadow-xs'
+                    : 'border-slate-200/80 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-xs text-slate-900 block">Corporate Fleet</span>
+                    <span className="text-[11px] text-slate-500">Ethiopian Airlines Fleet Account</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FDRE Regulation 570/2025 Tax & 0% Commission Policy Modal */}
+      {showTaxModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Tax Law & 0% Guarantee</h3>
+                  <p className="text-[11px] text-slate-500">FDRE Reg. No. 570/2025 Compliant</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTaxModal(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900">
+                <span className="font-bold block mb-1">🛡️ 0% Platform Commission Guarantee</span>
+                <p className="text-[11px]">
+                  Chebelew charges 0% commission on independent rides. 100% of the net fare goes directly to the driver via verified Ethiopian payment rails.
+                </p>
+              </div>
+
+              {selectedEstimate && (
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5 font-mono text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Base Fare Subtotal:</span>
+                    <span className="font-bold text-slate-800">{selectedEstimate.fare.subtotal.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">+ 15% VAT (Reg 570/2025):</span>
+                    <span className="font-bold text-emerald-700">{selectedEstimate.fare.vatAmount.toFixed(2)} ETB</span>
+                  </div>
+                  <div className="flex justify-between pt-1 border-t border-slate-200 text-xs font-black text-slate-900">
+                    <span>Total Upfront Price:</span>
+                    <span>{selectedEstimate.fare.totalFare.toFixed(2)} ETB</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowTaxModal(false)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition"
+            >
+              Understood
+            </button>
           </div>
         </div>
       )}
