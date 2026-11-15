@@ -517,7 +517,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const isAmharic = language === 'am';
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-slate-100">
+    <div className="relative h-[calc(100vh-68px)] w-full overflow-hidden bg-slate-100">
       {/* 100% Edge-to-Edge Full-Screen Interactive Addis Ababa Map (Visible on Both Screens) */}
       <div className="absolute inset-0 z-0 w-full h-full">
         <AddisMap

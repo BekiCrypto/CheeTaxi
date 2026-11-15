@@ -177,7 +177,9 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 font-sans antialiased text-slate-900 relative selection:bg-brand-500 selection:text-white">
+    <div className={`w-full flex flex-col bg-slate-100 font-sans antialiased text-slate-900 relative selection:bg-brand-500 selection:text-white ${
+      currentModule === 'website' ? 'min-h-screen' : 'h-screen overflow-hidden'
+    }`}>
       {/* Subtle ambient light mesh gradient seeping through frosted glass */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-75">
         <div className="absolute -top-32 -left-32 w-[550px] h-[550px] bg-emerald-500/15 rounded-full blur-[110px]" />
@@ -196,7 +198,13 @@ export function App() {
         />
       )}
 
-      <main className="flex-1 overflow-hidden relative z-10">
+      <main className={`flex-1 relative z-10 ${
+        currentModule === 'website'
+          ? 'min-h-screen'
+          : isStandaloneMobile
+          ? 'h-screen w-full min-h-0 overflow-hidden'
+          : 'h-[calc(100vh-68px)] w-full min-h-0 overflow-hidden'
+      }`}>
         <Suspense fallback={<ModuleLoadingFallback label={currentModule.toUpperCase()} />}>
           {currentModule === 'track' && (
             <PublicTripTracker rideId={subPath || ''} />

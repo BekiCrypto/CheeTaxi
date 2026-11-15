@@ -32,7 +32,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
           </span>
           <span className="text-slate-400">Rider Client</span>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
           <RiderView
             currentRiderId={currentRiderId}
             currentRiderName={currentRiderName}
@@ -52,7 +52,7 @@ export const SplitView: React.FC<SplitViewProps> = ({
           </span>
           <span className="text-slate-400">Driver Console</span>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
           <DriverView
             currentDriverId={currentDriverId}
             language={language}
