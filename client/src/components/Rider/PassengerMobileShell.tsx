@@ -4,7 +4,8 @@ import {
   MapPin, Plus, Trash2, CheckCircle2, ChevronRight, Phone,
   Receipt, ArrowUpRight, AlertTriangle, Star, RefreshCw,
   Search, Sliders, Share2, X, Send, Navigation, ArrowUpDown,
-  Sparkles, CreditCard, ChevronDown, Check, ShieldCheck
+  Sparkles, CreditCard, ChevronDown, ChevronUp, Check, ShieldCheck,
+  ChevronLeft, Info, HelpCircle
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Language, translations } from '../../i18n/translations';
@@ -84,6 +85,12 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
   const [selectedOfferId, setSelectedOfferId] = useState<string>('chebelew_direct');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TELEBIRR');
   const [isLoadingOffers, setIsLoadingOffers] = useState(false);
+
+  // Collapsible Accordions for Clean Yango-style Map-Dominant UI
+  const [showAllOffers, setShowAllOffers] = useState(false);
+  const [showPickupNotes, setShowPickupNotes] = useState(false);
+  const [showPaymentRails, setShowPaymentRails] = useState(false);
+  const [showCategoryDetails, setShowCategoryDetails] = useState(false);
 
   // Live Ride Tracking
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
@@ -480,10 +487,14 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
               )}
             </div>
 
-            {/* UBER-LEVEL FLOATING MOBILE BOTTOM SHEET */}
+            {/* UBER/YANGO-LEVEL FLOATING MOBILE BOTTOM SHEET */}
             <div
               className={`absolute bottom-0 left-0 right-0 z-[1000] mobile-bottom-sheet rounded-t-[32px] transition-all duration-300 ease-out flex flex-col ${
-                isSheetExpanded ? 'max-h-[85vh]' : 'max-h-[60vh]'
+                isSheetExpanded
+                  ? 'max-h-[88vh]'
+                  : sheetState === 'EXPLORE'
+                  ? 'max-h-[38vh]'
+                  : 'max-h-[62vh]'
               } pb-20`}
             >
               {/* Drag Handle Bar */}
@@ -494,237 +505,375 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                 <div className="w-12 h-1.5 rounded-full bg-slate-600/70 hover:bg-slate-500 transition" />
               </div>
 
-              <div className="px-5 overflow-y-auto space-y-4">
+              <div className="px-5 overflow-y-auto space-y-3">
                 {/* -------------------------------------------------------------
-                    SHEET STAGE 1: EXPLORE & QUICK DESTINATION DISCOVERY
+                    SHEET STAGE 1: EXPLORE & QUICK DESTINATION DISCOVERY (YANGO STYLE)
                     ------------------------------------------------------------- */}
                 {sheetState === 'EXPLORE' && (
-                  <div className="space-y-4 pt-1">
-                    {/* Big "Where to?" Search Bar */}
+                  <div className="space-y-3 pt-1">
+                    {/* Line 1: Minimalist "Where to?" Search Bar */}
                     <div
                       onClick={() => setIsSearchingDest(true)}
-                      className="bg-slate-800/90 hover:bg-slate-800 border border-slate-700 rounded-2xl p-3.5 flex items-center justify-between cursor-pointer shadow-lg active-press"
+                      className="bg-slate-800/90 hover:bg-slate-800 border border-slate-700/80 rounded-2xl p-3 flex items-center justify-between cursor-pointer shadow-lg active-press transition"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
                           <Search className="w-4 h-4" />
                         </div>
                         <div>
-                          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                             {isAm ? 'የት መሄድ ይፈልጋሉ?' : 'Where to?'}
                           </p>
-                          <h3 className="text-sm font-bold text-white line-clamp-1">
-                            {destination.address || 'Select Addis Ababa destination...'}
+                          <h3 className="text-xs font-bold text-white line-clamp-1">
+                            {destination.address || (isAm ? 'መዳረሻ ይምረጡ...' : 'Select destination in Addis Ababa...')}
                           </h3>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
-                    </div>
-
-                    {/* Popular Addis Hubs Horizontal Carousel */}
-                    <div className="space-y-1.5">
-                      <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                        {isAm ? 'ተወዳጅ መዳረሻዎች' : 'Popular Addis Hubs'}
-                      </p>
-                      <div className="flex gap-2 overflow-x-auto pb-1.5 no-scrollbar">
-                        {POPULAR_HUBS.map((hub) => (
-                          <button
-                            key={hub.label}
-                            onClick={() => {
-                              setDestination({
-                                address: hub.name,
-                                lat: hub.lat,
-                                lng: hub.lng,
-                              });
-                              setSheetState('OFFERS');
-                            }}
-                            className="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 rounded-xl text-xs font-bold text-slate-200 shrink-0 flex items-center gap-1.5 shadow-sm active-press"
-                          >
-                            <span>{hub.label}</span>
-                          </button>
-                        ))}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] bg-slate-900/90 text-amber-400 px-2 py-0.5 rounded-lg border border-slate-700 font-bold">
+                          {isAm ? 'አሁን' : 'Now'}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400" />
                       </div>
                     </div>
 
-                    {/* Ride Service Tier Cards */}
+                    {/* Line 2: Horizontal Quick Hub Chips (Zero scrollbar, one-tap) */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+                      {POPULAR_HUBS.map((hub) => (
+                        <button
+                          key={hub.label}
+                          onClick={() => {
+                            setDestination({
+                              address: hub.name,
+                              lat: hub.lat,
+                              lng: hub.lng,
+                            });
+                            setSheetState('OFFERS');
+                          }}
+                          className="px-3 py-1.5 bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700/60 rounded-xl text-[11px] font-bold text-slate-200 shrink-0 flex items-center gap-1.5 shadow-sm active-press transition"
+                        >
+                          <span>{hub.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Line 3: Compact Horizontal Vehicle Class Selector */}
                     <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
-                          {isAm ? 'የአገልግሎት አይነት' : 'Ride Options'}
-                        </p>
-                        <span className="text-[10px] text-emerald-400 font-bold">100% Fare to Driver</span>
+                      <div className="flex items-center justify-between px-0.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {isAm ? 'የአገልግሎት ደረጃ' : 'Ride Class'}
+                        </span>
+                        <button
+                          onClick={() => setShowCategoryDetails(!showCategoryDetails)}
+                          className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5 hover:underline"
+                        >
+                          <span>{showCategoryDetails ? (isAm ? 'አሳጥር' : 'Fold') : (isAm ? 'ዝርዝር' : 'Details')}</span>
+                          <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${showCategoryDetails ? 'rotate-180' : ''}`} />
+                        </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {VEHICLE_CATEGORIES.map((cat) => (
-                          <div
-                            key={cat.id}
-                            onClick={() => {
-                              setSelectedCategory(cat.id);
-                              setSheetState('OFFERS');
-                            }}
-                            className={`p-3 rounded-2xl border transition cursor-pointer active-press flex flex-col justify-between ${
-                              selectedCategory === cat.id
-                                ? 'bg-amber-500/15 border-amber-500 shadow-md'
-                                : 'bg-slate-800/50 border-slate-700/60 hover:bg-slate-800'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-2xl">{cat.icon}</span>
-                              <span className="text-xs font-black text-amber-400 font-mono">
-                                from {cat.fare} Br
-                              </span>
-                            </div>
-                            <div className="mt-2">
-                              <h4 className="text-xs font-bold text-white">{cat.label}</h4>
-                              <p className="text-[10px] text-slate-400 line-clamp-1">{cat.sub}</p>
-                            </div>
+                      {/* Sleek horizontal 4-pill tier strip */}
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {VEHICLE_CATEGORIES.map((cat) => {
+                          const isSelected = selectedCategory === cat.id;
+                          return (
+                            <button
+                              key={cat.id}
+                              onClick={() => {
+                                setSelectedCategory(cat.id);
+                                setSheetState('OFFERS');
+                              }}
+                              className={`p-2 rounded-xl border transition text-center active-press flex flex-col items-center justify-center ${
+                                isSelected
+                                  ? 'bg-amber-500/20 border-amber-500 shadow ring-1 ring-amber-500/40 text-white'
+                                  : 'bg-slate-800/50 border-slate-700/60 hover:bg-slate-800 text-slate-300'
+                              }`}
+                            >
+                              <span className="text-lg leading-none">{cat.icon}</span>
+                              <span className="text-[10px] font-bold mt-1 line-clamp-1">{cat.label.split(' ')[0]}</span>
+                              <span className="text-[9px] font-black text-amber-400 font-mono mt-0.5">{cat.fare} Br</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Foldable details if user clicks "Details" */}
+                      {showCategoryDetails && (
+                        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 space-y-1.5 animate-slide-up text-xs">
+                          <div className="flex justify-between items-center text-[10px] text-emerald-400 font-bold">
+                            <span>🛡️ 100% Fare to Driver</span>
+                            <span>0% Chebelew Platform Surcharge</span>
                           </div>
-                        ))}
-                      </div>
+                          <div className="grid grid-cols-2 gap-1.5 text-[10px] text-slate-300">
+                            <div>🚗 Economy: Corolla, Dzire (Daily travel)</div>
+                            <div>🚙 Comfort VIP: Guaranteed A/C & leather interior</div>
+                            <div>🚐 Minivan: 7 passengers with luggage room</div>
+                            <div>📦 Fast Courier: Express document & parcel</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* -------------------------------------------------------------
-                    SHEET STAGE 2: MULTI-PROVIDER COMPARISON & BOOKING
+                    SHEET STAGE 2: MULTI-PROVIDER COMPARISON & BOOKING (YANGO COLLAPSIBLE)
                     ------------------------------------------------------------- */}
                 {sheetState === 'OFFERS' && (
-                  <div className="space-y-3.5 pt-1">
-                    {/* Back to Explore & Route Summary */}
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="space-y-2.5 pt-1">
+                    {/* Sleek Route Header Bar */}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-800/80">
                       <button
                         onClick={() => setSheetState('EXPLORE')}
                         className="text-xs text-slate-400 hover:text-white font-bold flex items-center gap-1 active-press"
                       >
-                        ← Back to Search
+                        <ChevronLeft className="w-3.5 h-3.5" /> {isAm ? 'ቀይር' : 'Change'}
                       </button>
-                      <span className="text-xs font-black text-amber-400">
-                        {isAm ? 'የዋጋ ንፅፅር' : 'Upfront Comparison'}
+
+                      {/* Route Micro-summary */}
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-slate-300 max-w-[200px] truncate">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                        <span className="truncate">{pickup.address.split(',')[0]}</span>
+                        <span className="text-slate-500">➔</span>
+                        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                        <span className="truncate text-white">{destination.address.split(',')[0]}</span>
+                      </div>
+
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                        0% FEE
                       </span>
                     </div>
 
-                    {/* Pickup & Destination Summary Bar */}
-                    <div className="bg-slate-800/60 rounded-2xl p-3 border border-slate-700/70 space-y-2 text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
-                        <span className="text-slate-300 line-clamp-1">{pickup.address}</span>
-                      </div>
-                      <div className="ml-1 w-0.5 h-2 bg-slate-600" />
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-                        <span className="text-white font-bold line-clamp-1">{destination.address}</span>
-                      </div>
-                    </div>
+                    {/* Hero Offer Card (Selected Active Offer) */}
+                    {(() => {
+                      const activeOffer = marketplaceOffers.find((o) => o.id === selectedOfferId) || marketplaceOffers[0];
+                      const isChebelew = !activeOffer || activeOffer.providerId === 'chebelew';
 
-                    {/* 4-Mode Comparison Filter Tabs */}
-                    <div className="grid grid-cols-4 gap-1 p-1 bg-slate-900 rounded-xl text-[10px] font-bold">
-                      {[
-                        { mode: 'best_value', label: 'Best Value' },
-                        { mode: 'cheapest', label: 'Cheapest' },
-                        { mode: 'fastest_pickup', label: 'Fastest' },
-                        { mode: 'premium_comfort', label: 'Comfort' },
-                      ].map((item) => (
-                        <button
-                          key={item.mode}
-                          onClick={() => setComparisonMode(item.mode as any)}
-                          className={`py-1.5 rounded-lg transition text-center active-press ${
-                            comparisonMode === item.mode
-                              ? 'bg-amber-500 text-slate-950 font-black shadow'
-                              : 'text-slate-400 hover:text-white'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Offer Cards Stream */}
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-0.5">
-                      {marketplaceOffers.map((offer) => {
-                        const isSelected = selectedOfferId === offer.id;
-                        const isChebelew = offer.providerId === 'chebelew';
-
-                        return (
-                          <div
-                            key={offer.id}
-                            onClick={() => setSelectedOfferId(offer.id)}
-                            className={`p-3 rounded-2xl border transition cursor-pointer active-press flex items-center justify-between ${
-                              isSelected
-                                ? 'bg-amber-500/15 border-amber-500 shadow-md ring-1 ring-amber-500/50'
-                                : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shadow ${
-                                  isChebelew
-                                    ? 'bg-amber-500 text-slate-950 font-black'
-                                    : 'bg-slate-700 text-white'
-                                }`}
-                              >
-                                {isChebelew ? 'ቼ' : offer.providerName.charAt(0)}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <h4 className="text-xs font-black text-white">{offer.providerName}</h4>
-                                  {isChebelew && (
-                                    <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-md">
-                                      0% FEE
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-[11px] text-slate-400">
-                                  {offer.estimatedPickupMinutes || 3} min away • {offer.vehicleCategory}
-                                </p>
-                              </div>
+                      return (
+                        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-amber-500/40 rounded-2xl p-3 shadow-lg flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-base shadow ${
+                              isChebelew ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-white'
+                            }`}>
+                              {isChebelew ? 'ቼ' : (activeOffer?.providerName?.charAt(0) || 'C')}
                             </div>
-
-                            <div className="text-right">
-                              <span className="text-sm font-black text-amber-400 font-mono">
-                                {offer.estimatedFare} ETB
-                              </span>
-                              <p className="text-[10px] text-slate-500 font-mono">Guaranteed</p>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="text-xs font-black text-white">
+                                  {activeOffer?.providerName || 'Chebelew Direct Driver'}
+                                </h4>
+                                <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded">
+                                  {isChebelew ? '0% FEE' : 'STANDARD'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                {activeOffer?.estimatedPickupMinutes || 3} min away • {selectedCategory.toUpperCase()}
+                              </p>
                             </div>
                           </div>
-                        );
-                      })}
+
+                          <div className="text-right">
+                            <div className="text-base font-black text-amber-400 font-mono">
+                              {activeOffer?.estimatedFare || 220} <span className="text-xs">ETB</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 font-mono">Guaranteed Fare</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* COLLAPSIBLE ACCORDION 1: Compare Other Providers & Modes */}
+                    <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 overflow-hidden">
+                      <button
+                        onClick={() => setShowAllOffers(!showAllOffers)}
+                        className="w-full p-2.5 flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white transition active-press"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{isAm ? 'አማራጮችን አወዳድር' : 'Compare Other Providers & Modes'}</span>
+                          <span className="text-[10px] text-amber-400 font-mono font-bold">
+                            ({marketplaceOffers.length} offers)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-slate-400">
+                            {showAllOffers ? (isAm ? 'ዝጋ' : 'Fold') : (isAm ? 'ክፈት' : 'Expand')}
+                          </span>
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${showAllOffers ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+
+                      {showAllOffers && (
+                        <div className="p-2.5 pt-0 border-t border-slate-800/60 space-y-2 animate-slide-up">
+                          {/* 4-Mode Filter Tabs */}
+                          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-xl text-[10px] font-bold">
+                            {[
+                              { mode: 'best_value', label: 'Best Value' },
+                              { mode: 'cheapest', label: 'Cheapest' },
+                              { mode: 'fastest_pickup', label: 'Fastest' },
+                              { mode: 'premium_comfort', label: 'Comfort' },
+                            ].map((item) => (
+                              <button
+                                key={item.mode}
+                                onClick={() => setComparisonMode(item.mode as any)}
+                                className={`py-1 rounded-lg transition text-center active-press ${
+                                  comparisonMode === item.mode
+                                    ? 'bg-amber-500 text-slate-950 font-black shadow'
+                                    : 'text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Offer Cards Stream */}
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-0.5">
+                            {marketplaceOffers.map((offer) => {
+                              const isSelected = selectedOfferId === offer.id;
+                              const isChebelew = offer.providerId === 'chebelew';
+
+                              return (
+                                <div
+                                  key={offer.id}
+                                  onClick={() => {
+                                    setSelectedOfferId(offer.id);
+                                  }}
+                                  className={`p-2 rounded-xl border transition cursor-pointer active-press flex items-center justify-between ${
+                                    isSelected
+                                      ? 'bg-amber-500/15 border-amber-500 shadow-sm ring-1 ring-amber-500/40'
+                                      : 'bg-slate-950/60 border-slate-800 hover:bg-slate-800/50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+                                        isChebelew ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-700 text-white'
+                                      }`}
+                                    >
+                                      {isChebelew ? 'ቼ' : offer.providerName.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs font-bold text-white">{offer.providerName}</span>
+                                        {isChebelew && (
+                                          <span className="text-[8px] bg-emerald-500/20 text-emerald-400 font-bold px-1 rounded">
+                                            0% FEE
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-slate-400">{offer.estimatedPickupMinutes || 3}m away</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right">
+                                    <span className="text-xs font-black text-amber-400 font-mono">
+                                      {offer.estimatedFare} ETB
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Payment Selector Pill */}
-                    <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl p-2.5 text-xs">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-amber-400" />
-                        <span className="font-bold text-slate-300">Payment:</span>
-                        <select
-                          value={paymentMethod}
-                          onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                          className="bg-transparent text-amber-400 font-bold focus:outline-none cursor-pointer"
-                        >
-                          <option value="TELEBIRR" className="bg-slate-900 text-white">Telebirr (Direct)</option>
-                          <option value="CBE_BIRR" className="bg-slate-900 text-white">CBE Birr</option>
-                          <option value="CASH" className="bg-slate-900 text-white">Cash to Driver</option>
-                          <option value="WALLET" className="bg-slate-900 text-white">Chebelew Wallet</option>
-                        </select>
-                      </div>
-                      <span className="text-[10px] text-emerald-400 font-bold">15% VAT Included</span>
+                    {/* COLLAPSIBLE ACCORDION 2: Payment Rail & Taxes */}
+                    <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 overflow-hidden">
+                      <button
+                        onClick={() => setShowPaymentRails(!showPaymentRails)}
+                        className="w-full p-2.5 flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white transition active-press"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Payment: <strong className="text-amber-400">{paymentMethod}</strong></span>
+                          <span className="text-[9px] text-emerald-400 font-mono font-bold">• 15% VAT Included</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${showPaymentRails ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+
+                      {showPaymentRails && (
+                        <div className="p-2.5 pt-0 border-t border-slate-800/60 space-y-1.5 animate-slide-up text-xs">
+                          <div className="grid grid-cols-2 gap-1.5 pt-1">
+                            {[
+                              { id: 'TELEBIRR', label: 'Telebirr (Direct)', icon: '📱' },
+                              { id: 'CBE_BIRR', label: 'CBE Birr', icon: '🏦' },
+                              { id: 'CASH', label: 'Cash to Driver', icon: '💵' },
+                              { id: 'WALLET', label: 'Chebelew Wallet', icon: '👛' },
+                            ].map((rail) => (
+                              <button
+                                key={rail.id}
+                                onClick={() => {
+                                  setPaymentMethod(rail.id as PaymentMethod);
+                                  setShowPaymentRails(false);
+                                }}
+                                className={`p-2 rounded-xl border text-left active-press transition flex items-center gap-2 ${
+                                  paymentMethod === rail.id
+                                    ? 'bg-amber-500/20 border-amber-500 text-white font-bold'
+                                    : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+                                }`}
+                              >
+                                <span>{rail.icon}</span>
+                                <span className="text-[11px] truncate">{rail.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[9px] text-slate-400 text-center pt-0.5">
+                            FDRE Regulation 570/2025 electronic tax receipt automatically issued.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Driver Pickup Instructions Input */}
-                    <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-2.5 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <input
-                        type="text"
-                        value={pickupNotes}
-                        onChange={(e) => setPickupNotes(e.target.value)}
-                        placeholder="Pickup note (e.g. Gate 3, in front of Awash Bank)..."
-                        className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
-                      />
+                    {/* COLLAPSIBLE ACCORDION 3: Pickup Note & Special Requirements */}
+                    <div className="rounded-xl border border-slate-800/80 bg-slate-900/60 overflow-hidden">
+                      <button
+                        onClick={() => setShowPickupNotes(!showPickupNotes)}
+                        className="w-full p-2.5 flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white transition active-press"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate">
+                            {pickupNotes ? `Note: "${pickupNotes}"` : (isAm ? 'የመነሻ ማስታወሻ ወይም በር ቁጥር...' : 'Pickup Note / Gate Info (Optional)')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${showPickupNotes ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+
+                      {showPickupNotes && (
+                        <div className="p-2.5 pt-0 border-t border-slate-800/60 space-y-2 animate-slide-up">
+                          <div className="pt-1">
+                            <input
+                              type="text"
+                              value={pickupNotes}
+                              onChange={(e) => setPickupNotes(e.target.value)}
+                              placeholder="e.g. Gate 3, Awash Bank building, yellow umbrella..."
+                              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                          {destination.address.toLowerCase().includes('airport') && (
+                            <div>
+                              <input
+                                type="text"
+                                value={flightNumber}
+                                onChange={(e) => setFlightNumber(e.target.value)}
+                                placeholder="Flight # (e.g. ET 302) for Terminal pickup coordination"
+                                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Waiting & Cancellation Policy */}
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
-                      <span>⏱️ Free cancel within 3m</span>
+                    {/* Waiting & Cancellation Policy Micro-bar */}
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-0.5">
+                      <span>⏱️ Free cancel within 3 min</span>
                       <span>🛡️ 3 min free driver wait time</span>
                     </div>
 
@@ -733,13 +882,15 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       onClick={handleRequestRide}
                       onMouseEnter={() => setIsHoveredBook(true)}
                       onMouseLeave={() => setIsHoveredBook(false)}
-                      className="w-full py-4 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black rounded-2xl text-base shadow-2xl flex items-center justify-center gap-2.5 transition active-press group"
+                      className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black rounded-2xl text-sm shadow-xl flex items-center justify-center gap-2.5 transition active-press group"
                     >
-                      <Send className={`w-5 h-5 ${isHoveredBook ? 'animate-plane-fly' : ''}`} />
+                      <Send className={`w-4 h-4 ${isHoveredBook ? 'animate-plane-fly' : ''}`} />
                       <span>
                         {isHoveredBook
                           ? (isAm ? 'እንሂድ! 🚀' : "Let's Roll! 🚀")
-                          : (isAm ? 'አሁን ቼበለው ይዘዙ' : 'Confirm Chebelew Ride')}
+                          : (isAm
+                              ? `አሁን ቼበለው ይዘዙ • ${(marketplaceOffers.find((o) => o.id === selectedOfferId) || marketplaceOffers[0])?.estimatedFare || 220} ብር`
+                              : `Confirm Chebelew Ride • ${(marketplaceOffers.find((o) => o.id === selectedOfferId) || marketplaceOffers[0])?.estimatedFare || 220} ETB`)}
                       </span>
                     </button>
                   </div>
