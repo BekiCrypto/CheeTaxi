@@ -180,7 +180,7 @@ export function createRideRouter(io: SocketIOServer) {
   /**
    * Get rides history for user
    */
-  router.get('/user/:userId', (req, res) => {
+  const getUserRidesHandler = (req: any, res: any) => {
     const rows = db.prepare(`
       SELECT * FROM rides
       WHERE rider_id = ? OR driver_id = (SELECT id FROM drivers WHERE user_id = ?)
@@ -190,7 +190,10 @@ export function createRideRouter(io: SocketIOServer) {
 
     const rides = rows.map((r) => DispatchService.getRideById(r.id)).filter(Boolean);
     return res.json({ rides });
-  });
+  };
+
+  router.get('/user/:userId', getUserRidesHandler);
+  router.get('/history/:userId', getUserRidesHandler);
 
   // --------------------------------------------------------------------------
   // Priority 1: Scheduled & Recurring Bookings (Workstream 5)

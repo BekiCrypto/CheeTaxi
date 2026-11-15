@@ -5,11 +5,14 @@ import {
   Receipt, ArrowUpRight, AlertTriangle, Star, RefreshCw,
   Search, Sliders, Share2, X, Send, Navigation, ArrowUpDown,
   Sparkles, CreditCard, ChevronDown, ChevronUp, Check, ShieldCheck,
-  ChevronLeft, Info, HelpCircle
+  ChevronLeft, Info, HelpCircle, LocateFixed, Crosshair, Building,
+  ShoppingBag, Hotel, Compass, Activity, FileText, CheckCircle
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Language, translations } from '../../i18n/translations';
 import { MobileAuthModal } from '../Onboarding/MobileAuthModal';
+import { VatReceiptModal } from '../Payment/VatReceiptModal';
+import { PassengerWalletModal } from '../Payment/PassengerWalletModal';
 import { ADDIS_LANDMARKS, AddisLandmark } from '@shared/landmarks';
 import { sounds } from '../../utils/audio';
 import { Ride, Driver, MarketplaceOffer, LocationPoint, PaymentMethod, VehicleCategory } from '@shared/types';
@@ -85,6 +88,22 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
   const [selectedOfferId, setSelectedOfferId] = useState<string>('chebelew_direct');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TELEBIRR');
   const [isLoadingOffers, setIsLoadingOffers] = useState(false);
+
+  // Receipt & Wallet Modals
+  const [selectedReceiptRide, setSelectedReceiptRide] = useState<Ride | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number>(1250);
+
+  // Search enhancements
+  const [searchCategoryFilter, setSearchCategoryFilter] = useState<'all' | 'transit' | 'commercial' | 'hotel' | 'square' | 'institution'>('all');
+  const [isEditingPickupInSearch, setIsEditingPickupInSearch] = useState(false);
+  const [pickupSearchQuery, setPickupSearchQuery] = useState('');
+
+  // Safety settings & Cancel Protection
+  const [requireSafetyPin, setRequireSafetyPin] = useState(true);
+  const [emergencyContact, setEmergencyContact] = useState('+251911998877');
+  const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
 
   // Collapsible Accordions for Clean Yango-style Map-Dominant UI
   const [showAllOffers, setShowAllOffers] = useState(false);
@@ -265,7 +284,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
   const fetchRideHistory = async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch(`/api/rides/history/${user.id}`);
+      const res = await fetch(`/api/rides/user/${user.id}`);
       if (res.ok) {
         const data = await res.json();
         setTripHistory(data.rides || []);
@@ -487,16 +506,47 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
               )}
             </div>
 
+            {/* FLOATING MAP ACTION BUTTONS (RECENTER & SWAP) */}
+            <div className="absolute right-4 bottom-[calc(44vh+14px)] z-[950] flex flex-col gap-2 pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playBeep(750, 'sine', 0.05);
+                  setPickup({ ...pickup });
+                }}
+                className="w-11 h-11 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-slate-700/80 shadow-2xl backdrop-blur-xl flex items-center justify-center transition active-press"
+                title="Recenter Map on Current Location"
+              >
+                <LocateFixed className="w-5 h-5" />
+              </button>
+
+              {sheetState === 'OFFERS' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prev = pickup;
+                    setPickup(destination);
+                    setDestination(prev);
+                    sounds.playBeep(650, 'sine', 0.05);
+                  }}
+                  className="w-11 h-11 rounded-2xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 shadow-2xl backdrop-blur-xl flex items-center justify-center transition active-press"
+                  title="Swap Pickup and Destination"
+                >
+                  <ArrowUpDown className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
             {/* UBER/YANGO-LEVEL FLOATING MOBILE BOTTOM SHEET */}
             <div
               className={`absolute bottom-0 left-0 right-0 z-[1000] mobile-bottom-sheet rounded-t-[32px] transition-all duration-300 ease-out flex flex-col ${
                 isSheetExpanded
                   ? 'max-h-[88vh]'
                   : sheetState === 'EXPLORE'
-                  ? 'max-h-[38vh]'
+                  ? 'max-h-[42vh]'
                   : sheetState === 'ACTIVE_RIDE'
                   ? 'max-h-[44vh]'
-                  : 'max-h-[62vh]'
+                  : 'max-h-[64vh]'
               } pb-20`}
             >
               {/* Drag Handle Bar */}
@@ -539,7 +589,67 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       </div>
                     </div>
 
-                    {/* Line 2: Horizontal Quick Hub Chips (Zero scrollbar, one-tap) */}
+                    {/* Line 2: Quick Saved Places (Home, Office, Airport) One-Tap Strip */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const home = savedPlaces.find((p) => p.id === 'sp_home') || savedPlaces[0];
+                          setDestination({ address: home.address, lat: home.lat, lng: home.lng });
+                          sounds.playBeep(700, 'sine', 0.05);
+                          setSheetState('OFFERS');
+                        }}
+                        className="p-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 rounded-xl flex items-center gap-2 text-left active-press transition"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 text-xs">
+                          🏠
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-white leading-tight">Home</p>
+                          <p className="text-[9px] text-slate-400 truncate">CMC Michael</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const work = savedPlaces.find((p) => p.id === 'sp_work') || savedPlaces[1];
+                          setDestination({ address: work.address, lat: work.lat, lng: work.lng });
+                          sounds.playBeep(700, 'sine', 0.05);
+                          setSheetState('OFFERS');
+                        }}
+                        className="p-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 rounded-xl flex items-center gap-2 text-left active-press transition"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 text-xs">
+                          💼
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-white leading-tight">Office</p>
+                          <p className="text-[9px] text-slate-400 truncate">Kazanchis</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const airport = savedPlaces.find((p) => p.id === 'sp_airport') || savedPlaces[2];
+                          setDestination({ address: airport.address, lat: airport.lat, lng: airport.lng });
+                          sounds.playBeep(700, 'sine', 0.05);
+                          setSheetState('OFFERS');
+                        }}
+                        className="p-2 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/70 rounded-xl flex items-center gap-2 text-left active-press transition"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 text-xs">
+                          ✈️
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-white leading-tight">Airport</p>
+                          <p className="text-[9px] text-slate-400 truncate">Bole T2</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Line 3: Horizontal Quick Hub Chips (Zero scrollbar, one-tap) */}
                     <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
                       {POPULAR_HUBS.map((hub) => (
                         <button
@@ -559,7 +669,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       ))}
                     </div>
 
-                    {/* Line 3: Compact Horizontal Vehicle Class Selector */}
+                    {/* Line 4: Compact Horizontal Vehicle Class Selector */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between px-0.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -587,13 +697,16 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                               }}
                               className={`p-2 rounded-xl border transition text-center active-press flex flex-col items-center justify-center ${
                                 isSelected
-                                  ? 'bg-amber-500/20 border-amber-500 shadow ring-1 ring-amber-500/40 text-white'
-                                  : 'bg-slate-800/50 border-slate-700/60 hover:bg-slate-800 text-slate-300'
+                                    ? 'bg-amber-500/20 border-amber-500 shadow ring-1 ring-amber-500/40 text-white'
+                                    : 'bg-slate-800/50 border-slate-700/60 hover:bg-slate-800 text-slate-300'
                               }`}
                             >
                               <span className="text-lg leading-none">{cat.icon}</span>
                               <span className="text-[10px] font-bold mt-1 line-clamp-1">{cat.label.split(' ')[0]}</span>
-                              <span className="text-[9px] font-black text-amber-400 font-mono mt-0.5">{cat.fare} Br</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[9px] font-black text-amber-400 font-mono">{cat.fare} Br</span>
+                                <span className="text-[8px] text-slate-400 font-bold">{cat.id === 'minivan' ? '7p' : '4p'}</span>
+                              </div>
                             </button>
                           );
                         })}
@@ -614,6 +727,17 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                           </div>
                         </div>
                       )}
+                    </div>
+
+                    {/* Transparency & Regulation Guarantee */}
+                    <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 pt-0.5 font-medium">
+                      <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5" /> 0% Commission
+                      </span>
+                      <span>•</span>
+                      <span>100% to Driver</span>
+                      <span>•</span>
+                      <span>FDRE Reg 570/2025 VAT</span>
                     </div>
                   </div>
                 )}
@@ -996,8 +1120,9 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
 
                     {/* Cancel Trip Button */}
                     <button
-                      onClick={handleCancelActiveRide}
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-rose-400 text-xs font-bold rounded-xl border border-rose-500/20 active-press"
+                      type="button"
+                      onClick={() => setIsCancelConfirmOpen(true)}
+                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-rose-400 text-xs font-bold rounded-xl border border-rose-500/20 active-press transition"
                     >
                       Cancel Ride / ጉዞ ሰርዝ
                     </button>
@@ -1035,6 +1160,20 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                         <span className="font-bold">0.00 ETB (100% to Driver)</span>
                       </div>
                     </div>
+
+                    {/* View Official VAT Receipt Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeRide) {
+                          setSelectedReceiptRide(activeRide);
+                          setShowReceiptModal(true);
+                        }
+                      }}
+                      className="w-full py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 border border-emerald-500/30 transition active-press"
+                    >
+                      <Receipt className="w-4 h-4 text-emerald-400" /> View Official Reg 570/2025 VAT Receipt
+                    </button>
 
                     {/* Driver Rating & Tip */}
                     <div className="space-y-2">
@@ -1130,29 +1269,95 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
               </div>
             </div>
 
-            {/* FULLSCREEN DESTINATION SEARCH OVERLAY MODAL */}
+            {/* FULLSCREEN DESTINATION SEARCH OVERLAY MODAL (DUAL INPUT & CATEGORY FILTER) */}
             {isSearchingDest && (
               <div className="fixed inset-0 z-[1500] bg-slate-950 p-4 flex flex-col animate-fade-in">
-                <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                {/* Search Header Bar */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsSearchingDest(false)}
+                      className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-200 active-press transition"
+                    >
+                      ← Back
+                    </button>
+                    <div>
+                      <h3 className="text-sm font-black text-white">{isAm ? 'መዳረሻ ይፈልጉ' : 'Select Destination'}</h3>
+                      <p className="text-[10px] text-slate-400">Addis Ababa Metropolitan Area</p>
+                    </div>
+                  </div>
                   <button
-                    onClick={() => setIsSearchingDest(false)}
-                    className="p-2 bg-slate-800 rounded-xl text-slate-300 active-press"
+                    onClick={() => {
+                      setIsSearchingDest(false);
+                      setSheetState('EXPLORE');
+                    }}
+                    className="text-xs text-amber-400 font-bold hover:underline"
                   >
-                    ←
+                    Done
                   </button>
-                  <div className="flex-1 relative">
+                </div>
+
+                {/* Dual Pickup & Destination Box with Swap */}
+                <div className="my-3 p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 relative">
+                  {/* Pickup Row */}
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
+                    <input
+                      type="text"
+                      value={pickup.address}
+                      onChange={(e) => setPickup({ ...pickup, address: e.target.value })}
+                      placeholder="Pickup spot in Addis..."
+                      className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sounds.playBeep(800, 'sine', 0.05);
+                        setPickup({
+                          address: 'Bole Medhanialem Mall, Addis Ababa',
+                          addressAm: 'ቦሌ መድኃኔዓለም እና ኤድና ሞል',
+                          lat: 8.995,
+                          lng: 38.788,
+                        });
+                      }}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[10px] font-bold rounded-lg border border-slate-700 flex items-center gap-1 shrink-0 active-press"
+                      title="Use Current Location"
+                    >
+                      <Crosshair className="w-3 h-3" /> GPS
+                    </button>
+                  </div>
+
+                  <div className="border-t border-slate-800/80 my-1 relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const prev = pickup;
+                        setPickup(destination);
+                        setDestination(prev);
+                        sounds.playBeep(700, 'sine', 0.05);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-700 flex items-center justify-center transition active-press"
+                      title="Swap Pickup & Destination"
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Destination Row */}
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
                     <input
                       type="text"
                       autoFocus
-                      placeholder="Search Addis Ababa address or hub..."
+                      placeholder="Where to? (e.g. Airport, Bole, Kazanchis, Piassa)..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                      className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 font-bold focus:outline-none"
                     />
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-2.5 text-slate-400"
+                        className="p-1 text-slate-400 hover:text-white"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1160,34 +1365,79 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto pt-3 space-y-2">
-                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider px-1">
-                    Addis Ababa Transport Hubs & Landmarks
-                  </p>
+                {/* Category Filter Pills Strip */}
+                <div className="flex gap-1.5 overflow-x-auto pb-2 no-scrollbar">
+                  {[
+                    { id: 'all', label: 'All Hubs' },
+                    { id: 'transit', label: '✈️ Airport & Transit' },
+                    { id: 'commercial', label: '🛍️ Malls & Shopping' },
+                    { id: 'hotel', label: '🏨 Luxury Hotels' },
+                    { id: 'square', label: '🏛️ City Squares' },
+                    { id: 'institution', label: '🏢 Institutions' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSearchCategoryFilter(cat.id as any)}
+                      className={`px-3 py-1 rounded-xl text-[11px] font-bold border transition shrink-0 active-press ${
+                        searchCategoryFilter === cat.id
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
 
-                  {ADDIS_LANDMARKS.filter(
-                    (lm) =>
+                {/* Filtered Landmark Results List */}
+                <div className="flex-1 overflow-y-auto space-y-2 pt-1 no-scrollbar">
+                  {ADDIS_LANDMARKS.filter((lm) => {
+                    const matchesCategory = searchCategoryFilter === 'all' || lm.category === searchCategoryFilter;
+                    const matchesQuery =
+                      !searchQuery ||
                       lm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      (lm.nameAm && lm.nameAm.includes(searchQuery))
-                  ).map((lm) => (
+                      (lm.nameAm && lm.nameAm.includes(searchQuery));
+                    return matchesCategory && matchesQuery;
+                  }).map((lm) => (
                     <div
                       key={lm.id}
-                      onClick={() => handleSelectLandmark(lm)}
-                      className="p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800/80 rounded-2xl flex items-center justify-between cursor-pointer active-press"
+                      onClick={() => {
+                        sounds.playBeep(720, 'sine', 0.05);
+                        handleSelectLandmark(lm);
+                      }}
+                      className="p-3 bg-slate-900 hover:bg-slate-800/90 border border-slate-800/80 rounded-2xl flex items-center justify-between cursor-pointer active-press transition"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-                          <MapPin className="w-4 h-4" />
+                        <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                          {lm.category === 'transit' ? '✈️' : lm.category === 'hotel' ? '🏨' : lm.category === 'commercial' ? '🛍️' : '📍'}
                         </div>
                         <div>
-                          <h4 className="text-sm font-bold text-white">{lm.name}</h4>
-                          <p className="text-xs text-amber-400 font-serif">{lm.nameAm}</p>
-                          <span className="text-[10px] text-slate-500 uppercase">{lm.category}</span>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-xs font-bold text-white">{lm.name}</h4>
+                            <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                              {lm.category}
+                            </span>
+                          </div>
+                          {lm.nameAm && <p className="text-[11px] text-amber-300 font-serif mt-0.5">{lm.nameAm}</p>}
                         </div>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-500" />
                     </div>
                   ))}
+                </div>
+
+                {/* Bottom Quick Action: Pick directly on map */}
+                <div className="pt-2 border-t border-slate-800/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSearchingDest(false);
+                      setSheetState('EXPLORE');
+                    }}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-800 active-press transition"
+                  >
+                    <MapPin className="w-4 h-4" /> Set Pin Directly on Addis Map
+                  </button>
                 </div>
               </div>
             )}
@@ -1198,7 +1448,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
             TAB 2: ACTIVITY & TRIP HISTORY
             ============================================================== */}
         {activeTab === 'activity' && (
-          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20">
+          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20 no-scrollbar">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-black text-white">Your Trips / ጉዞዎችዎ</h2>
@@ -1207,10 +1457,41 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
               <button
                 onClick={fetchRideHistory}
                 className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition active-press"
+                title="Refresh trip history"
               >
                 <RefreshCw className={`w-4 h-4 ${loadingHistory ? 'animate-spin' : ''}`} />
               </button>
             </div>
+
+            {/* LIVE TRIP IN PROGRESS CARD IF ACTIVE */}
+            {activeRide && (
+              <div
+                onClick={() => {
+                  setActiveTab('ride');
+                  sounds.playBeep(700, 'sine', 0.05);
+                }}
+                className="bg-gradient-to-r from-amber-500/20 via-amber-600/10 to-slate-900 border border-amber-500/50 rounded-2xl p-4 flex items-center justify-between cursor-pointer active-press hover:border-amber-400 transition shadow-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold animate-pulse shrink-0">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-amber-400 uppercase tracking-wide">Live Trip in Progress</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    </div>
+                    <p className="text-xs text-white font-bold truncate max-w-[200px]">
+                      {activeRide.destination?.address || 'Trip in Progress'}
+                    </p>
+                    <p className="text-[11px] text-slate-400">Status: {activeRide.status}</p>
+                  </div>
+                </div>
+                <span className="px-3 py-1.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl shadow shrink-0">
+                  Track on Map ➔
+                </span>
+              </div>
+            )}
 
             {tripHistory.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
@@ -1229,12 +1510,12 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
             ) : (
               <div className="space-y-3">
                 {tripHistory.map((trip) => (
-                  <div key={trip.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+                  <div key={trip.id} className="bg-slate-900 border border-slate-800/90 rounded-2xl p-4 space-y-3 shadow-md hover:border-slate-700 transition">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-amber-400 font-mono">
-                        {trip.id.slice(0, 10)}
+                        #{trip.id.slice(0, 10)}
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
                         {trip.status}
                       </span>
                     </div>
@@ -1252,20 +1533,35 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
 
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
                       <div>
-                        <span className="text-slate-400 text-[11px]">Paid: </span>
-                        <strong className="text-white text-sm">{trip.fare?.totalFare || 0} ETB</strong>
+                        <span className="text-slate-400 text-[11px]">Fare: </span>
+                        <strong className="text-white text-sm font-black">{trip.fare?.totalFare || 0} ETB</strong>
+                        <span className="text-[10px] text-slate-500 ml-1">({trip.paymentMethod || 'CASH'})</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-400">{trip.paymentMethod}</span>
                         <button
+                          type="button"
                           onClick={() => {
-                            if (trip.id) {
-                              window.open(`/track/${trip.id}`, '_blank');
-                            }
+                            setSelectedReceiptRide(trip);
+                            setShowReceiptModal(true);
+                            sounds.playBeep(700, 'sine', 0.05);
                           }}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg font-bold text-[11px] flex items-center gap-1 active-press"
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl font-bold text-[11px] flex items-center gap-1.5 border border-slate-700 active-press transition"
                         >
-                          <Receipt className="w-3 h-3" /> Receipt
+                          <Receipt className="w-3.5 h-3.5" /> Tax Invoice
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (trip.pickup) setPickup(trip.pickup);
+                            if (trip.destination) setDestination(trip.destination);
+                            setActiveTab('ride');
+                            setSheetState('OFFERS');
+                            setShowAllOffers(true);
+                            sounds.playBeep(800, 'sine', 0.05);
+                          }}
+                          className="px-2.5 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl font-bold text-[11px] flex items-center gap-1 active-press transition"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Rebook
                         </button>
                       </div>
                     </div>
@@ -1280,7 +1576,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
             TAB 3: WALLET & MULTI-RAIL PAYMENT
             ============================================================== */}
         {activeTab === 'wallet' && (
-          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20">
+          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20 no-scrollbar">
             <div>
               <h2 className="text-base font-black text-white">Digital Wallet / የኪስ ቦርሳ</h2>
               <p className="text-xs text-slate-400">Telebirr, CBE Birr & International Cards</p>
@@ -1293,11 +1589,35 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                   <p className="text-xs font-extrabold uppercase tracking-wider text-slate-900/80">
                     Chebelew Passenger Balance
                   </p>
-                  <h3 className="text-3xl font-black tracking-tight mt-1">1,250.00 <span className="text-lg">ETB</span></h3>
+                  <h3 className="text-3xl font-black tracking-tight mt-1">{walletBalance.toFixed(2)} <span className="text-lg">ETB</span></h3>
                 </div>
-                <div className="w-10 h-10 rounded-2xl bg-slate-950 text-amber-400 flex items-center justify-center font-bold text-lg">
-                  ብር
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowWalletModal(true);
+                    sounds.playBeep(800, 'sine', 0.05);
+                  }}
+                  className="px-3.5 py-2 bg-slate-950 hover:bg-slate-900 text-amber-400 rounded-2xl font-black text-xs shadow-lg flex items-center gap-1.5 active-press transition"
+                >
+                  <Plus className="w-4 h-4" /> Top Up
+                </button>
+              </div>
+
+              {/* Quick Amount Reload Shortcuts */}
+              <div className="flex gap-2 pt-1">
+                {[100, 250, 500, 1000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => {
+                      setShowWalletModal(true);
+                      sounds.playBeep(750, 'sine', 0.05);
+                    }}
+                    className="flex-1 py-1.5 rounded-xl bg-slate-950/20 hover:bg-slate-950/30 text-slate-950 font-black text-[11px] border border-slate-950/20 transition active-press text-center"
+                  >
+                    +{amt} Br
+                  </button>
+                ))}
               </div>
 
               <div className="pt-2 border-t border-slate-900/20 flex justify-between items-center text-xs font-bold">
@@ -1371,7 +1691,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
             TAB 4: SAVED PLACES
             ============================================================== */}
         {activeTab === 'saved' && (
-          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20">
+          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20 no-scrollbar">
             <div>
               <h2 className="text-base font-black text-white">Saved Places / የተቀመጡ ቦታዎች</h2>
               <p className="text-xs text-slate-400">1-Tap Fast Pickup & Destination Selection</p>
@@ -1467,10 +1787,10 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
             TAB 5: PROFILE & SUPPORT
             ============================================================== */}
         {activeTab === 'profile' && (
-          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20">
+          <div className="h-full w-full overflow-y-auto p-4 space-y-4 max-w-lg mx-auto pb-20 no-scrollbar">
             <div>
-              <h2 className="text-base font-black text-white">Account & Support / መለያ እና ድጋፍ</h2>
-              <p className="text-xs text-slate-400">Settings, Language and 24/7 Safety</p>
+              <h2 className="text-base font-black text-white">Account & Safety / መለያ እና ደህንነት</h2>
+              <p className="text-xs text-slate-400">Settings, 4-Digit PIN & 24/7 Ethiopian Hotlines</p>
             </div>
 
             {/* Profile Card */}
@@ -1491,6 +1811,72 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
               >
                 Switch
               </button>
+            </div>
+
+            {/* Passenger Safety Toolkit */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Safety & Verification Toolkit</span>
+              </div>
+
+              {/* 4-Digit Boarding PIN Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                <div className="pr-3">
+                  <div className="text-xs font-bold text-white">4-Digit Boarding PIN</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Require driver to input your secret 4-digit PIN before starting trip.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRequireSafetyPin(!requireSafetyPin)}
+                  className={`w-12 h-6 rounded-full transition p-0.5 flex items-center ${
+                    requireSafetyPin ? 'bg-amber-500 justify-end' : 'bg-slate-700 justify-start'
+                  }`}
+                >
+                  <span className="w-5 h-5 rounded-full bg-slate-950 block shadow" />
+                </button>
+              </div>
+
+              {/* Trusted Emergency Contact */}
+              <div className="p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1.5">
+                <div className="text-xs font-bold text-white">Emergency Contact Phone</div>
+                <div className="text-[11px] text-slate-400">
+                  Auto-sent live tracking link whenever Emergency SOS is triggered.
+                </div>
+                <input
+                  type="tel"
+                  value={emergencyContact}
+                  onChange={(e) => setEmergencyContact(e.target.value)}
+                  className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-amber-400 focus:outline-none focus:border-amber-500"
+                  placeholder="+251 9XX XXX XXX"
+                />
+              </div>
+            </div>
+
+            {/* Quick Support & Help Shortcuts */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+                <HelpCircle className="w-4 h-4 text-amber-400" />
+                <span>Passenger Help & Dispute Support</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => alert('Lost & Found item ticket opened. Chebelew Support will contact your driver.')}
+                  className="p-2.5 bg-slate-800/90 hover:bg-slate-800 rounded-xl text-slate-300 border border-slate-700 text-left transition active-press"
+                >
+                  🎒 Lost & Found Item
+                </button>
+                <button
+                  type="button"
+                  onClick={() => alert('Fare Review ticket initiated for your latest trip.')}
+                  className="p-2.5 bg-slate-800/90 hover:bg-slate-800 rounded-xl text-slate-300 border border-slate-700 text-left transition active-press"
+                >
+                  ⚖️ Fare Dispute
+                </button>
+              </div>
             </div>
 
             {/* Language Switcher */}
@@ -1597,6 +1983,64 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
           sounds.playBeep(880, 'sine', 0.2);
         }}
       />
+
+      {/* Official Electronic VAT Tax Receipt Modal */}
+      {selectedReceiptRide && (
+        <VatReceiptModal
+          ride={selectedReceiptRide}
+          isOpen={showReceiptModal}
+          onClose={() => {
+            setShowReceiptModal(false);
+            setSelectedReceiptRide(null);
+          }}
+        />
+      )}
+
+      {/* Passenger Digital Wallet Modal (Telebirr, CBE, Visa/Mastercard) */}
+      <PassengerWalletModal
+        userId={user.id}
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onBalanceUpdated={(newBal) => {
+          setWalletBalance(newBal);
+        }}
+      />
+
+      {/* Safe Ride Cancellation Confirmation Dialog */}
+      {isCancelConfirmOpen && (
+        <div className="fixed inset-0 z-[1200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-black text-white">Cancel Your Ride Request?</h3>
+              <p className="text-xs text-slate-400">
+                Your driver is currently on route. In accordance with Chebelew's zero-penalty policy, no cancellation fee applies within 3 minutes of match.
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCancelConfirmOpen(false)}
+                className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl text-xs font-bold transition active-press"
+              >
+                Keep Ride
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCancelConfirmOpen(false);
+                  handleCancelActiveRide();
+                }}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-black transition active-press shadow-lg shadow-rose-950"
+              >
+                Yes, Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
