@@ -168,6 +168,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showTaxModal, setShowTaxModal] = useState(false);
+  const [isVehiclesExpanded, setIsVehiclesExpanded] = useState(false);
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [ticketCategory, setTicketCategory] = useState<'lost_item' | 'fare_dispute' | 'payment' | 'driver_behavior' | 'app_issue'>('lost_item');
@@ -677,70 +678,130 @@ export const RiderView: React.FC<RiderViewProps> = ({
         ) : !activeRide ? (
           <div className="p-4 space-y-4 flex-1 flex flex-col justify-between overflow-y-auto no-scrollbar">
             <div className="space-y-3">
-              {/* Ride Class Options (Sleek Scannable Cards - Uber / Yango Style) */}
-              <div className="space-y-2">
-                {estimates
-                  .filter((e) => !e.isAggregatedPartner)
-                  .map((est) => {
-                    const isSelected = selectedCategory === est.category;
-                    return (
-                      <button
-                        key={est.category}
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategory(est.category);
-                          const matchingOffer = marketplaceOffers.find(
-                            (o) => o.providerId === 'chebelew' && o.vehicleCategory === est.category
-                          );
-                          if (matchingOffer) setSelectedOfferId(matchingOffer.id);
-                        }}
-                        className={`w-full p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between text-left cursor-pointer group ${
-                          isSelected
-                            ? 'border-brand-500 bg-brand-50/70 shadow-sm ring-1 ring-brand-500/20'
-                            : 'border-slate-200/80 bg-white/80 hover:bg-white hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-11 h-11 rounded-xl flex items-center justify-center transition ${
-                              isSelected
-                                ? 'bg-brand-500 text-white shadow-xs'
-                                : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
-                            }`}
-                          >
-                            <Car className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-extrabold text-xs text-slate-900">
-                                {est.displayName}
-                              </span>
-                              <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
-                                0% Fee
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                              <span>⏱️ ~{est.etaMinutes}m away</span>
-                              <span>•</span>
-                              <span className="flex items-center gap-0.5">
-                                <Users className="w-3 h-3" /> {est.capacity} seats
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-sm font-black text-slate-900 font-mono">
-                            {est.fare.totalFare.toFixed(0)}{' '}
-                            <span className="text-[10px] font-semibold text-slate-500">ETB</span>
-                          </div>
-                          <span className="text-[9px] text-slate-400 block font-medium">
-                            Fixed Upfront
+              {/* Vehicle Category Selector (Collapsible - Single Selected Hero Card / Unfold on Tap) */}
+              <div className="frosted-card rounded-2xl border border-white/60 shadow-xs overflow-hidden transition-all">
+                {!isVehiclesExpanded ? (
+                  /* Collapsed State: Single Compact Selected Vehicle Row (~54px) */
+                  <button
+                    type="button"
+                    onClick={() => setIsVehiclesExpanded(true)}
+                    className="w-full p-3 bg-white/80 hover:bg-white text-left transition flex items-center justify-between cursor-pointer group"
+                    title={isAmharic ? 'የመኪና ምርጫን ለመቀየር ይጫኑ' : 'Click to change vehicle category'}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-brand-500 text-white flex items-center justify-center shadow-xs">
+                        <Car className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-xs text-slate-900">
+                            {selectedEstimate?.displayName || 'Chebelew Standard'}
+                          </span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                            0% Fee
                           </span>
                         </div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                          <span>⏱️ ~{selectedEstimate?.etaMinutes || 3}m away</span>
+                          <span>•</span>
+                          <span className="flex items-center gap-0.5">
+                            <Users className="w-3 h-3" /> {selectedEstimate?.capacity || 4} seats
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-sm font-black text-slate-900 font-mono">
+                          {selectedEstimate?.fare.totalFare.toFixed(0) || 192}{' '}
+                          <span className="text-[10px] font-semibold text-slate-500">ETB</span>
+                        </div>
+                        <span className="text-[9px] text-slate-400 block font-medium">Fixed Upfront</span>
+                      </div>
+                      <div className="flex items-center gap-0.5 text-[10px] font-bold text-brand-700 bg-brand-50 group-hover:bg-brand-100 px-2 py-1 rounded-lg border border-brand-200/80 transition">
+                        <span>{isAmharic ? 'ቀይር' : 'Change'}</span>
+                        <ChevronDown className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  /* Expanded State: All Vehicle Categories with Instant Selection */
+                  <div className="p-3 bg-white/95 space-y-2 animate-fade-in">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                        {isAmharic ? 'የመኪና ምርጫ' : 'Select Vehicle Class'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsVehiclesExpanded(false)}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span>{isAmharic ? 'አሳጥር' : 'Fold'}</span>
+                        <ChevronUp className="w-3 h-3" />
                       </button>
-                    );
-                  })}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {estimates
+                        .filter((e) => !e.isAggregatedPartner)
+                        .map((est) => {
+                          const isSelected = selectedCategory === est.category;
+                          return (
+                            <button
+                              key={est.category}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCategory(est.category);
+                                const matchingOffer = marketplaceOffers.find(
+                                  (o) => o.providerId === 'chebelew' && o.vehicleCategory === est.category
+                                );
+                                if (matchingOffer) setSelectedOfferId(matchingOffer.id);
+                                setIsVehiclesExpanded(false);
+                              }}
+                              className={`w-full p-2.5 rounded-xl border-2 transition-all flex items-center justify-between text-left cursor-pointer group ${
+                                isSelected
+                                  ? 'border-brand-500 bg-brand-50/70 shadow-sm ring-1 ring-brand-500/20'
+                                  : 'border-slate-200/80 bg-white hover:bg-slate-50 hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div
+                                  className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+                                    isSelected
+                                      ? 'bg-brand-500 text-white shadow-xs'
+                                      : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
+                                  }`}
+                                >
+                                  <Car className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-extrabold text-xs text-slate-900">{est.displayName}</span>
+                                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded-full">
+                                      0% Fee
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                    <span>⏱️ ~{est.etaMinutes}m away</span>
+                                    <span>•</span>
+                                    <span>{est.capacity} seats</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <div className="text-xs font-black text-slate-900 font-mono">
+                                  {est.fare.totalFare.toFixed(0)} <span className="text-[9px] font-semibold text-slate-500">ETB</span>
+                                </div>
+                                <span className="text-[9px] text-slate-400 block font-medium">Fixed Upfront</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Quick Settings Bar - Sleek Single Horizontal Row */}
