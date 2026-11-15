@@ -12,14 +12,21 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Custom Car SVG Marker
-function createCarIcon(heading: number = 0, color: string = '#149d9f', label?: string) {
+// Custom Car SVG Marker with optional broadcast ping halo
+function createCarIcon(heading: number = 0, color: string = '#149d9f', label?: string, isPinging: boolean = false) {
   return L.divIcon({
     className: 'custom-car-marker',
     html: `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%);">
-        ${label ? `<div style="background: rgba(15, 23, 42, 0.88); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9999px; white-space: nowrap; margin-bottom: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2);">${label}</div>` : ''}
-        <div style="width: 32px; height: 32px; background: ${color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.35); border: 2px solid #ffffff; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
+        ${isPinging ? `
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 48px; height: 48px; border-radius: 50%; border: 2px solid #10b981; animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; pointer-events: none;"></div>
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); animation: pulse 1.5s infinite; pointer-events: none;"></div>
+        ` : ''}
+        ${label ? `<div style="background: ${isPinging ? 'rgba(6, 78, 59, 0.95)' : 'rgba(15, 23, 42, 0.88)'}; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9999px; white-space: nowrap; margin-bottom: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid ${isPinging ? '#10b981' : 'rgba(255,255,255,0.2)'}; display: flex; align-items: center; gap: 3px;">
+          ${isPinging ? '<span style="width: 5px; height: 5px; border-radius: 50%; background: #10b981; animation: pulse 1s infinite;"></span>' : ''}
+          ${label}
+        </div>` : ''}
+        <div style="width: 32px; height: 32px; background: ${isPinging ? '#059669' : color}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.35); border: 2px solid #ffffff; transform: rotate(${heading}deg); transition: transform 0.4s ease;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
             <circle cx="7" cy="17" r="2"/>
@@ -59,16 +66,23 @@ function createActiveTaxiIcon(heading: number = 0, label: string = 'Your Taxi') 
   });
 }
 
-// Pickup Marker Icon
-function createPickupIcon(title: string = 'Pickup') {
+// Pickup Marker Icon with optional expanding radar wave when searching
+function createPickupIcon(title: string = 'Pickup', isSearching: boolean = false) {
   return L.divIcon({
     className: 'custom-pickup-marker',
     html: `
-      <div style="display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
-        <div style="background: #10b981; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; white-space: nowrap; margin-bottom: 3px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+      <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
+        ${isSearching ? `
+          <div style="position: absolute; top: calc(100% - 9px); left: 50%; transform: translate(-50%, -50%); width: 220px; height: 220px; pointer-events: none; z-index: 1;">
+            <div style="position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(16, 185, 129, 0.65); animation: ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="position: absolute; inset: 30px; border-radius: 50%; border: 1.5px solid rgba(16, 185, 129, 0.45); animation: ping 2.4s cubic-bezier(0, 0, 0.2, 1) infinite 0.8s;"></div>
+            <div style="position: absolute; inset: 60px; border-radius: 50%; background: radial-gradient(circle, rgba(16, 185, 129, 0.28) 0%, rgba(16, 185, 129, 0.05) 70%, transparent 100%); animation: pulse 2s infinite;"></div>
+          </div>
+        ` : ''}
+        <div style="background: #10b981; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; white-space: nowrap; margin-bottom: 3px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 10;">
           📍 ${title}
         </div>
-        <div style="width: 18px; height: 18px; background: #10b981; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 12px #10b981;"></div>
+        <div style="width: 18px; height: 18px; background: #10b981; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 14px #10b981; z-index: 10;"></div>
       </div>
     `,
     iconSize: [20, 20],
@@ -219,6 +233,7 @@ interface AddisMapProps {
   onCancelPicking?: () => void;
   className?: string;
   interactive?: boolean;
+  isSearching?: boolean;
 }
 
 export const AddisMap: React.FC<AddisMapProps> = ({
@@ -234,6 +249,7 @@ export const AddisMap: React.FC<AddisMapProps> = ({
   onCancelPicking,
   className = 'h-full w-full',
   interactive = true,
+  isSearching = false,
 }) => {
   // Center of Addis Ababa (Meskel Square)
   const defaultCenter: [number, number] = [9.0105, 38.7615];
@@ -302,7 +318,7 @@ export const AddisMap: React.FC<AddisMapProps> = ({
         {pickup && (
           <Marker
             position={[pickup.lat, pickup.lng]}
-            icon={createPickupIcon(pickup.address.split(',')[0])}
+            icon={createPickupIcon(pickup.address.split(',')[0], isSearching)}
           >
             <Popup>
               <div className="text-xs font-semibold">
@@ -331,7 +347,12 @@ export const AddisMap: React.FC<AddisMapProps> = ({
           <Marker
             key={d.id}
             position={[d.currentLat, d.currentLng]}
-            icon={createCarIcon(d.heading || 0, d.isBusy ? '#eab308' : '#149d9f', d.vehiclePlate)}
+            icon={createCarIcon(
+              d.heading || 0,
+              d.isBusy ? '#eab308' : '#149d9f',
+              isSearching ? `${d.vehiclePlate} • Pinging` : d.vehiclePlate,
+              isSearching
+            )}
           >
             <Popup>
               <div className="text-xs space-y-1">
@@ -343,7 +364,7 @@ export const AddisMap: React.FC<AddisMapProps> = ({
                   Rating: ★{d.rating} | Category: {d.vehicleCategory.toUpperCase()}
                 </div>
                 <div className="text-emerald-600 font-medium">
-                  {d.isBusy ? '● On Active Trip' : '● Online & Available'}
+                  {isSearching ? '● Receiving Ride Broadcast' : d.isBusy ? '● On Active Trip' : '● Online & Available'}
                 </div>
               </div>
             </Popup>

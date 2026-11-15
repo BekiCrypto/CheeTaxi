@@ -72,6 +72,129 @@ interface RiderViewProps {
   onRideActive?: (ride: Ride | null) => void;
 }
 
+interface RealisticNearbyCab extends Driver {
+  distanceMeters: number;
+  initialOffsetLat: number;
+  initialOffsetLng: number;
+}
+
+const REALISTIC_CAB_BLUEPRINTS = [
+  {
+    id: 'sim_driver_ahmed',
+    fullName: 'Ahmed Mohammed (አህመድ)',
+    phone: '+251912334455',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+    vehicleMake: 'Toyota',
+    vehicleModel: 'Corolla Exec',
+    vehicleYear: 2019,
+    vehiclePlate: 'ET-3-A78945',
+    vehicleColor: 'Silver Gray',
+    vehicleCategory: 'sedan' as VehicleCategory,
+    licenseNumber: 'AA-DL-98231',
+    rating: 4.92,
+    totalRides: 482,
+    offsetLat: 0.0021,
+    offsetLng: -0.0018,
+    heading: 65,
+    distanceMeters: 310,
+  },
+  {
+    id: 'sim_driver_yared',
+    fullName: 'Yared Tadesse (ያሬድ)',
+    phone: '+251915778899',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    vehicleMake: 'Hyundai',
+    vehicleModel: 'Elantra Comfort',
+    vehicleYear: 2022,
+    vehiclePlate: 'ET-3-D19022',
+    vehicleColor: 'Midnight Blue',
+    vehicleCategory: 'comfort' as VehicleCategory,
+    licenseNumber: 'AA-DL-51209',
+    rating: 4.95,
+    totalRides: 390,
+    offsetLat: 0.0016,
+    offsetLng: 0.0032,
+    heading: 220,
+    distanceMeters: 410,
+  },
+  {
+    id: 'sim_driver_dawit',
+    fullName: 'Dawit Bekele (ዳዊት)',
+    phone: '+251913445566',
+    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    vehicleMake: 'Toyota',
+    vehicleModel: 'Avanza 7-Seater',
+    vehicleYear: 2021,
+    vehiclePlate: 'ET-3-B45210',
+    vehicleColor: 'Metallic White',
+    vehicleCategory: 'minivan' as VehicleCategory,
+    licenseNumber: 'AA-DL-77412',
+    rating: 4.88,
+    totalRides: 615,
+    offsetLat: -0.0031,
+    offsetLng: 0.0026,
+    heading: 140,
+    distanceMeters: 520,
+  },
+  {
+    id: 'sim_driver_bethlehem',
+    fullName: 'Bethlehem Girma (ቤተልሔም)',
+    phone: '+251914556677',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+    vehicleMake: 'Toyota',
+    vehicleModel: 'Vitz Compact',
+    vehicleYear: 2019,
+    vehiclePlate: 'ET-3-C88190',
+    vehicleColor: 'Deep Blue',
+    vehicleCategory: 'sedan' as VehicleCategory,
+    licenseNumber: 'AA-DL-63109',
+    rating: 4.90,
+    totalRides: 520,
+    offsetLat: -0.0026,
+    offsetLng: -0.0031,
+    heading: 310,
+    distanceMeters: 640,
+  },
+  {
+    id: 'sim_driver_kalkidan',
+    fullName: 'Kalkidan Alemu (ቃልኪዳን)',
+    phone: '+251916332211',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    vehicleMake: 'Suzuki',
+    vehicleModel: 'Dzire GLX',
+    vehicleYear: 2023,
+    vehiclePlate: 'ET-3-E55319',
+    vehicleColor: 'Pearl White',
+    vehicleCategory: 'sedan' as VehicleCategory,
+    licenseNumber: 'AA-DL-38192',
+    rating: 4.86,
+    totalRides: 275,
+    offsetLat: 0.0038,
+    offsetLng: -0.0015,
+    heading: 85,
+    distanceMeters: 780,
+  },
+  {
+    id: 'sim_driver_tewodros',
+    fullName: 'Tewodros Kassaye (ቴዎድሮስ)',
+    phone: '+251917884433',
+    avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150',
+    vehicleMake: 'Toyota',
+    vehicleModel: 'RAV4 Executive',
+    vehicleYear: 2022,
+    vehiclePlate: 'ET-3-F77102',
+    vehicleColor: 'Dark Gray',
+    vehicleCategory: 'comfort' as VehicleCategory,
+    licenseNumber: 'AA-DL-82731',
+    rating: 4.94,
+    totalRides: 440,
+    offsetLat: -0.0041,
+    offsetLng: 0.0037,
+    heading: 175,
+    distanceMeters: 890,
+  },
+];
+
 export const RiderView: React.FC<RiderViewProps> = ({
   currentRiderId,
   currentRiderName,
@@ -98,6 +221,8 @@ export const RiderView: React.FC<RiderViewProps> = ({
   });
 
   const [availableDrivers, setAvailableDrivers] = useState<Driver[]>([]);
+  const [simulatedCabs, setSimulatedCabs] = useState<RealisticNearbyCab[]>([]);
+  const [searchElapsedSeconds, setSearchElapsedSeconds] = useState(0);
   const [estimates, setEstimates] = useState<FareEstimate[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<VehicleCategory>('sedan');
   const [riderMode, setRiderMode] = useState<'rides' | 'deliveries'>('rides');
@@ -244,6 +369,201 @@ export const RiderView: React.FC<RiderViewProps> = ({
       })
       .catch(console.error);
   }, [currentRiderId]);
+
+  // Initialize and cluster realistic available cabs around hailed pickup location
+  useEffect(() => {
+    if (!pickup?.lat || !pickup?.lng) return;
+
+    const initialCabs: RealisticNearbyCab[] = REALISTIC_CAB_BLUEPRINTS.map((bp) => {
+      const lat = pickup.lat + bp.offsetLat;
+      const lng = pickup.lng + bp.offsetLng;
+      const distM = Math.round(
+        Math.sqrt(
+          Math.pow((lat - pickup.lat) * 111000, 2) +
+          Math.pow((lng - pickup.lng) * 111000 * Math.cos((pickup.lat * Math.PI) / 180), 2)
+        )
+      );
+      return {
+        id: bp.id,
+        userId: `user_${bp.id}`,
+        fullName: bp.fullName,
+        phone: bp.phone,
+        avatarUrl: bp.avatarUrl,
+        vehicleMake: bp.vehicleMake,
+        vehicleModel: bp.vehicleModel,
+        vehicleYear: bp.vehicleYear,
+        vehiclePlate: bp.vehiclePlate,
+        vehicleColor: bp.vehicleColor,
+        vehicleCategory: bp.vehicleCategory,
+        licenseNumber: bp.licenseNumber,
+        kycStatus: 'approved',
+        isOnline: true,
+        isBusy: false,
+        currentLat: lat,
+        currentLng: lng,
+        heading: bp.heading,
+        rating: bp.rating,
+        totalRides: bp.totalRides,
+        walletBalanceEtb: 3850,
+        subscriptionStatus: 'active',
+        countryCode: 'ET',
+        cityCode: 'ADDIS_ABABA',
+        distanceMeters: distM,
+        initialOffsetLat: bp.offsetLat,
+        initialOffsetLng: bp.offsetLng,
+      };
+    });
+
+    setSimulatedCabs(initialCabs);
+  }, [pickup.lat, pickup.lng]);
+
+  // Live Cruising Simulation: animate available cabs along road headings around hailed location
+  useEffect(() => {
+    if (!pickup?.lat || !pickup?.lng) return;
+
+    const interval = setInterval(() => {
+      setSimulatedCabs((prev) =>
+        prev.map((cab) => {
+          if (activeRide?.driver?.id === cab.id) return cab;
+
+          const speed = 0.00006; // Cruising ~25 km/h
+          const rad = ((cab.heading || 0) * Math.PI) / 180;
+          let nextLat = cab.currentLat + Math.cos(rad) * speed;
+          let nextLng = cab.currentLng + Math.sin(rad) * speed;
+          let nextHeading = cab.heading || 0;
+
+          // Boundary limit: Keep within ~1.2 km of the hailed location
+          const dLat = nextLat - pickup.lat;
+          const dLng = nextLng - pickup.lng;
+          const distSq = dLat * dLat + dLng * dLng;
+
+          if (distSq > 0.00016) {
+            const targetAngle = (Math.atan2(-dLng, -dLat) * 180) / Math.PI;
+            nextHeading = (targetAngle + 360) % 360;
+          } else if (Math.random() < 0.25) {
+            nextHeading = (nextHeading + (Math.random() * 30 - 15) + 360) % 360;
+          }
+
+          const distM = Math.round(
+            Math.sqrt(
+              Math.pow((nextLat - pickup.lat) * 111000, 2) +
+              Math.pow((nextLng - pickup.lng) * 111000 * Math.cos((pickup.lat * Math.PI) / 180), 2)
+            )
+          );
+
+          return {
+            ...cab,
+            currentLat: nextLat,
+            currentLng: nextLng,
+            heading: Math.round(nextHeading),
+            distanceMeters: distM,
+          };
+        })
+      );
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [pickup.lat, pickup.lng, activeRide?.driver?.id]);
+
+  // Handle Search Countdown & Auto-Match Simulation
+  useEffect(() => {
+    if (!activeRide || activeRide.status !== 'REQUESTED') {
+      setSearchElapsedSeconds(0);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSearchElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
+    // Auto-match after 5.5s: assign closest cab
+    const matchTimeout = setTimeout(() => {
+      if (activeRide && activeRide.status === 'REQUESTED') {
+        const closestCab = simulatedCabs[0] || REALISTIC_CAB_BLUEPRINTS[0];
+        const assignedDriver: Driver = {
+          id: closestCab.id,
+          userId: `user_${closestCab.id}`,
+          fullName: closestCab.fullName,
+          phone: closestCab.phone,
+          avatarUrl: closestCab.avatarUrl,
+          vehicleMake: closestCab.vehicleMake,
+          vehicleModel: closestCab.vehicleModel,
+          vehicleYear: closestCab.vehicleYear,
+          vehiclePlate: closestCab.vehiclePlate,
+          vehicleColor: closestCab.vehicleColor,
+          vehicleCategory: (closestCab.vehicleCategory || selectedCategory) as VehicleCategory,
+          licenseNumber: closestCab.licenseNumber,
+          kycStatus: 'approved',
+          isOnline: true,
+          isBusy: true,
+          currentLat: closestCab.currentLat,
+          currentLng: closestCab.currentLng,
+          heading: closestCab.heading,
+          rating: closestCab.rating,
+          totalRides: closestCab.totalRides,
+          walletBalanceEtb: 3850,
+          subscriptionStatus: 'active',
+          countryCode: 'ET',
+          cityCode: 'ADDIS_ABABA',
+        };
+
+        const updatedRide: Ride = {
+          ...activeRide,
+          status: 'ASSIGNED',
+          driverId: assignedDriver.id,
+          driver: assignedDriver,
+        };
+
+        setActiveRide(updatedRide);
+        setActiveDriverPos([assignedDriver.currentLat, assignedDriver.currentLng]);
+        setActiveDriverHeading(assignedDriver.heading || 0);
+        if (onRideActive) onRideActive(updatedRide);
+        sounds.playRideAccepted();
+
+        if (socket) {
+          socket.emit('ride:accept', { rideId: activeRide.id, driverId: assignedDriver.id });
+        }
+      }
+    }, 5500);
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(matchTimeout);
+    };
+  }, [activeRide?.id, activeRide?.status, simulatedCabs]);
+
+  // Live driver approach simulation: driver moves toward passenger pickup
+  useEffect(() => {
+    if (!activeRide || activeRide.status !== 'ASSIGNED' || !activeRide.driver || !activeDriverPos) return;
+
+    const approachInterval = setInterval(() => {
+      setActiveDriverPos((current) => {
+        if (!current) return current;
+        const [lat, lng] = current;
+        const dLat = pickup.lat - lat;
+        const dLng = pickup.lng - lng;
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+
+        // Arrived within ~40 meters
+        if (dist < 0.0004) {
+          setActiveRide((prev) => (prev ? { ...prev, status: 'ARRIVED' } : null));
+          sounds.playIncomingRideAlert();
+          return [pickup.lat, pickup.lng];
+        }
+
+        const step = 0.18;
+        const nextLat = lat + dLat * step;
+        const nextLng = lng + dLng * step;
+        const rad = Math.atan2(dLng, dLat);
+        const heading = ((rad * 180) / Math.PI + 360) % 360;
+        setActiveDriverHeading(Math.round(heading));
+
+        return [nextLat, nextLng];
+      });
+    }, 2000);
+
+    return () => clearInterval(approachInterval);
+  }, [activeRide?.status, activeRide?.driver?.id, pickup.lat, pickup.lng]);
 
   // Fetch fare estimates and marketplace multi-provider offers
   useEffect(() => {
@@ -603,7 +923,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
         <AddisMap
           pickup={pickup}
           destination={destination}
-          drivers={availableDrivers}
+          drivers={simulatedCabs.length > 0 ? simulatedCabs : availableDrivers}
           activeDriverLocation={activeDriverPos || (activeRide?.driver ? [activeRide.driver.currentLat, activeRide.driver.currentLng] : undefined)}
           activeDriverHeading={activeDriverHeading || (activeRide?.driver?.heading || 0)}
           activeDriverPlate={activeRide?.driver?.vehiclePlate}
@@ -611,6 +931,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
           onMapClick={handleMapClick}
           pickingMode={mapPickingMode}
           onCancelPicking={() => setMapPickingMode(null)}
+          isSearching={activeRide?.status === 'REQUESTED'}
         />
       </div>
 
@@ -1132,30 +1453,101 @@ export const RiderView: React.FC<RiderViewProps> = ({
             /* Full Live HUD Content */
             <div className="p-4 space-y-4 overflow-y-auto no-scrollbar flex-1 flex flex-col justify-between">
             <div className="space-y-4">
-              {/* Uber Radar Search Animation when REQUESTED */}
+              {/* Uber/Yango Radar Search Animation & Realistic Available Cabs Live Telemetry */}
               {activeRide.status === 'REQUESTED' ? (
-                <div className="bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden space-y-4">
+                <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white p-5 rounded-2xl shadow-2xl relative overflow-hidden space-y-4">
+                  {/* Ambient background glow */}
+                  <div className="absolute -top-16 -right-16 w-36 h-36 bg-brand-500/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
                   {/* Concentric Animated Radar Rings */}
-                  <div className="relative w-32 h-32 flex items-center justify-center my-2">
+                  <div className="relative w-28 h-28 mx-auto flex items-center justify-center my-1">
                     <div className="absolute inset-0 rounded-full border border-brand-500/30 animate-ping opacity-75" />
-                    <div className="absolute w-24 h-24 rounded-full border-2 border-brand-400/40 animate-pulse" />
-                    <div className="absolute w-16 h-16 rounded-full bg-brand-500/20 flex items-center justify-center" />
-                    <div className="relative z-10 w-12 h-12 rounded-full bg-brand-500 shadow-lg shadow-brand-500/50 flex items-center justify-center text-white">
-                      <Car className="w-6 h-6 animate-bounce" />
+                    <div className="absolute w-20 h-20 rounded-full border-2 border-brand-400/40 animate-pulse" />
+                    <div className="absolute w-14 h-14 rounded-full bg-brand-500/20 flex items-center justify-center" />
+                    <div className="relative z-10 w-11 h-11 rounded-full bg-brand-500 shadow-lg shadow-brand-500/50 flex items-center justify-center text-white">
+                      <Car className="w-5 h-5 animate-bounce" />
                     </div>
                   </div>
 
-                  <div>
+                  <div className="text-center">
                     <h3 className="font-extrabold text-base text-white">Connecting with nearby taxis...</h3>
-                    <p className="text-xs text-slate-300 mt-1 max-w-[280px]">
-                      Broadcasting ride request to certified Chebelew drivers near {pickup.address.split(',')[0]}
+                    <p className="text-xs text-slate-300 mt-1 max-w-[320px] mx-auto">
+                      Broadcasting ride request to certified Chebelew drivers near{' '}
+                      <span className="text-brand-300 font-semibold">{pickup.address.split(',')[0]}</span>
                     </p>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3.5 py-1.5 rounded-full text-xs font-semibold text-brand-300 border border-white/10">
-                    <Clock className="w-3.5 h-3.5 animate-spin" />
-                    <span>Estimated match: ~1-2 mins</span>
+                  {/* Realistic Available Cabs around Hailed Location Feed */}
+                  <div className="space-y-2 pt-1 text-left">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium px-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>{simulatedCabs.length || 5} certified cabs receiving broadcast</span>
+                      </span>
+                      <span className="font-mono text-[10px] text-brand-300">Radius: 1.2 km</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto no-scrollbar">
+                      {simulatedCabs.slice(0, 3).map((cab) => (
+                        <div
+                          key={cab.id}
+                          className="flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-3 py-2 text-xs transition"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-brand-500/20 border border-brand-400/40 flex items-center justify-center text-brand-300 shrink-0">
+                              <Car className="w-3.5 h-3.5" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-white text-[11px] flex items-center gap-1.5">
+                                <span>{cab.fullName.split(' ')[0]}</span>
+                                <span className="font-mono text-[10px] text-slate-400">({cab.vehiclePlate})</span>
+                              </div>
+                              <div className="text-[10px] text-slate-300">
+                                {cab.vehicleMake} {cab.vehicleModel} • ★{cab.rating}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                              {cab.distanceMeters || 320}m
+                            </span>
+                            <span className="block text-[9px] text-slate-400">Pinging...</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Match ETA & Animated Progress Bar */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between text-xs font-semibold text-brand-300 px-1">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 animate-spin" />
+                        <span>Estimated match: ~1-2 mins</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {Math.min(100, Math.round((searchElapsedSeconds / 5.5) * 100))}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-brand-500 to-emerald-400 h-full rounded-full transition-all duration-1000 ease-linear"
+                        style={{ width: `${Math.min(100, Math.round((searchElapsedSeconds / 5.5) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cancel Button */}
+                  <button
+                    type="button"
+                    onClick={handleCancelRide}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-300 hover:text-white bg-white/10 hover:bg-white/15 transition border border-white/10 flex items-center justify-center gap-1.5 mt-2 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Cancel Request (0 ETB Fee)</span>
+                  </button>
                 </div>
               ) : (
                 <>
