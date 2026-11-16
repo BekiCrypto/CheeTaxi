@@ -14,6 +14,12 @@ export function setupSocketHandlers(io: SocketIOServer) {
       socket.join(`driver:${driverId}`);
     });
 
+    socket.on('driver:register', (data: { driverId: string }) => {
+      if (data?.driverId) {
+        socket.join(`driver:${data.driverId}`);
+      }
+    });
+
     socket.on('join:admin', () => {
       socket.join('admin:dispatch');
     });

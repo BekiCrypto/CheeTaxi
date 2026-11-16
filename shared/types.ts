@@ -834,3 +834,35 @@ export interface PassengerWalletTransaction {
   status: 'COMPLETED' | 'PENDING' | 'FAILED';
   createdAt: string;
 }
+
+// ----------------------------------------------------------------------------
+// Multi-Provider AI Trip Value Optimizer & Driver Comparison Metrics
+// ----------------------------------------------------------------------------
+export interface TripValueMetrics {
+  compositeScore: number;
+  effectiveHourlyRateEtb: number;
+  netTakeHomeEtb: number;
+  fuelCostEstimateEtb: number;
+  pickupDistanceKm: number;
+  pickupEtaMinutes: number;
+  tripDistanceKm: number;
+  tripDurationMinutes: number;
+  totalEngagementMinutes: number;
+  trafficIndex: number;
+  trafficDescription: string;
+  surgeMultiplier: number;
+  isAiRecommended: boolean;
+  recommendationTag: string;
+  recommendationReason: string;
+  profitAdvantagePercent?: number;
+}
+
+export interface MultiProviderRideOffer extends Ride {
+  providerId: AggregatorProviderId;
+  providerName: string;
+  providerLogo?: string;
+  commissionRate: number;
+  valueMetrics: TripValueMetrics;
+  expiresInSeconds: number;
+}
+

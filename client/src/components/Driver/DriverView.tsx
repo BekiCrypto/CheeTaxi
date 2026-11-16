@@ -29,9 +29,11 @@ import {
   Calculator,
   Target,
   CreditCard,
+  Sparkles,
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { DemandHeatmapZone, Driver, DriverNetProfitability, DriverOperatingExpenses, Ride, VehicleCategory } from '@shared/types';
+import { MultiProviderRideOffer, rankAndRecommendOffers } from '@shared/tripOptimizer';
 import { translations, Language } from '../../i18n/translations';
 import { sounds } from '../../utils/audio';
 import { DriverSubscriptionTab } from './DriverSubscriptionTab';
@@ -58,6 +60,8 @@ export const DriverView: React.FC<DriverViewProps> = ({
   const [driver, setDriver] = useState<Driver | null>(null);
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [incomingRide, setIncomingRide] = useState<Ride | null>(null);
+  const [multiOffers, setMultiOffers] = useState<MultiProviderRideOffer[]>([]);
+  const [selectedOfferIdx, setSelectedOfferIdx] = useState<number>(0);
   const [countdown, setCountdown] = useState<number>(30);
   const [activeTab, setActiveTab] = useState<'trip' | 'subscription' | 'deliveries' | 'earnings' | 'kyc' | 'heatmap' | 'payout_rails'>('trip');
   const [sosActive, setSosActive] = useState(false);
@@ -204,13 +208,32 @@ export const DriverView: React.FC<DriverViewProps> = ({
     socket.emit('join:driver', driver.id);
 
     const onIncomingRide = (ride: Ride) => {
+      // In-flight active trip guard
+      if (activeRide || driver.isBusy) return;
+      const scored = rankAndRecommendOffers([ride], { lat: driver.currentLat, lng: driver.currentLng });
+      setMultiOffers(scored);
+      setSelectedOfferIdx(0);
       setIncomingRide(ride);
       setCountdown(30);
       sounds.playIncomingRideAlert();
     };
 
+    const onMultiOffers = (data: { offers: Ride[] }) => {
+      // In-flight active trip guard
+      if (activeRide || driver.isBusy) return;
+      if (data?.offers && data.offers.length > 0) {
+        const scored = rankAndRecommendOffers(data.offers, { lat: driver.currentLat, lng: driver.currentLng });
+        setMultiOffers(scored);
+        setSelectedOfferIdx(0);
+        setIncomingRide(scored[0]);
+        setCountdown(30);
+        sounds.playIncomingRideAlert();
+      }
+    };
+
     const onRideCancelled = () => {
       setIncomingRide(null);
+      setMultiOffers([]);
       setActiveRide(null);
       setIsSimulatingMove(false);
       clearInterval(simIntervalRef.current);
@@ -234,12 +257,14 @@ export const DriverView: React.FC<DriverViewProps> = ({
     };
 
     socket.on('driver:incoming_ride', onIncomingRide);
+    socket.on('driver:multi_offers', onMultiOffers);
     socket.on('driver:ride_cancelled', onRideCancelled);
     socket.on('ride:status_changed', onStatusChanged);
     socket.on('driver:kyc_updated', onKycUpdated);
 
     return () => {
       socket.off('driver:incoming_ride', onIncomingRide);
+      socket.off('driver:multi_offers', onMultiOffers);
       socket.off('driver:ride_cancelled', onRideCancelled);
       socket.off('ride:status_changed', onStatusChanged);
       socket.off('driver:kyc_updated', onKycUpdated);
@@ -298,22 +323,53 @@ export const DriverView: React.FC<DriverViewProps> = ({
   };
 
   // Accept incoming ride
-  const handleAcceptRide = () => {
-    if (!incomingRide || !driver || !socket) return;
+  const handleAcceptRide = (specificRide?: Ride) => {
+    const targetRide = specificRide || multiOffers[selectedOfferIdx] || incomingRide;
+    if (!targetRide || !driver || !socket) return;
 
     socket.emit('ride:accept', {
-      rideId: incomingRide.id,
+      rideId: targetRide.id,
       driverId: driver.id,
     });
 
-    setActiveRide(incomingRide);
+    setActiveRide(targetRide);
     setIncomingRide(null);
+    setMultiOffers([]);
     sounds.playRideAccepted();
   };
 
   // Decline incoming ride
   const handleDeclineRide = () => {
     setIncomingRide(null);
+    setMultiOffers([]);
+  };
+
+  // Simulate Multi-Provider Offers
+  const handleSimulateMultiOffers = async () => {
+    if (!driver) return;
+    if (activeRide || driver.isBusy) {
+      alert('In-Flight Protection Active: Cannot receive incoming requests while on an active trip!');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/drivers/${driver.id}/simulate-multi-offers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.offers && data.offers.length > 0) {
+          const scored = rankAndRecommendOffers(data.offers, { lat: driver.currentLat, lng: driver.currentLng });
+          setMultiOffers(scored);
+          setSelectedOfferIdx(0);
+          setIncomingRide(scored[0]);
+          setCountdown(30);
+          sounds.playIncomingRideAlert();
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Transition: Arrived at pickup
@@ -496,6 +552,15 @@ export const DriverView: React.FC<DriverViewProps> = ({
               >
                 <UserPlus className="w-3 h-3 text-brand-400" />
                 <span>Onboarding Flow</span>
+              </button>
+
+              <button
+                onClick={handleSimulateMultiOffers}
+                className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition flex items-center gap-1 cursor-pointer"
+                title="Simulate Simultaneous Multi-Provider Requests (Chebelew, Yango, RIDE)"
+              >
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span>Multi-Offers AI</span>
               </button>
             </div>
 
@@ -1112,16 +1177,19 @@ export const DriverView: React.FC<DriverViewProps> = ({
         />
       </div>
 
-      {/* Incoming Ride Alert Modal (30s countdown) */}
-      {incomingRide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 border-2 border-brand-500">
+      {/* Incoming Ride Alert / Multi-Provider AI Comparison Modal */}
+      {(incomingRide || multiOffers.length > 0) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 text-center space-y-4 border-2 border-brand-500">
+            {/* Top Linear Countdown */}
             <div className="flex items-center justify-between text-xs text-slate-500 border-b pb-2">
-              <span className="font-bold text-brand-600">NEW RIDE DISPATCH</span>
+              <span className="font-bold text-brand-600 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                {multiOffers.length > 1 ? `MULTI-PROVIDER DISPATCH (${multiOffers.length} OFFERS)` : 'NEW RIDE DISPATCH'}
+              </span>
               <span className="font-mono font-bold text-rose-600">Expires in: {countdown}s</span>
             </div>
 
-            {/* Countdown progress bar */}
             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-brand-500 h-full transition-all duration-1000"
@@ -1129,46 +1197,112 @@ export const DriverView: React.FC<DriverViewProps> = ({
               />
             </div>
 
-            {/* Fare and Distance */}
-            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-              <span className="text-[10px] text-emerald-700 block">Estimated Net Earnings</span>
-              <div className="text-2xl font-black text-emerald-800">
-                {incomingRide.fare.driverNetPayout.toFixed(2)} ETB
+            {/* Multi-Offer Provider Tabs (When 2+ offers present) */}
+            {multiOffers.length > 1 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                {multiOffers.map((offer, idx) => {
+                  const isSelected = selectedOfferIdx === idx;
+                  const isAiTop = offer.valueMetrics.isAiRecommended;
+                  return (
+                    <button
+                      key={offer.id}
+                      onClick={() => {
+                        setSelectedOfferIdx(idx);
+                        setIncomingRide(offer);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold shrink-0 transition flex items-center gap-1 ${
+                        isSelected
+                          ? 'bg-brand-500 text-white border-brand-600 shadow font-black'
+                          : isAiTop
+                          ? 'bg-amber-50 text-amber-900 border-amber-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {isAiTop && <span className="text-[10px]">★</span>}
+                      <span>{offer.providerId.toUpperCase()}</span>
+                      <span className="font-mono">{offer.fare?.totalFare} ETB</span>
+                    </button>
+                  );
+                })}
               </div>
-              <span className="text-[11px] text-emerald-600">
-                {incomingRide.distanceKm} km (~{incomingRide.durationMinutes} mins)
-              </span>
+            )}
+
+            {/* AI Recommendation Banner */}
+            {multiOffers[selectedOfferIdx]?.valueMetrics.isAiRecommended && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-left text-xs space-y-0.5">
+                <div className="flex justify-between items-center font-black text-amber-900">
+                  <span>{multiOffers[selectedOfferIdx].valueMetrics.recommendationTag}</span>
+                  <span className="text-emerald-700 font-mono font-bold">
+                    {multiOffers[selectedOfferIdx].valueMetrics.effectiveHourlyRateEtb} ETB/hr
+                  </span>
+                </div>
+                <p className="text-[10px] text-amber-800">
+                  {multiOffers[selectedOfferIdx].valueMetrics.recommendationReason}
+                </p>
+              </div>
+            )}
+
+            {/* Fare & Metrics */}
+            <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-100 grid grid-cols-2 gap-2 text-center">
+              <div>
+                <span className="text-[10px] text-emerald-700 block uppercase font-bold">Net Payout</span>
+                <div className="text-2xl font-black text-emerald-900 font-mono">
+                  {(multiOffers[selectedOfferIdx] || incomingRide)?.fare.driverNetPayout.toFixed(0)} <span className="text-xs">ETB</span>
+                </div>
+                <span className="text-[9px] text-emerald-600 block">
+                  {(multiOffers[selectedOfferIdx] || incomingRide)?.providerId === 'chebelew' ? '0% Platform Fee' : '100% In-Pocket'}
+                </span>
+              </div>
+              <div className="border-l border-emerald-200 pl-2">
+                <span className="text-[10px] text-emerald-700 block uppercase font-bold">Trip Metrics</span>
+                <div className="text-sm font-bold text-slate-800 mt-1 font-mono">
+                  {(multiOffers[selectedOfferIdx] || incomingRide)?.distanceKm} km
+                </div>
+                <span className="text-[10px] text-slate-500 block font-mono">
+                  ~{(multiOffers[selectedOfferIdx] || incomingRide)?.durationMinutes} mins
+                </span>
+              </div>
             </div>
 
             {/* Locations */}
-            <div className="text-left text-xs space-y-2 bg-slate-50 p-3 rounded-xl">
+            <div className="text-left text-xs space-y-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
               <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-emerald-600 mt-0.5" />
-                <span className="text-slate-700 font-medium truncate">
-                  {incomingRide.pickup.address}
-                </span>
+                <MapPin className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                <div className="truncate">
+                  <span className="text-[9px] text-slate-400 block font-bold">PICKUP</span>
+                  <span className="text-slate-800 font-medium">
+                    {(multiOffers[selectedOfferIdx] || incomingRide)?.pickup.address}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <Navigation className="w-3.5 h-3.5 text-rose-600 mt-0.5" />
-                <span className="text-slate-700 font-medium truncate">
-                  {incomingRide.destination.address}
-                </span>
+              <div className="flex items-start gap-2 pt-1 border-t border-slate-200">
+                <Navigation className="w-3.5 h-3.5 text-rose-600 mt-0.5 shrink-0" />
+                <div className="truncate">
+                  <span className="text-[9px] text-slate-400 block font-bold">DESTINATION</span>
+                  <span className="text-slate-800 font-medium">
+                    {(multiOffers[selectedOfferIdx] || incomingRide)?.destination.address}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Accept / Decline buttons */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            {/* Accept / Decline buttons (Driver Decision Agency) */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
               <button
                 onClick={handleDeclineRide}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs transition"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl text-xs transition col-span-1"
               >
                 {t.declineRide}
               </button>
               <button
-                onClick={handleAcceptRide}
-                className="bg-brand-500 hover:bg-brand-600 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-brand-500/30 transition animate-pulse"
+                onClick={() => handleAcceptRide(multiOffers[selectedOfferIdx] || incomingRide!)}
+                className="bg-brand-500 hover:bg-brand-600 text-white font-black py-3 rounded-xl text-xs shadow-lg shadow-brand-500/30 transition col-span-2 flex items-center justify-center gap-1.5"
               >
-                {t.acceptRide}
+                <span>
+                  {multiOffers[selectedOfferIdx]?.valueMetrics.isAiRecommended
+                    ? 'Accept AI Recommended'
+                    : t.acceptRide}
+                </span>
               </button>
             </div>
           </div>

@@ -665,5 +665,149 @@ export function createDriverRouter(io: SocketIOServer) {
     }
   });
 
+  /**
+   * Simulate Multi-Provider Concurrent Ride Offers with AI Trip Value Optimization
+   * Used for testing concurrent dispatch and multi-offer comparison
+   */
+  router.post('/:id/simulate-multi-offers', (req, res) => {
+    const driver = db.prepare('SELECT * FROM drivers WHERE id = ? OR user_id = ?').get(
+      req.params.id,
+      req.params.id
+    ) as any;
+
+    if (!driver) {
+      return res.status(404).json({ error: 'Driver not found' });
+    }
+
+    // Protection Guardrail: In-flight active trip block
+    if (driver.is_busy === 1 || driver.active_ride_id) {
+      return res.status(409).json({
+        success: false,
+        code: 'DRIVER_ACTIVE_TRIP_LOCKED',
+        message: 'Driver is currently on an active trip. In-flight protection blocks incoming requests to guarantee ride completion and 100% partner dispatch success.',
+        isBusy: true,
+        activeRideId: driver.active_ride_id,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const mockDriverLoc = { lat: driver.current_lat || 9.0105, lng: driver.current_lng || 38.7615 };
+
+    // 1. Chebelew Direct Offer (0% Commission, Short Pickup)
+    const offerChebelew: any = {
+      id: `ride_cheb_${Date.now()}`,
+      riderId: 'user_leila_01',
+      riderName: 'Leila Haile',
+      riderPhone: '+251911223344',
+      pickup: {
+        address: 'Bole Medhanialem Mall, Addis Ababa',
+        lat: 8.995,
+        lng: 38.788,
+      },
+      destination: {
+        address: 'Meskel Square, Addis Ababa',
+        lat: 9.0105,
+        lng: 38.7615,
+      },
+      vehicleCategory: 'sedan',
+      distanceKm: 4.8,
+      durationMinutes: 14,
+      fare: {
+        totalFare: 380,
+        driverNetPayout: 380,
+        platformCommission: 0.0,
+        vatAmount: 49.56,
+      },
+      paymentMethod: 'TELEBIRR',
+      status: 'REQUESTED',
+      providerId: 'chebelew',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // 2. Yango Partner Bridge Offer (12% Bridge Commission, Medium Pickup)
+    const offerYango: any = {
+      id: `ride_yango_${Date.now() + 1}`,
+      riderId: 'user_dawit_yango',
+      riderName: 'Dawit Bekele (Yango Passenger)',
+      riderPhone: '+251922334455',
+      pickup: {
+        address: 'Edna Mall Cinema, Bole, Addis Ababa',
+        lat: 8.998,
+        lng: 38.786,
+      },
+      destination: {
+        address: 'Kazanchis Commercial Hub, Addis Ababa',
+        lat: 9.0185,
+        lng: 38.7705,
+      },
+      vehicleCategory: 'sedan',
+      distanceKm: 5.2,
+      durationMinutes: 18,
+      fare: {
+        totalFare: 420,
+        driverNetPayout: 369.6, // 420 - 12% (50.4)
+        platformCommission: 50.4,
+        vatAmount: 54.78,
+      },
+      paymentMethod: 'CASH',
+      status: 'REQUESTED',
+      providerId: 'yango',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // 3. RIDE Partner Fleet Offer (15% Commission, Longer Pickup)
+    const offerRide: any = {
+      id: `ride_ride_${Date.now() + 2}`,
+      riderId: 'user_selam_ride',
+      riderName: 'Selamawit T. (RIDE Partner)',
+      riderPhone: '+251933445566',
+      pickup: {
+        address: 'Atlas Hotel Intersection, Bole',
+        lat: 9.006,
+        lng: 38.782,
+      },
+      destination: {
+        address: 'Piassa Churchill Avenue, Addis Ababa',
+        lat: 9.032,
+        lng: 38.751,
+      },
+      vehicleCategory: 'sedan',
+      distanceKm: 6.9,
+      durationMinutes: 26,
+      fare: {
+        totalFare: 490,
+        driverNetPayout: 416.5, // 490 - 15% (73.5)
+        platformCommission: 73.5,
+        vatAmount: 63.91,
+      },
+      paymentMethod: 'TELEBIRR',
+      status: 'REQUESTED',
+      providerId: 'ride',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const rawOffers = [offerChebelew, offerYango, offerRide];
+
+    // Emit to connected driver socket
+    io.to(`driver:${driver.id}`).emit('driver:multi_offers', {
+      offers: rawOffers,
+      timestamp: now,
+    });
+
+    // Also emit first ride to standard listener for backward compatibility
+    io.to(`driver:${driver.id}`).emit('driver:incoming_ride', offerChebelew);
+
+    return res.json({
+      success: true,
+      message: 'Simulated 3 multi-provider concurrent offers dispatched to driver.',
+      driverId: driver.id,
+      offersCount: rawOffers.length,
+      offers: rawOffers,
+    });
+  });
+
   return router;
 }

@@ -5,7 +5,7 @@ import {
   ArrowRight, Clock, AlertTriangle, RefreshCw, Compass, Flame,
   Share2, Check, ExternalLink, ShieldCheck, ChevronRight,
   ChevronDown, ChevronUp, Sparkles, Volume2, Globe, Radio,
-  Banknote, Fuel, Wrench, Zap
+  Banknote, Fuel, Wrench, Zap, Layers, Trophy
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { AddisMap } from '../Map/AddisMap';
@@ -15,7 +15,13 @@ import { DriverSubscriptionTab } from './DriverSubscriptionTab';
 import { DriverPaymentRailsTab } from './DriverPaymentRailsTab';
 import { DriverKYCVerification } from './DriverKYCVerification';
 import { sounds } from '../../utils/audio';
-import { Ride, Driver } from '@shared/types';
+import { Ride, Driver, AggregatorProviderId } from '@shared/types';
+import { 
+  MultiProviderRideOffer, 
+  TripValueMetrics, 
+  rankAndRecommendOffers, 
+  evaluateTripValue 
+} from '@shared/tripOptimizer';
 
 interface DriverMobileShellProps {
   currentDriverId: string;
@@ -90,9 +96,12 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
 
-  // Active Ride and Incoming Offer States
-  const [incomingOffer, setIncomingOffer] = useState<Ride | null>(null);
+  // Multi-Provider Concurrent Offers State & AI Optimizer
+  const [incomingOffers, setIncomingOffers] = useState<MultiProviderRideOffer[]>([]);
+  const [selectedOfferIndex, setSelectedOfferIndex] = useState<number>(0);
   const [countdown, setCountdown] = useState(15);
+
+  // Active In-Flight Ride States
   const [activeRide, setActiveRide] = useState<Ride | null>(null);
   const [rideStep, setRideStep] = useState<'NONE' | 'TO_PICKUP' | 'AT_PICKUP' | 'IN_TRANSIT' | 'COMPLETED'>('NONE');
   const [boardingWaitTimer, setBoardingWaitTimer] = useState(180); // 3 minutes wait time
@@ -144,30 +153,58 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
     } catch (e) {}
   }, []);
 
+  const startCountdownTimer = (initialSecs: number = 15) => {
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    setCountdown(initialSecs);
+
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdownIntervalRef.current);
+          setIncomingOffers([]);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   // Socket listeners for incoming rides and dispatch events
   useEffect(() => {
     if (!socket) return;
 
     socket.emit('driver:register', { driverId });
+    socket.emit('join:driver', driverId);
 
+    // Standard incoming single ride
     const handleNewRide = (ride: Ride) => {
-      if (!isOnline || activeRide) return;
+      // IN-FLIGHT ACTIVE TRIP LOCK:
+      // When driver is on an active trip, strictly block incoming requests
+      if (!isOnline || activeRide || rideStep !== 'NONE') return;
 
-      setIncomingOffer(ride);
-      setCountdown(15);
+      const scored = rankAndRecommendOffers([ride], { lat: driverLocation.lat, lng: driverLocation.lng });
+      setIncomingOffers((prev) => {
+        const existing = prev.filter(o => o.id !== ride.id);
+        const combined = [...existing, ...scored];
+        return rankAndRecommendOffers(combined, { lat: driverLocation.lat, lng: driverLocation.lng });
+      });
+      setSelectedOfferIndex(0);
       sounds.playIncomingRideAlert();
+      startCountdownTimer(15);
+    };
 
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(countdownIntervalRef.current);
-            setIncomingOffer(null);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    // Multi-provider simultaneous offers broadcast
+    const handleMultiOffers = (data: { offers: Ride[] }) => {
+      // IN-FLIGHT ACTIVE TRIP LOCK:
+      if (!isOnline || activeRide || rideStep !== 'NONE') return;
+
+      if (data?.offers && data.offers.length > 0) {
+        const ranked = rankAndRecommendOffers(data.offers, { lat: driverLocation.lat, lng: driverLocation.lng });
+        setIncomingOffers(ranked);
+        setSelectedOfferIndex(0);
+        sounds.playIncomingRideAlert();
+        startCountdownTimer(18);
+      }
     };
 
     const handleRideCancelled = (data: { rideId: string }) => {
@@ -177,20 +214,24 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
         sounds.playBeep(300, 'sawtooth', 0.5);
         alert('Passenger has cancelled the ride.');
       }
-      if (incomingOffer && incomingOffer.id === data.rideId) {
-        setIncomingOffer(null);
-      }
+      setIncomingOffers((prev) => prev.filter(o => o.id !== data.rideId));
     };
 
     socket.on('ride:new', handleNewRide);
+    socket.on('driver:incoming_ride', handleNewRide);
+    socket.on('driver:multi_offers', handleMultiOffers);
     socket.on('ride:cancelled', handleRideCancelled);
+    socket.on('driver:ride_cancelled', handleRideCancelled);
 
     return () => {
       socket.off('ride:new', handleNewRide);
+      socket.off('driver:incoming_ride', handleNewRide);
+      socket.off('driver:multi_offers', handleMultiOffers);
       socket.off('ride:cancelled', handleRideCancelled);
+      socket.off('driver:ride_cancelled', handleRideCancelled);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
-  }, [socket, isOnline, activeRide, incomingOffer, driverId]);
+  }, [socket, isOnline, activeRide, rideStep, driverId, driverLocation]);
 
   // Periodic GPS Location Beacon
   useEffect(() => {
@@ -237,26 +278,119 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
     }
   };
 
-  // Accept incoming ride offer
-  const handleAcceptRide = () => {
-    if (!incomingOffer || !socket) return;
+  // Accept a specific ride offer (AI recommended or user selected)
+  const handleAcceptOffer = (offerToAccept?: MultiProviderRideOffer) => {
+    const target = offerToAccept || incomingOffers[selectedOfferIndex] || incomingOffers[0];
+    if (!target || !socket) return;
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
 
     socket.emit('ride:accept', {
-      rideId: incomingOffer.id,
+      rideId: target.id,
       driverId,
     });
 
-    setActiveRide(incomingOffer);
-    setIncomingOffer(null);
+    // In-Flight lock: activeRide becomes set, blocking any subsequent requests
+    setActiveRide(target);
+    setIncomingOffers([]);
     setRideStep('TO_PICKUP');
     sounds.playRideAccepted();
   };
 
-  const handleDeclineRide = () => {
+  const handleDeclineAllOffers = () => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    setIncomingOffer(null);
+    setIncomingOffers([]);
     sounds.playBeep(350, 'square', 0.15);
+  };
+
+  // Simulate Multi-Provider Offers (Chebelew, Yango, RIDE) for immediate testing
+  const handleSimulateMultiOffers = async () => {
+    if (!isOnline) {
+      alert('Please switch Online first to receive multi-provider ride offers!');
+      return;
+    }
+    if (activeRide || rideStep !== 'NONE') {
+      alert('In-Flight Protection Active: Cannot receive incoming requests while on an active trip!');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/drivers/${driverId}/simulate-multi-offers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.offers && data.offers.length > 0) {
+          const ranked = rankAndRecommendOffers(data.offers, { lat: driverLocation.lat, lng: driverLocation.lng });
+          setIncomingOffers(ranked);
+          setSelectedOfferIndex(0);
+          sounds.playIncomingRideAlert();
+          startCountdownTimer(20);
+        }
+      }
+    } catch (e) {
+      // Offline fallback: generate client-side mock multi-offers
+      const now = new Date().toISOString();
+      const mockOffers: any[] = [
+        {
+          id: `ride_mock_cheb_${Date.now()}`,
+          riderId: 'user_leila_01',
+          riderName: 'Leila Haile',
+          riderPhone: '+251911223344',
+          pickup: { address: 'Bole Medhanialem Mall', lat: 8.995, lng: 38.788 },
+          destination: { address: 'Meskel Square, Addis Ababa', lat: 9.0105, lng: 38.7615 },
+          vehicleCategory: 'sedan',
+          distanceKm: 4.8,
+          durationMinutes: 14,
+          fare: { totalFare: 380, driverNetPayout: 380, platformCommission: 0, vatAmount: 49.56 },
+          paymentMethod: 'TELEBIRR',
+          status: 'REQUESTED',
+          providerId: 'chebelew',
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: `ride_mock_yango_${Date.now()}`,
+          riderId: 'user_dawit_yango',
+          riderName: 'Dawit B. (Yango Partner)',
+          riderPhone: '+251922334455',
+          pickup: { address: 'Edna Mall Cinema, Bole', lat: 8.998, lng: 38.786 },
+          destination: { address: 'Kazanchis Commercial Hub', lat: 9.0185, lng: 38.7705 },
+          vehicleCategory: 'sedan',
+          distanceKm: 5.2,
+          durationMinutes: 18,
+          fare: { totalFare: 420, driverNetPayout: 369.6, platformCommission: 50.4, vatAmount: 54.78 },
+          paymentMethod: 'CASH',
+          status: 'REQUESTED',
+          providerId: 'yango',
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: `ride_mock_ride_${Date.now()}`,
+          riderId: 'user_selam_ride',
+          riderName: 'Selamawit T. (RIDE Partner)',
+          riderPhone: '+251933445566',
+          pickup: { address: 'Atlas Hotel Intersection', lat: 9.006, lng: 38.782 },
+          destination: { address: 'Piassa Churchill Ave', lat: 9.032, lng: 38.751 },
+          vehicleCategory: 'sedan',
+          distanceKm: 6.9,
+          durationMinutes: 26,
+          fare: { totalFare: 490, driverNetPayout: 416.5, platformCommission: 73.5, vatAmount: 63.91 },
+          paymentMethod: 'TELEBIRR',
+          status: 'REQUESTED',
+          providerId: 'ride',
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+
+      const ranked = rankAndRecommendOffers(mockOffers, { lat: driverLocation.lat, lng: driverLocation.lng });
+      setIncomingOffers(ranked);
+      setSelectedOfferIndex(0);
+      sounds.playIncomingRideAlert();
+      startCountdownTimer(20);
+    }
   };
 
   // In-Cab HUD Turn-by-Turn state steps
@@ -317,6 +451,17 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
   };
 
   const isAm = language === 'am';
+
+  // Currently focused offer in comparison deck
+  const currentOffer: MultiProviderRideOffer | null =
+    incomingOffers.length > 0
+      ? incomingOffers[selectedOfferIndex] || incomingOffers[0]
+      : null;
+
+  // Active display points for AddisMap
+  const mapPickup = activeRide?.pickup || currentOffer?.pickup;
+  const mapDestination = activeRide?.destination || currentOffer?.destination;
+  const mapRouteCoords = activeRide?.routeCoordinates || currentOffer?.routeCoordinates || [];
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-950 text-slate-100 overflow-hidden select-none font-sans">
@@ -443,9 +588,9 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
             {/* Full-Screen Map */}
             <div className="absolute inset-0 z-0">
               <AddisMap
-                pickup={activeRide?.pickup || incomingOffer?.pickup}
-                destination={activeRide?.destination || incomingOffer?.destination}
-                routeCoordinates={activeRide?.routeCoordinates || incomingOffer?.routeCoordinates || []}
+                pickup={mapPickup}
+                destination={mapDestination}
+                routeCoordinates={mapRouteCoords}
                 activeDriverLocation={[driverLocation.lat, driverLocation.lng]}
                 activeDriverHeading={driverLocation.heading}
                 activeDriverPlate={driver.vehiclePlate}
@@ -462,8 +607,28 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                 <span className="text-emerald-400 font-bold">±3m RTK</span>
               </div>
 
+              {/* In-Flight Active Trip Lock Shield Badge */}
+              {activeRide && (
+                <div className="bg-emerald-950/90 backdrop-blur-xl border border-emerald-500/40 px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 text-[10px] text-emerald-300 pointer-events-auto animate-pulse">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="font-bold">In-Flight Lock: Other Requests Blocked</span>
+                </div>
+              )}
+
               {/* Center / Right controls */}
               <div className="flex items-center gap-1.5 pointer-events-auto">
+                {/* Multi-Offer AI Simulator Button (Interactive Feature Showcase) */}
+                {isOnline && !activeRide && (
+                  <button
+                    onClick={handleSimulateMultiOffers}
+                    className="px-2.5 py-1.5 bg-gradient-to-r from-purple-600/30 via-indigo-600/30 to-amber-600/30 hover:from-purple-600/50 hover:to-amber-600/50 border border-purple-500/40 rounded-xl text-[11px] font-bold text-purple-200 flex items-center gap-1.5 shadow-lg active-press transition"
+                    title="Simulate Simultaneous Multi-Provider Requests (Chebelew, Yango, RIDE)"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isAm ? '3 ጥሪዎችን አወዳድር' : 'Simulate 3 Offers'}</span>
+                  </button>
+                )}
+
                 {/* Corridor Shortcut Pill */}
                 <button
                   onClick={() => setShowCorridorSheet(!showCorridorSheet)}
@@ -475,7 +640,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                   title="On-My-Way Corridor Filter"
                 >
                   <Sliders className="w-3 h-3" />
-                  <span className="truncate max-w-[90px]">{isFilterActive && destinationFilter ? destinationFilter : (isAm ? 'አቅጣጫ' : 'Corridor')}</span>
+                  <span className="truncate max-w-[80px]">{isFilterActive && destinationFilter ? destinationFilter : (isAm ? 'አቅጣጫ' : 'Corridor')}</span>
                 </button>
 
                 {/* Demand Heatmap Toggle */}
@@ -569,7 +734,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                 ============================================================ */}
 
             {/* STATE A: OFFLINE DOCK */}
-            {!isOnline && !activeRide && !incomingOffer && (
+            {!isOnline && !activeRide && incomingOffers.length === 0 && (
               <div className="absolute bottom-4 left-4 right-4 z-[950] max-w-md mx-auto space-y-2.5 animate-slide-up">
                 {/* Collapsible Shift Overview Pill */}
                 <div className="bg-slate-900/95 backdrop-blur-2xl border border-slate-800 rounded-2xl p-3 shadow-xl">
@@ -607,7 +772,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
             )}
 
             {/* STATE B: ONLINE & SEARCHING RADAR DOCK */}
-            {isOnline && !activeRide && !incomingOffer && (
+            {isOnline && !activeRide && incomingOffers.length === 0 && (
               <div className="absolute bottom-4 left-4 right-4 z-[950] max-w-md mx-auto bg-slate-900/95 backdrop-blur-2xl border border-slate-800 rounded-3xl p-4 shadow-2xl space-y-3 animate-slide-up">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
@@ -620,7 +785,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                         <span>{isAm ? 'በመስመር ላይ • ጉዞ በመፈለግ ላይ' : 'ONLINE • Finding Rides'}</span>
                       </h4>
                       <p className="text-[10px] text-slate-400 mt-0.5">
-                        {isAm ? 'በ5 ኪ.ሜ ራዲየስ ውስጥ በቅርብ ላሉ ተሳፋሪዎች' : 'Auto-matching nearest riders within 5km radius'}
+                        {isAm ? 'ከቼበለው እና ከተባባሪ ድርጅቶች ጥሪዎችን በመጠበቅ ላይ' : 'Listening across Chebelew, Yango & RIDE partners'}
                       </p>
                     </div>
                   </div>
@@ -640,7 +805,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                     <span className="text-slate-400 font-sans">{shiftStats.tripsCompleted} trips</span>
                   </div>
                   <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 font-bold rounded-full text-[10px] border border-amber-500/30">
-                    0% Commission Active
+                    Multi-Provider AI Active
                   </span>
                 </div>
               </div>
@@ -999,77 +1164,230 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       </main>
 
       {/* ==============================================================
-          SLIDE-UP YANGO PRO STYLE INCOMING RIDE OFFER BOTTOM SHEET
+          AI-POWERED MULTI-PROVIDER TRIP VALUE OPTIMIZER & COMPARISON DECK
           ============================================================== */}
-      {incomingOffer && (
+      {currentOffer && (
         <div className="fixed inset-0 z-[1500] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in pointer-events-auto">
-          <div className="w-full max-w-md bg-slate-900 border-t-2 sm:border-2 border-amber-500 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 space-y-4 text-center relative overflow-hidden urgent-pulse animate-slide-up">
+          <div className="w-full max-w-lg bg-slate-900 border-t-2 sm:border-2 border-amber-500 rounded-t-3xl sm:rounded-3xl shadow-2xl p-4 sm:p-5 space-y-3.5 text-center relative overflow-hidden urgent-pulse animate-slide-up">
             {/* Top Linear Countdown Timer Bar */}
             <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
               <div
                 className="bg-amber-400 h-full transition-all duration-1000 ease-linear"
-                style={{ width: `${(countdown / 15) * 100}%` }}
+                style={{ width: `${(countdown / 18) * 100}%` }}
               />
             </div>
 
-            {/* Header & Net Fare */}
-            <div className="flex items-center justify-between pt-1">
+            {/* Header: Multi-Offer Notification & AI Tag */}
+            <div className="flex items-center justify-between pt-0.5">
               <div className="text-left">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-wider border border-amber-500/30">
-                  {isAm ? 'አዲስ ጉዞ ጥሪ' : 'NEW RIDE OFFER'}
-                </span>
+                {incomingOffers.length > 1 ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-500/25 text-purple-300 text-[10px] font-black uppercase tracking-wider border border-purple-500/40 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      {incomingOffers.length} {isAm ? 'ጥሪዎች ተገኝተዋል' : 'Simultaneous Offers'}
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-bold">
+                      {isAm ? 'በአይአይ የተተነተነ' : 'AI Analyzed'}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-wider border border-amber-500/30">
+                    {isAm ? 'አዲስ ጉዞ ጥሪ' : 'NEW RIDE OFFER'}
+                  </span>
+                )}
                 <p className="text-[10px] text-slate-400 mt-1">
-                  {incomingOffer.riderName || 'Passenger'} • ★ 4.95
+                  {currentOffer.riderName || 'Passenger'} • ★ 4.95 • {currentOffer.providerName}
                 </p>
               </div>
+
               <div className="text-right">
-                <h3 className="text-2xl font-black text-white font-mono">
-                  {incomingOffer.fare?.totalFare || 380} <span className="text-xs font-bold text-amber-400">ETB</span>
-                </h3>
-                <span className="text-[10px] text-emerald-400 font-bold block">100% Direct to You</span>
+                <span className="text-[10px] font-mono font-bold text-rose-400">
+                  {countdown}s remaining
+                </span>
+                <div className="text-xl font-black text-white font-mono leading-none mt-0.5">
+                  {currentOffer.fare?.totalFare || 380} <span className="text-xs font-bold text-amber-400">ETB</span>
+                </div>
               </div>
             </div>
 
-            {/* Route Details */}
-            <div className="bg-slate-800/80 rounded-2xl p-3.5 text-left space-y-2.5 text-xs">
-              <div className="flex items-start gap-2.5">
+            {/* Multi-Offer Interactive Tab Selector (When 2+ offers arrive simultaneously) */}
+            {incomingOffers.length > 1 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                  <span>{isAm ? 'ጥሪዎችን አወዳድር (ንካ ለመምረጥ)' : 'Compare Offers (Tap to inspect on map)'}:</span>
+                  <span className="text-amber-400 font-bold">{isAm ? 'የእርስዎ ምርጫ' : 'Driver Decision Mode'}</span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {incomingOffers.map((offer, idx) => {
+                    const isSelected = selectedOfferIndex === idx;
+                    const isAiTop = offer.valueMetrics.isAiRecommended;
+                    return (
+                      <button
+                        key={offer.id}
+                        onClick={() => setSelectedOfferIndex(idx)}
+                        className={`px-3 py-2 rounded-2xl border text-xs font-bold shrink-0 transition flex items-center gap-1.5 active-press ${
+                          isSelected
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg font-black'
+                            : isAiTop
+                            ? 'bg-slate-800/90 text-amber-300 border-amber-500/50 hover:bg-slate-750'
+                            : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
+                        }`}
+                      >
+                        {isAiTop && <Trophy className="w-3.5 h-3.5 text-amber-950 animate-pulse" />}
+                        <span>
+                          {offer.providerId === 'chebelew' ? 'Chebelew' : offer.providerId === 'yango' ? 'Yango' : 'RIDE'}
+                        </span>
+                        <span className="font-mono">{offer.fare?.totalFare} ETB</span>
+                        {isAiTop && (
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-black ${isSelected ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'}`}>
+                            TOP
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* AI Trip Value Score & Transparent Recommendation Card */}
+            <div className={`p-3 rounded-2xl border text-left transition ${
+              currentOffer.valueMetrics.isAiRecommended
+                ? 'bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-teal-500/15 border-amber-500/40 shadow-inner'
+                : 'bg-slate-800/70 border-slate-700/80'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm shadow ${
+                    currentOffer.valueMetrics.isAiRecommended
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'bg-slate-700 text-slate-200'
+                  }`}>
+                    {currentOffer.valueMetrics.isAiRecommended ? '★' : `#${selectedOfferIndex + 1}`}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-black uppercase tracking-wider ${
+                        currentOffer.valueMetrics.isAiRecommended ? 'text-amber-400' : 'text-slate-200'
+                      }`}>
+                        {currentOffer.valueMetrics.recommendationTag}
+                      </span>
+                      {currentOffer.valueMetrics.profitAdvantagePercent && (
+                        <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.2 rounded border border-emerald-500/30">
+                          +{currentOffer.valueMetrics.profitAdvantagePercent}% Profit
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-300 leading-tight mt-0.5">
+                      {currentOffer.valueMetrics.recommendationReason}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-base font-black text-emerald-400 font-mono block leading-none">
+                    {currentOffer.valueMetrics.effectiveHourlyRateEtb} <span className="text-[9px] font-normal">ETB/h</span>
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-bold block mt-0.5">
+                    Score: {currentOffer.valueMetrics.compositeScore}/100
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Direct 4-Pillar Comparative Parameter Matrix */}
+            <div className="grid grid-cols-4 gap-1.5 text-center text-xs">
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700/70">
+                <span className="text-[9px] text-slate-400 uppercase font-bold block">Net Fare</span>
+                <span className="font-mono font-black text-amber-400 text-xs">
+                  {currentOffer.fare?.totalFare} ETB
+                </span>
+                <span className="text-[8px] text-emerald-400 font-bold block mt-0.5">
+                  {currentOffer.commissionRate === 0 ? '0% Comm' : `-${currentOffer.commissionRate * 100}% Comm`}
+                </span>
+              </div>
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700/70">
+                <span className="text-[9px] text-slate-400 uppercase font-bold block">Pickup</span>
+                <span className="font-mono font-bold text-slate-200 text-xs">
+                  {currentOffer.valueMetrics.pickupDistanceKm} km
+                </span>
+                <span className="text-[8px] text-emerald-400 block mt-0.5">
+                  ~{currentOffer.valueMetrics.pickupEtaMinutes}m ETA
+                </span>
+              </div>
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700/70">
+                <span className="text-[9px] text-slate-400 uppercase font-bold block">Trip Duration</span>
+                <span className="font-mono font-bold text-slate-200 text-xs">
+                  {currentOffer.valueMetrics.tripDurationMinutes} min
+                </span>
+                <span className="text-[8px] text-slate-400 block mt-0.5">
+                  {currentOffer.distanceKm} km trip
+                </span>
+              </div>
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-slate-700/70">
+                <span className="text-[9px] text-slate-400 uppercase font-bold block">Net Take-Home</span>
+                <span className="font-mono font-black text-emerald-400 text-xs">
+                  {currentOffer.valueMetrics.netTakeHomeEtb} ETB
+                </span>
+                <span className="text-[8px] text-slate-400 block mt-0.5">
+                  After Fuel
+                </span>
+              </div>
+            </div>
+
+            {/* Route Landmarks */}
+            <div className="bg-slate-800/60 rounded-2xl p-3 text-left space-y-2 text-xs border border-slate-700/60">
+              <div className="flex items-start gap-2">
                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
                   <MapPin className="w-3.5 h-3.5" />
                 </div>
                 <div className="overflow-hidden">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                    {isAm ? 'መነሻ ቦታ (~1.2 ኪ.ሜ ርቀት • ~3 ደቂቃ)' : 'Pickup (~1.2 km away • ~3 min ETA)'}
+                  <span className="text-[9px] text-slate-400 uppercase font-bold block">
+                    {isAm ? 'መነሻ ቦታ' : 'Pickup Location'}
                   </span>
-                  <p className="font-semibold text-slate-100 truncate">{incomingOffer.pickup?.address}</p>
+                  <p className="font-semibold text-slate-100 truncate">{currentOffer.pickup?.address}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2.5 pt-1.5 border-t border-slate-700/60">
+              <div className="flex items-start gap-2 pt-1.5 border-t border-slate-700/40">
                 <div className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
                   <Navigation className="w-3.5 h-3.5" />
                 </div>
                 <div className="overflow-hidden">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                    {isAm ? 'መድረሻ ቦታ (~4.8 ኪ.ሜ ጉዞ)' : 'Destination (~4.8 km trip)'}
-                  </span>
-                  <p className="font-semibold text-slate-100 truncate">{incomingOffer.destination?.address}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] text-slate-400 uppercase font-bold block">
+                      {isAm ? 'መድረሻ ቦታ' : 'Destination'}
+                    </span>
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      {currentOffer.valueMetrics.trafficDescription}
+                    </span>
+                  </div>
+                  <p className="font-semibold text-slate-100 truncate">{currentOffer.destination?.address}</p>
                 </div>
               </div>
             </div>
 
-            {/* Accept / Decline Action Buttons */}
-            <div className="grid grid-cols-3 gap-2.5 pt-1">
+            {/* Action Buttons: 100% Driver Agency to choose AI recommended or any specific offer */}
+            <div className="grid grid-cols-3 gap-2 pt-1">
               <button
-                onClick={handleDeclineRide}
+                onClick={handleDeclineAllOffers}
                 className="py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white font-bold rounded-2xl text-xs transition border border-slate-700 active-press col-span-1"
               >
-                {isAm ? 'እምቢ' : 'Decline'} ({countdown}s)
+                {isAm ? 'ሁሉንም እምቢ' : 'Decline All'}
               </button>
               <button
-                onClick={handleAcceptRide}
-                className="py-3.5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black rounded-2xl text-sm shadow-xl shadow-amber-500/25 transition active-press col-span-2 flex items-center justify-center gap-1.5"
+                onClick={() => handleAcceptOffer(currentOffer)}
+                className={`py-3.5 font-black rounded-2xl text-sm shadow-xl transition active-press col-span-2 flex items-center justify-center gap-1.5 ${
+                  currentOffer.valueMetrics.isAiRecommended
+                    ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 text-slate-950 shadow-amber-500/30'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/30'
+                }`}
               >
                 <Check className="w-4 h-4 stroke-[3]" />
-                <span>{isAm ? 'ጉዞውን ተቀበል' : 'Accept Ride / ተቀበል'}</span>
+                <span>
+                  {currentOffer.valueMetrics.isAiRecommended
+                    ? (isAm ? 'የተመረጠውን ተቀበል (AI Top)' : 'Accept AI Recommended')
+                    : (isAm ? 'ይህንን ጉዞ ተቀበል' : 'Accept Selected Offer')}
+                </span>
               </button>
             </div>
           </div>

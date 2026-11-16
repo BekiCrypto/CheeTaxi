@@ -30,10 +30,10 @@ export class DispatchService {
     category: VehicleCategory,
     maxRadiusKm: number = 8.0
   ): (Driver & { distanceToPickupKm: number; etaMinutes: number })[] {
-    // Select all online, non-busy, approved drivers with active or grace-period subscription
+    // Select all online, non-busy, approved drivers not on an active trip
     const rows = db.prepare(`
       SELECT * FROM drivers
-      WHERE is_online = 1 AND is_busy = 0 AND kyc_status = 'approved'
+      WHERE is_online = 1 AND is_busy = 0 AND (active_ride_id IS NULL OR active_ride_id = '') AND kyc_status = 'approved'
         AND (subscription_status IN ('active', 'grace_period') OR subscription_status IS NULL)
     `).all() as any[];
 
@@ -132,7 +132,15 @@ export class DispatchService {
         initialStatus = 'ASSIGNED';
       }
     } else {
-      initialStatus = 'ASSIGNED';
+      // Guardrail: Validate that manual/direct driver is actually available and not on an active trip
+      const target = db.prepare('SELECT is_online, is_busy, active_ride_id FROM drivers WHERE id = ?').get(assignedDriverId) as any;
+      if (target && (target.is_busy === 1 || Boolean(target.active_ride_id) || target.is_online === 0)) {
+        // Driver is currently on an active trip or offline - block assignment to avoid failed ride requests
+        assignedDriverId = undefined;
+        initialStatus = 'REQUESTED';
+      } else {
+        initialStatus = 'ASSIGNED';
+      }
     }
 
     const insertStmt = db.prepare(`

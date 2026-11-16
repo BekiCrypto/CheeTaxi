@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ProviderAggregatorService } from '../services/providerAggregatorService.js';
+import { DispatchService } from '../services/dispatchService.js';
 import { AggregatorProviderId, CircuitBreakerState } from '../../../shared/types.js';
 
 export const providerRouter = Router();
@@ -220,3 +221,42 @@ providerRouter.delete('/logs', (_req, res) => {
   ProviderAggregatorService.clearRoutingLogs();
   return res.json({ success: true, message: 'Aggregator routing logs cleared.' });
 });
+
+/**
+ * Real-Time Available Cabs for Provider Aggregator Routing
+ * Guarantees zero ghost dispatches by strictly excluding cabs on active trips (is_busy = 1 or active_ride_id != null)
+ */
+providerRouter.get('/availability', (req, res) => {
+  const providerId = (req.query.providerId as AggregatorProviderId) || 'chebelew';
+  const lat = req.query.lat ? parseFloat(req.query.lat as string) : 9.0105;
+  const lng = req.query.lng ? parseFloat(req.query.lng as string) : 38.7615;
+  const radiusKm = req.query.radius ? parseFloat(req.query.radius as string) : 10.0;
+  const category = (req.query.category as any) || 'sedan';
+
+  const availableDrivers = DispatchService.findEligibleDrivers(lat, lng, category, radiusKm);
+
+  return res.json({
+    success: true,
+    providerId,
+    timestamp: new Date().toISOString(),
+    queryCenter: { lat, lng },
+    radiusKm,
+    availableCabsCount: availableDrivers.length,
+    activeProtectionStatus: 'BLOCK_BUSY_DRIVERS_ACTIVE',
+    cabs: availableDrivers.map((d: any) => ({
+      driverId: d.id,
+      fullName: d.fullName,
+      vehiclePlate: d.vehiclePlate,
+      vehicleModel: `${d.vehicleMake} ${d.vehicleModel} (${d.vehicleColor})`,
+      currentLat: d.currentLat,
+      currentLng: d.currentLng,
+      distanceKm: d.distanceToPickupKm,
+      etaMinutes: d.etaMinutes,
+      rating: d.rating,
+      subscriptionStatus: d.subscriptionStatus,
+      isBusy: d.isBusy,
+      activeRideId: d.activeRideId || null,
+    })),
+  });
+});
+
