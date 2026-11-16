@@ -23,13 +23,17 @@ export interface CreateRideInput {
 
 export class DispatchService {
   /**
-   * Finds nearby eligible drivers ordered by proximity to pickup
+   * Finds nearby eligible drivers ordered by proximity to pickup.
+   * Filters out drivers whose "On-My-Way" destination corridor does not match the trip destination.
    */
   static findEligibleDrivers(
     pickupLat: number,
     pickupLng: number,
     category: VehicleCategory,
-    maxRadiusKm: number = 8.0
+    maxRadiusKm: number = 8.0,
+    destinationAddress?: string,
+    _destinationLat?: number,
+    _destinationLng?: number
   ): (Driver & { distanceToPickupKm: number; etaMinutes: number })[] {
     // Select all online, non-busy, approved drivers not on an active trip
     const rows = db.prepare(`
@@ -46,6 +50,30 @@ export class DispatchService {
       const targetCategory = category.startsWith('partner_') ? 'sedan' : category;
       if (row.vehicle_category !== targetCategory && category !== 'sedan') {
         continue;
+      }
+
+      // Check On-My-Way Destination Corridor Filter
+      if (
+        row.is_corridor_active === 1 &&
+        row.destination_filter &&
+        row.destination_filter.trim() !== '' &&
+        row.destination_filter !== 'All Addis Ababa'
+      ) {
+        if (destinationAddress) {
+          const filterTokens = row.destination_filter
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ' ')
+            .split(/\s+/)
+            .filter((tok: string) => tok.length > 2);
+          const destLower = destinationAddress.toLowerCase();
+          const matchesCorridor =
+            filterTokens.length === 0 ||
+            filterTokens.some((tok: string) => destLower.includes(tok));
+          if (!matchesCorridor) {
+            // Driver is heading to a specific neighborhood and this trip doesn't align
+            continue;
+          }
+        }
       }
 
       const dist = calculateHaversineDistance(pickupLat, pickupLng, row.current_lat, row.current_lng);
@@ -136,7 +164,11 @@ export class DispatchService {
       const candidates = this.findEligibleDrivers(
         input.pickup.lat,
         input.pickup.lng,
-        input.vehicleCategory
+        input.vehicleCategory,
+        8.0,
+        input.destination.address,
+        input.destination.lat,
+        input.destination.lng
       );
       if (candidates.length > 0) {
         assignedDriverId = candidates[0].id;
@@ -242,7 +274,28 @@ export class DispatchService {
       now
     );
 
-    return this.getRideById(rideId);
+    const updatedRide = this.getRideById(rideId);
+    if (updatedRide?.partnerCallbackUrl) {
+      try {
+        fetch(updatedRide.partnerCallbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: 'ride:assigned',
+            partnerOrderId: updatedRide.partnerOrderId,
+            rideId: updatedRide.id,
+            driverId: updatedRide.driverId,
+            driverName: driver.full_name,
+            driverPhone: driver.phone,
+            vehiclePlate: driver.vehicle_plate,
+            status: 'ASSIGNED',
+            timestamp: now,
+          }),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    return updatedRide;
   }
 
   /**
@@ -325,7 +378,25 @@ export class DispatchService {
       );
     }
 
-    return this.getRideById(rideId);
+    const updatedRide = this.getRideById(rideId);
+    if (updatedRide?.partnerCallbackUrl) {
+      try {
+        fetch(updatedRide.partnerCallbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event: `ride:${status.toLowerCase()}`,
+            partnerOrderId: updatedRide.partnerOrderId,
+            rideId: updatedRide.id,
+            driverId: updatedRide.driverId,
+            status,
+            timestamp: now,
+          }),
+        }).catch(() => {});
+      } catch (e) {}
+    }
+
+    return updatedRide;
   }
 
   /**
@@ -438,6 +509,7 @@ export class DispatchService {
       operatorNotes: row.operator_notes,
       providerId: row.provider_id || 'chebelew',
       partnerOrderId: row.partner_order_id || undefined,
+      partnerCallbackUrl: row.partner_callback_url || undefined,
       countryCode: row.country_code || 'ET',
       createdAt: row.created_at,
       updatedAt: row.updated_at,

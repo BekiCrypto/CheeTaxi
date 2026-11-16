@@ -588,11 +588,15 @@ export function initDatabase() {
   migrateColumn('drivers', 'ai_verification_status', "TEXT DEFAULT 'pending'");
   migrateColumn('drivers', 'admin_override_by', 'TEXT');
   migrateColumn('drivers', 'admin_override_at', 'TEXT');
+  migrateColumn('drivers', 'destination_filter', 'TEXT');
+  migrateColumn('drivers', 'is_corridor_active', 'INTEGER NOT NULL DEFAULT 0');
+  migrateColumn('drivers', 'corridor_radius_km', 'REAL NOT NULL DEFAULT 1.5');
 
   migrateColumn('rides', 'corporate_id', 'TEXT');
   migrateColumn('rides', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
   migrateColumn('rides', 'provider_id', "TEXT DEFAULT 'chebelew'");
   migrateColumn('rides', 'partner_order_id', 'TEXT');
+  migrateColumn('rides', 'partner_callback_url', 'TEXT');
 
   migrateColumn('users', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
   migrateColumn('users', 'is_verified', 'INTEGER NOT NULL DEFAULT 1');

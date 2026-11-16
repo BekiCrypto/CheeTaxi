@@ -438,7 +438,7 @@ export function createDriverRouter(io: SocketIOServer) {
    * Driver Destination Corridor Filter ("On-My-Way" Mode)
    */
   router.post('/:id/destination', (req, res) => {
-    const { destination, isActive } = req.body;
+    const { destination, isActive, radiusKm } = req.body;
     const driver = db.prepare('SELECT * FROM drivers WHERE id = ? OR user_id = ?').get(
       req.params.id,
       req.params.id
@@ -448,11 +448,22 @@ export function createDriverRouter(io: SocketIOServer) {
       return res.status(404).json({ error: 'Driver not found' });
     }
 
+    const activeInt = isActive ? 1 : 0;
+    const filterVal = destination ? String(destination).trim() : null;
+    const rad = typeof radiusKm === 'number' ? radiusKm : (driver.corridor_radius_km || 1.5);
+
+    db.prepare(`
+      UPDATE drivers
+      SET destination_filter = ?, is_corridor_active = ?, corridor_radius_km = ?
+      WHERE id = ?
+    `).run(filterVal, activeInt, rad, driver.id);
+
     return res.json({
       success: true,
       driverId: driver.id,
-      destination: destination || 'All Addis Ababa',
-      isActive: Boolean(isActive),
+      destination: filterVal || 'All Addis Ababa',
+      isActive: Boolean(activeInt),
+      radiusKm: rad,
     });
   });
 
@@ -467,9 +478,11 @@ export function createDriverRouter(io: SocketIOServer) {
     }
 
     return res.json({
+      success: true,
       driverId: driver.id,
-      destination: 'All Addis Ababa',
-      isActive: false,
+      destination: driver.destination_filter || 'All Addis Ababa',
+      isActive: Boolean(driver.is_corridor_active),
+      radiusKm: driver.corridor_radius_km || 1.5,
     });
   });
 

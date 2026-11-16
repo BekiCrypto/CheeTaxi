@@ -107,7 +107,15 @@ export function createRideRouter(io: SocketIOServer) {
     } else {
       // Broadcast incoming ride request to nearby eligible drivers
       // The driver retains full agency: they inspect the AI trip recommendations and choose to accept
-      const eligible = DispatchService.findEligibleDrivers(pickup.lat, pickup.lng, vehicleCategory, 10);
+      const eligible = DispatchService.findEligibleDrivers(
+        pickup.lat,
+        pickup.lng,
+        vehicleCategory,
+        10,
+        destination.address,
+        destination.lat,
+        destination.lng
+      );
       for (const d of eligible) {
         io.to(`driver:${d.id}`).emit('driver:incoming_ride', ride);
       }

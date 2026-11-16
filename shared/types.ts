@@ -271,6 +271,7 @@ export interface Ride {
   corporateId?: string;
   providerId?: AggregatorProviderId;
   partnerOrderId?: string;
+  partnerCallbackUrl?: string;
   countryCode: string;
   createdAt: string;
   updatedAt: string;

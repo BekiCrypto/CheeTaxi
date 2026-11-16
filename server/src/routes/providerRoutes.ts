@@ -1,9 +1,18 @@
 import { Router } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import { db } from '../db/database.js';
+import { estimateRoadMetrics, generateRouteCoordinates } from '../services/geoService.js';
 import { ProviderAggregatorService } from '../services/providerAggregatorService.js';
 import { DispatchService } from '../services/dispatchService.js';
 import { AggregatorProviderId, CircuitBreakerState } from '../../../shared/types.js';
+import { Server as SocketIOServer } from 'socket.io';
 
 export const providerRouter = Router();
+
+let socketIO: SocketIOServer | null = null;
+export function setProviderIO(io: SocketIOServer) {
+  socketIO = io;
+}
 
 /**
  * Normalized multi-provider search & ranking
@@ -258,5 +267,128 @@ providerRouter.get('/availability', (req, res) => {
       activeRideId: d.activeRideId || null,
     })),
   });
+});
+
+/**
+ * Partner Inbound Dispatch Ingestion API (Trojan Horse / Mobility Clearinghouse)
+ * Allows third-party operators (RIDE, Feres, hotel concierges, corporate dispatchers)
+ * to route unfulfilled passenger trip requests into Chebelew's active driver pool.
+ */
+providerRouter.post(['/inbound-ride', '/rides'], (req, res) => {
+  const {
+    partnerId = 'ride_partner',
+    partnerOrderId,
+    passengerName = 'Partner Passenger',
+    passengerPhone = '+251911000000',
+    pickup,
+    destination,
+    vehicleCategory = 'sedan',
+    offeredFareEtb,
+    partnerCommissionRate = 0.12,
+    callbackWebhookUrl,
+  } = req.body;
+
+  if (!pickup?.lat || !pickup?.lng || !destination?.lat || !destination?.lng) {
+    return res.status(400).json({ error: 'Valid pickup and destination coordinates are required' });
+  }
+
+  const metrics = estimateRoadMetrics(pickup.lat, pickup.lng, destination.lat, destination.lng);
+  const fareTotal = offeredFareEtb || Math.round(metrics.distanceKm * 38 + 150);
+  const commRate = typeof partnerCommissionRate === 'number' ? partnerCommissionRate : 0.12;
+  const platformCommission = Math.round(fareTotal * commRate);
+  const driverNetPayout = Math.max(0, fareTotal - platformCommission);
+  const vatAmount = Math.round(((fareTotal * 0.15) / 1.15) * 100) / 100;
+
+  const rideId = `ride_ext_${uuidv4().substring(0, 8)}`;
+  const now = new Date().toISOString();
+  const routeCoordinates = generateRouteCoordinates(pickup.lat, pickup.lng, destination.lat, destination.lng, 24);
+
+  const fareObj = {
+    baseFare: 150,
+    distanceFare: fareTotal - 150,
+    timeFare: 0,
+    surgeMultiplier: 1.0,
+    totalFare: fareTotal,
+    platformCommission,
+    driverNetPayout,
+    vatAmount,
+    currency: 'ETB',
+  };
+
+  try {
+    const partnerUserId = `user_partner_${partnerId}`;
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, phone, name, role, is_verified, created_at)
+      VALUES (?, ?, ?, 'rider', 1, ?)
+    `).run(partnerUserId, passengerPhone, passengerName, now);
+
+    db.prepare(`
+      INSERT INTO rides (
+        id, rider_id, rider_name, rider_phone, pickup_json, destination_json,
+        vehicle_category, distance_km, duration_min, fare_json, payment_method,
+        payment_status, status, route_coords_json, provider_id, partner_order_id,
+        partner_callback_url, country_code, created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, 'ET', ?, ?
+      )
+    `).run(
+      rideId,
+      partnerUserId,
+      passengerName,
+      passengerPhone,
+      JSON.stringify(pickup),
+      JSON.stringify(destination),
+      vehicleCategory,
+      metrics.distanceKm,
+      metrics.durationMinutes,
+      JSON.stringify(fareObj),
+      'CASH',
+      'PENDING',
+      'REQUESTED',
+      JSON.stringify(routeCoordinates),
+      partnerId,
+      partnerOrderId || `EXT_${uuidv4().substring(0, 6).toUpperCase()}`,
+      callbackWebhookUrl || null,
+      now,
+      now
+    );
+
+    const ride = DispatchService.getRideById(rideId)!;
+
+    // Broadcast to eligible, non-busy drivers
+    const eligibleDrivers = DispatchService.findEligibleDrivers(
+      pickup.lat,
+      pickup.lng,
+      vehicleCategory,
+      10.0,
+      destination.address,
+      destination.lat,
+      destination.lng
+    );
+
+    if (socketIO) {
+      for (const d of eligibleDrivers) {
+        socketIO.to(`driver:${d.id}`).emit('driver:incoming_ride', ride);
+      }
+      socketIO.emit('driver:ride_broadcast', ride);
+      socketIO.to('admin:dispatch').emit('admin:new_trip', ride);
+    }
+
+    return res.status(201).json({
+      success: true,
+      rideId: ride.id,
+      partnerOrderId: ride.partnerOrderId,
+      status: ride.status,
+      eligibleDriversCount: eligibleDrivers.length,
+      fare: fareObj,
+      message: `Partner ride ingested into Chebelew clearinghouse and broadcast to ${eligibleDrivers.length} nearby cabs.`,
+    });
+  } catch (err: any) {
+    console.error('Inbound partner ride error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to ingest partner ride' });
+  }
 });
 

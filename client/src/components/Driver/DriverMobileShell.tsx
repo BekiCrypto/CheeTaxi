@@ -117,6 +117,10 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
   const [corridorRadiusKm, setCorridorRadiusKm] = useState(1.5);
   const [showCorridorSheet, setShowCorridorSheet] = useState(false);
 
+  // Viral 0% Commission Savings Share Modal
+  const [showSavingsShareModal, setShowSavingsShareModal] = useState(false);
+  const [copiedSavings, setCopiedSavings] = useState(false);
+
   // Driver Profitability & Shift Stats
   const [shiftStats, setShiftStats] = useState({
     grossEarnings: 2850,
@@ -129,6 +133,11 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
   });
   const [showShiftBreakdown, setShowShiftBreakdown] = useState(false);
 
+  // 0% Commission Metrics vs traditional 15-20% platforms
+  const competitorFeeTotal = Math.round(shiftStats.grossEarnings * 0.15);
+  const commissionSavedToday = Math.max(0, competitorFeeTotal - shiftStats.subscriptionFeeDaily);
+  const monthlyProjectedSavings = Math.round(commissionSavedToday * 26);
+
   // Current Driver GPS
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number; heading: number }>({
     lat: 9.0105,
@@ -138,6 +147,37 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
 
   const countdownIntervalRef = useRef<any>(null);
   const waitTimerIntervalRef = useRef<any>(null);
+
+  // Fetch driver destination corridor settings from backend
+  const fetchDriverDestination = async (dId: string) => {
+    try {
+      const res = await fetch(`/api/drivers/${dId}/destination`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.destination && data.destination !== 'All Addis Ababa') {
+          setDestinationFilter(data.destination);
+        }
+        setIsFilterActive(Boolean(data.isActive));
+        if (typeof data.radiusKm === 'number') {
+          setCorridorRadiusKm(data.radiusKm);
+        }
+      }
+    } catch (e) {}
+  };
+
+  // Sync destination corridor changes to backend
+  const handleUpdateCorridor = async (dest: string, active: boolean, radius = corridorRadiusKm) => {
+    setDestinationFilter(dest);
+    setIsFilterActive(active);
+    setCorridorRadiusKm(radius);
+    try {
+      await fetch(`/api/drivers/${driverId}/destination`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination: dest, isActive: active, radiusKm: radius }),
+      });
+    } catch (e) {}
+  };
 
   // Load cached driver session & check in-flight active ride
   useEffect(() => {
@@ -176,6 +216,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
 
     if (currentDriverId) {
       checkActiveRide(currentDriverId);
+      fetchDriverDestination(currentDriverId);
     }
   }, [socket]);
 
@@ -680,11 +721,24 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
 
             {/* FLOATING TOP RADAR CONTROLS (UNOBSTRUCTED MAP) */}
             <div className="absolute top-4 left-4 right-4 z-[900] flex justify-between items-center pointer-events-none gap-2">
-              {/* GPS Accuracy Pill */}
-              <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 px-2.5 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 text-[10px] font-mono pointer-events-auto">
-                <Compass className="w-3 h-3 text-amber-400" />
-                <span className="text-slate-300">Addis:</span>
-                <span className="text-emerald-400 font-bold">±3m RTK</span>
+              <div className="flex items-center gap-1.5 pointer-events-auto">
+                {/* GPS Accuracy Pill */}
+                <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800/80 px-2.5 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 text-[10px] font-mono">
+                  <Compass className="w-3 h-3 text-amber-400" />
+                  <span className="text-slate-300">Addis:</span>
+                  <span className="text-emerald-400 font-bold">±3m RTK</span>
+                </div>
+
+                {/* 0% Commission Saved vs Competitors Badge & Viral Trigger */}
+                <button
+                  onClick={() => setShowSavingsShareModal(true)}
+                  className="bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-emerald-500/30 border border-amber-500/40 px-2.5 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 text-[10px] text-amber-300 active-press transition"
+                  title="Your 0% Commission Advantage vs RIDE/Feres (15-20%)"
+                >
+                  <Trophy className="w-3 h-3 text-amber-400" />
+                  <span className="font-bold">+{competitorFeeTotal} ETB</span>
+                  <Share2 className="w-2.5 h-2.5 text-slate-400" />
+                </button>
               </div>
 
               {/* In-Flight Active Trip Lock Shield Badge */}
@@ -756,7 +810,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">{isAm ? 'ሁኔታ' : 'Status'}:</span>
                   <button
-                    onClick={() => setIsFilterActive(!isFilterActive)}
+                    onClick={() => handleUpdateCorridor(destinationFilter, !isFilterActive)}
                     className={`px-3 py-1 rounded-full text-[11px] font-black transition ${
                       isFilterActive ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'
                     }`}
@@ -769,8 +823,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                     <button
                       key={hub}
                       onClick={() => {
-                        setDestinationFilter(hub);
-                        setIsFilterActive(true);
+                        handleUpdateCorridor(hub, true);
                         setShowCorridorSheet(false);
                       }}
                       className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs border border-slate-700 active-press transition"
@@ -797,8 +850,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                     <button
                       key={zone}
                       onClick={() => {
-                        setDestinationFilter(zone.split(' (')[0]);
-                        setIsFilterActive(true);
+                        handleUpdateCorridor(zone.split(' (')[0], true);
                       }}
                       className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 shrink-0 border border-slate-700 active-press transition"
                     >
@@ -874,6 +926,30 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                     className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-bold border border-slate-700 transition active-press"
                   >
                     {isAm ? 'አቋርጥ' : 'Go Offline'}
+                  </button>
+                </div>
+
+                {/* 0% Commission Advantage Banner with 1-Tap Viral Share */}
+                <div className="bg-gradient-to-r from-amber-500/15 via-emerald-500/15 to-teal-500/15 border border-amber-500/30 rounded-2xl p-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <Trophy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-black text-amber-300">
+                        {isAm ? `ዛሬ +${competitorFeeTotal} ብር አተረፉ!` : `Saved +${competitorFeeTotal} ETB Today!`}
+                      </div>
+                      <p className="text-[9px] text-slate-400">
+                        {isAm ? 'በቼበለው 0% ኮሚሽን ምክንያት' : 'Zero commission vs 15% RIDE/Feres'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowSavingsShareModal(true)}
+                    className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] flex items-center gap-1 shadow active-press transition"
+                  >
+                    <Share2 className="w-3 h-3" />
+                    <span>{isAm ? 'አጋራ' : 'Share'}</span>
                   </button>
                 </div>
 
@@ -1120,10 +1196,19 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
             </div>
 
             {/* 0% Commission Comparison */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-300 space-y-1">
-              <p className="font-bold text-amber-200">Chebelew 0% Advantage:</p>
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 text-xs text-amber-300 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-amber-200">Chebelew 0% Advantage:</p>
+                <button
+                  onClick={() => setShowSavingsShareModal(true)}
+                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] flex items-center gap-1 shadow active-press transition"
+                >
+                  <Share2 className="w-3 h-3" />
+                  <span>{isAm ? 'አጋራ' : 'Share'}</span>
+                </button>
+              </div>
               <p>
-                On traditional 15% commission platforms, you would have paid <strong>{Math.round(shiftStats.grossEarnings * 0.15)} ETB</strong> in commissions today. With Chebelew, you only paid your 50 ETB subscription!
+                On traditional 15% commission platforms, you would have paid <strong>{competitorFeeTotal} ETB</strong> in commissions today. With Chebelew, you only paid your 50 ETB subscription — saving <strong>+{commissionSavedToday} ETB</strong> in pure in-pocket profit!
               </p>
             </div>
           </div>
@@ -1156,7 +1241,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-300">{isAm ? 'የኮሪደር ማጣሪያ ሁነታ' : 'Corridor Matching Mode'}</span>
                 <button
-                  onClick={() => setIsFilterActive(!isFilterActive)}
+                  onClick={() => handleUpdateCorridor(destinationFilter, !isFilterActive)}
                   className={`px-3 py-1 rounded-full text-xs font-bold transition active-press ${
                     isFilterActive ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-400'
                   }`}
@@ -1167,13 +1252,22 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
 
               <div>
                 <label className="block text-xs text-slate-400 mb-1">{isAm ? 'የአዲስ አበባ መዳረሻ ሰፈር' : 'Target Neighborhood or Hub in Addis'}</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Gerji Imperial, CMC, Ayat, Lebu, Piassa"
-                  value={destinationFilter}
-                  onChange={(e) => setDestinationFilter(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. Gerji Imperial, CMC, Ayat, Lebu, Piassa"
+                    value={destinationFilter}
+                    onChange={(e) => setDestinationFilter(e.target.value)}
+                    onBlur={(e) => handleUpdateCorridor(e.target.value, isFilterActive)}
+                    className="flex-1 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                  <button
+                    onClick={() => handleUpdateCorridor(destinationFilter, isFilterActive)}
+                    className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold rounded-xl border border-slate-700 active-press transition"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -1187,7 +1281,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                   max="5.0"
                   step="0.5"
                   value={corridorRadiusKm}
-                  onChange={(e) => setCorridorRadiusKm(parseFloat(e.target.value))}
+                  onChange={(e) => handleUpdateCorridor(destinationFilter, isFilterActive, parseFloat(e.target.value))}
                   className="w-full accent-amber-500 cursor-pointer"
                 />
               </div>
@@ -1198,10 +1292,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
                   {['✈️ Bole Airport', '🏢 Kazanchis', '🏛️ Meskel Sq', '☕ Piassa', '🏘️ CMC Michael', '🛣️ Lebu'].map((loc) => (
                     <button
                       key={loc}
-                      onClick={() => {
-                        setDestinationFilter(loc);
-                        setIsFilterActive(true);
-                      }}
+                      onClick={() => handleUpdateCorridor(loc, true)}
                       className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 transition active-press"
                     >
                       {loc}
@@ -1570,6 +1661,105 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
               className="w-full py-2.5 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition"
             >
               Dismiss / ዝጋ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 0% Commission Viral Savings Card & Share Modal */}
+      {showSavingsShareModal && (
+        <div className="fixed inset-0 z-[1400] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-slate-950 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+              <Trophy className="w-8 h-8 stroke-[2.5]" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <span className="text-[10px] font-black tracking-wider uppercase text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                0% Platform Commission
+              </span>
+              <h3 className="text-xl font-black text-white pt-1">
+                {isAm ? `ዛሬ ${competitorFeeTotal} ብር አተረፉ!` : `Saved ${competitorFeeTotal} ETB Today!`}
+              </h3>
+              <p className="text-xs text-slate-300">
+                {isAm
+                  ? `በRIDE ወይም ፌረስ ቢሰሩ ${competitorFeeTotal} ብር ኮሚሽን ይወሰድብዎት ነበር። በቼበለው 100% የእርስዎ ነው!`
+                  : `On 15% commission apps you would have paid ${competitorFeeTotal} ETB in commissions. On Chebelew, you keep 100%!`}
+              </p>
+            </div>
+
+            {/* Savings Comparison Box */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Traditional App Commission (15%):</span>
+                <span className="text-rose-400 line-through font-mono">-{competitorFeeTotal} ETB</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-400">
+                <span>Chebelew Flat Subscription:</span>
+                <span className="text-amber-400 font-mono">-{shiftStats.subscriptionFeeDaily} ETB</span>
+              </div>
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-center font-black">
+                <span className="text-emerald-300">Today's In-Pocket Savings:</span>
+                <span className="text-emerald-400 font-mono text-sm">+{commissionSavedToday} ETB</span>
+              </div>
+              <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1">
+                <span>Estimated Monthly Savings:</span>
+                <span className="text-amber-300 font-bold font-mono">~{monthlyProjectedSavings} ETB/mo</span>
+              </div>
+            </div>
+
+            {/* Social Share / Invite Viral Buttons */}
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={() => {
+                  const shareText = isAm
+                    ? `🚀 በቼበለው (Chebelew) 0% ኮሚሽን ዛሬ ብቻ ${competitorFeeTotal} ብር አተረፍኩ! ለደላላ 15% መክፈል አቁመው 100% ገቢዎን ይያዙ። አሁኑኑ ይቀላቀሉ: https://chebelew.trustlotto.app/`
+                    : `🚀 I saved ${competitorFeeTotal} ETB in commissions today on Chebelew! Keep 100% of your fares with 0% platform commission. Join now: https://chebelew.trustlotto.app/`;
+                  navigator.clipboard.writeText(shareText);
+                  setCopiedSavings(true);
+                  sounds.playPaymentSuccess();
+                  setTimeout(() => setCopiedSavings(false), 3000);
+                }}
+                className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-lg active-press transition"
+              >
+                {copiedSavings ? <Check className="w-4 h-4 text-emerald-950" /> : <Share2 className="w-4 h-4" />}
+                <span>
+                  {copiedSavings
+                    ? (isAm ? 'መልዕክቱ ተቀድቷል! ቴሌግራም ላይ ይለጥፉት ✓' : 'Copied! Ready to paste in driver groups ✓')
+                    : (isAm ? 'የቴሌግራም መልዕክት ቅዳ (Share on Telegram)' : 'Copy Shareable Telegram Post')}
+                </span>
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent('https://chebelew.trustlotto.app/')}&text=${encodeURIComponent(
+                    `🚀 በቼበለው 0% ኮሚሽን ዛሬ ${competitorFeeTotal} ብር አተረፍኩ! ለደላላ 15% መክፈል አቁመው ይቀላቀሉ:`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow active-press"
+                >
+                  <span>Telegram</span>
+                </a>
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                    `🚀 በቼበለው 0% ኮሚሽን ዛሬ ${competitorFeeTotal} ብር አተረፍኩ! ለደላላ 15% መክፈል አቁመው ይቀላቀሉ: https://chebelew.trustlotto.app/`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow active-press"
+                >
+                  <span>WhatsApp</span>
+                </a>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSavingsShareModal(false)}
+              className="w-full py-2.5 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition"
+            >
+              {isAm ? 'ዝጋ' : 'Close'}
             </button>
           </div>
         </div>
