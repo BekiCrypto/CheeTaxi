@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/database.js';
 import { estimateRoadMetrics, generateRouteCoordinates } from '../services/geoService.js';
 import { getFareEstimates } from '../services/fareService.js';
+import { computeMarketRadar } from '../services/marketRadarService.js';
 import { DispatchService } from '../services/dispatchService.js';
 import { ProviderAggregatorService } from '../services/providerAggregatorService.js';
 import { Server as SocketIOServer } from 'socket.io';
@@ -10,6 +11,29 @@ import { PassengerComfortPreferences, ScheduledRide } from '../../../shared/type
 
 export function createRideRouter(io: SocketIOServer) {
   const router = Router();
+
+  /**
+   * Autonomous Market Radar: Algorithmic comparison across Addis Ababa operators
+   * without requiring private third-party APIs
+   */
+  router.post('/market-radar', (req, res) => {
+    const { pickup, destination, distanceKm, durationMinutes } = req.body;
+
+    let dist = distanceKm;
+    let dur = durationMinutes;
+
+    if (!dist || !dur) {
+      if (!pickup?.lat || !pickup?.lng || !destination?.lat || !destination?.lng) {
+        return res.status(400).json({ error: 'Provide distanceKm & durationMinutes or pickup & destination coordinates' });
+      }
+      const metrics = estimateRoadMetrics(pickup.lat, pickup.lng, destination.lat, destination.lng);
+      dist = metrics.distanceKm;
+      dur = metrics.durationMinutes;
+    }
+
+    const radar = computeMarketRadar(Number(dist), Number(dur));
+    return res.json(radar);
+  });
 
   /**
    * Calculate fare estimates across categories & aggregators

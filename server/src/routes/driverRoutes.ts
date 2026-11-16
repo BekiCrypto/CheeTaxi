@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db/database.js';
 import { TelebirrService } from '../services/telebirrService.js';
+import { CommunityHazardService } from '../services/communityHazardService.js';
 import { Server as SocketIOServer } from 'socket.io';
 import { DemandHeatmapZone, DriverNetProfitability, DriverOperatingExpenses } from '../../../shared/types.js';
 
@@ -820,6 +821,56 @@ export function createDriverRouter(io: SocketIOServer) {
       offersCount: rawOffers.length,
       offers: rawOffers,
     });
+  });
+
+  // --------------------------------------------------------------------------
+  // Addis Driver Community Road Hazard & Traffic Radar ("ደራሽ / Derash")
+  // --------------------------------------------------------------------------
+
+  /**
+   * Get active community hazards
+   */
+  router.get('/community-hazards', (req, res) => {
+    const hazards = CommunityHazardService.getActiveHazards();
+    return res.json({ hazards });
+  });
+
+  /**
+   * Report a community hazard
+   */
+  router.post('/community-hazards', (req, res) => {
+    const { type, driverId, driverName, address, lat, lng, description, severity } = req.body;
+
+    if (!type || !address || lat === undefined || lng === undefined) {
+      return res.status(400).json({ error: 'type, address, lat, and lng are required' });
+    }
+
+    const hazard = CommunityHazardService.reportHazard({
+      type,
+      driverId: driverId || 'driver_anonymous',
+      driverName: driverName || 'Fellow Driver',
+      address,
+      lat: Number(lat),
+      lng: Number(lng),
+      description: description || '',
+      severity,
+    });
+
+    // Broadcast live hazard alert to all active drivers
+    io.emit('community:hazard_alert', hazard);
+
+    return res.status(201).json({ success: true, hazard });
+  });
+
+  /**
+   * Upvote a community hazard
+   */
+  router.post('/community-hazards/:id/upvote', (req, res) => {
+    const updated = CommunityHazardService.upvoteHazard(req.params.id);
+    if (!updated) {
+      return res.status(404).json({ error: 'Hazard not found or expired' });
+    }
+    return res.json({ success: true, hazard: updated });
   });
 
   return router;
