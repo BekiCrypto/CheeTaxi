@@ -76,7 +76,7 @@ describe('Multi-Provider Simultaneous Offer Comparison & In-Flight Cab Lock Suit
     });
 
     it('should score and rank multiple simultaneous offers from Chebelew, Yango, and RIDE', () => {
-      const mockOffers: Ride[] = [
+      const mockOffers: any[] = [
         {
           id: 'offer_cheb_test',
           riderId: 'rider_01',
