@@ -246,6 +246,121 @@ export class DispatchService {
   }
 
   /**
+   * Transition ride status with in-flight lock updates, cash reconciliation, and audit logging
+   */
+  static updateRideStatus(
+    rideId: string,
+    status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED',
+    extra?: { cancelReason?: string; cancelledBy?: string }
+  ): Ride | null {
+    const existing = this.getRideById(rideId);
+    if (!existing) return null;
+
+    const now = new Date().toISOString();
+
+    if (status === 'ARRIVED') {
+      db.prepare(`UPDATE rides SET status = 'ARRIVED', updated_at = ? WHERE id = ?`).run(now, rideId);
+      db.prepare(`
+        INSERT INTO dispatch_logs (id, ride_id, action, operator_name, details, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(uuidv4(), rideId, 'DRIVER_ARRIVED', 'Driver', `Driver arrived at pickup point`, now);
+    } else if (status === 'IN_PROGRESS') {
+      db.prepare(`UPDATE rides SET status = 'IN_PROGRESS', updated_at = ? WHERE id = ?`).run(now, rideId);
+      db.prepare(`
+        INSERT INTO dispatch_logs (id, ride_id, action, operator_name, details, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(uuidv4(), rideId, 'TRIP_STARTED', 'Driver', `Trip started towards destination`, now);
+    } else if (status === 'COMPLETED') {
+      db.prepare(`UPDATE rides SET status = 'COMPLETED', updated_at = ? WHERE id = ?`).run(now, rideId);
+
+      if (existing.driverId) {
+        // Release driver active trip in-flight lock
+        db.prepare(`
+          UPDATE drivers
+          SET is_busy = 0, active_ride_id = NULL, total_rides = total_rides + 1
+          WHERE id = ?
+        `).run(existing.driverId);
+
+        // Immediate cash reconciliation & driver wallet credit
+        if (existing.paymentMethod === 'CASH') {
+          db.prepare(`UPDATE rides SET payment_status = 'PAID' WHERE id = ?`).run(rideId);
+          db.prepare(`
+            UPDATE drivers
+            SET wallet_balance_etb = wallet_balance_etb + ?
+            WHERE id = ?
+          `).run(existing.fare?.driverNetPayout || 0, existing.driverId);
+        }
+      }
+
+      db.prepare(`
+        INSERT INTO dispatch_logs (id, ride_id, action, operator_name, details, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(uuidv4(), rideId, 'TRIP_COMPLETED', 'Driver', `Trip completed successfully`, now);
+    } else if (status === 'CANCELLED') {
+      db.prepare(`
+        UPDATE rides
+        SET status = 'CANCELLED', cancel_reason = ?, cancelled_by = ?, updated_at = ?
+        WHERE id = ?
+      `).run(extra?.cancelReason || 'Trip cancelled', extra?.cancelledBy || 'system', now, rideId);
+
+      if (existing.driverId) {
+        // Release driver in-flight lock
+        db.prepare(`
+          UPDATE drivers
+          SET is_busy = 0, active_ride_id = NULL
+          WHERE id = ?
+        `).run(existing.driverId);
+      }
+
+      db.prepare(`
+        INSERT INTO dispatch_logs (id, ride_id, action, operator_name, details, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        uuidv4(),
+        rideId,
+        'TRIP_CANCELLED',
+        extra?.cancelledBy || 'system',
+        `Trip cancelled: ${extra?.cancelReason || 'No reason specified'}`,
+        now
+      );
+    }
+
+    return this.getRideById(rideId);
+  }
+
+  /**
+   * Get active in-flight ride for a passenger or driver
+   */
+  static getActiveRideForUser(userId: string): Ride | null {
+    // 1. Check if user is passenger with active ride
+    const riderRow = db.prepare(`
+      SELECT id FROM rides
+      WHERE rider_id = ? AND status IN ('REQUESTED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(userId) as any;
+
+    if (riderRow) {
+      return this.getRideById(riderRow.id);
+    }
+
+    // 2. Check if user is driver with active ride
+    const driverRow = db.prepare(`
+      SELECT id FROM rides
+      WHERE driver_id IN (SELECT id FROM drivers WHERE user_id = ? OR id = ?)
+        AND status IN ('ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).get(userId, userId) as any;
+
+    if (driverRow) {
+      return this.getRideById(driverRow.id);
+    }
+
+    return null;
+  }
+
+  /**
    * Retrieves full Ride object with driver details
    */
   static getRideById(rideId: string): Ride | null {

@@ -109,6 +109,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
   // Passenger Telebirr QR for Fare Collection
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [cashCollectedConfirmed, setCashCollectedConfirmed] = useState(false);
+  const [isSosModalOpen, setIsSosModalOpen] = useState(false);
 
   // Destination Filter ("On-My-Way")
   const [destinationFilter, setDestinationFilter] = useState('');
@@ -138,8 +139,9 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
   const countdownIntervalRef = useRef<any>(null);
   const waitTimerIntervalRef = useRef<any>(null);
 
-  // Load cached driver session
+  // Load cached driver session & check in-flight active ride
   useEffect(() => {
+    let currentDriverId = driverId;
     try {
       const cached = localStorage.getItem('chebelew_active_user');
       if (cached) {
@@ -148,10 +150,34 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
           setDriverId(parsed.id);
           setDriverName(parsed.name);
           setDriverPhone(parsed.phone);
+          currentDriverId = parsed.id;
         }
       }
     } catch (e) {}
-  }, []);
+
+    const checkActiveRide = async (dId: string) => {
+      try {
+        const res = await fetch(`/api/rides/active/${dId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ride && ['ASSIGNED', 'ARRIVED', 'IN_PROGRESS'].includes(data.ride.status)) {
+            setActiveRide(data.ride);
+            if (data.ride.status === 'ASSIGNED') setRideStep('TO_PICKUP');
+            else if (data.ride.status === 'ARRIVED') setRideStep('AT_PICKUP');
+            else if (data.ride.status === 'IN_PROGRESS') setRideStep('IN_TRANSIT');
+            setIsOnline(true);
+            if (socket) {
+              socket.emit('join:ride', data.ride.id);
+            }
+          }
+        }
+      } catch (e) {}
+    };
+
+    if (currentDriverId) {
+      checkActiveRide(currentDriverId);
+    }
+  }, [socket]);
 
   const startCountdownTimer = (initialSecs: number = 15) => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -308,6 +334,7 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       rideId: target.id,
       driverId,
     });
+    socket.emit('join:ride', target.id);
 
     // Network redundancy: also trigger REST accept
     fetch(`/api/rides/${target.id}/accept`, {
@@ -431,8 +458,9 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       setBoardingWaitTimer((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    if (socket && activeRide) {
-      socket.emit('ride:arrived', { rideId: activeRide.id });
+    if (activeRide) {
+      if (socket) socket.emit('ride:arrived', { rideId: activeRide.id });
+      fetch(`/api/rides/${activeRide.id}/arrive`, { method: 'POST' }).catch(() => {});
     }
   };
 
@@ -441,8 +469,9 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
     setRideStep('IN_TRANSIT');
     sounds.playRideAccepted();
 
-    if (socket && activeRide) {
-      socket.emit('ride:start', { rideId: activeRide.id });
+    if (activeRide) {
+      if (socket) socket.emit('ride:start', { rideId: activeRide.id });
+      fetch(`/api/rides/${activeRide.id}/start`, { method: 'POST' }).catch(() => {});
     }
   };
 
@@ -458,8 +487,9 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       setQrDataUrl(url);
     } catch (e) {}
 
-    if (socket && activeRide) {
-      socket.emit('ride:complete', { rideId: activeRide.id });
+    if (activeRide) {
+      if (socket) socket.emit('ride:complete', { rideId: activeRide.id });
+      fetch(`/api/rides/${activeRide.id}/complete`, { method: 'POST' }).catch(() => {});
     }
 
     setShiftStats((prev) => ({
@@ -468,6 +498,28 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       tripsCompleted: prev.tripsCompleted + 1,
       netProfit: prev.netProfit + (activeRide?.fare?.totalFare || 380),
     }));
+  };
+
+  // Emergency SOS Trigger for Driver
+  const handleTriggerEmergencySos = async () => {
+    sounds.playBeep(900, 'sawtooth', 0.5);
+    try {
+      await fetch('/api/safety/sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rideId: activeRide?.id,
+          reporterUserId: driverId,
+          reporterName: driverName,
+          reporterPhone: driverPhone,
+          reporterRole: 'driver',
+          currentLat: driverLocation.lat,
+          currentLng: driverLocation.lng,
+          safetyNotes: `Driver triggered emergency SOS during active shift (Ride #${activeRide?.id || 'none'})`,
+        }),
+      });
+    } catch (e) {}
+    setIsSosModalOpen(true);
   };
 
   const handleCloseCompletedSummary = () => {
@@ -553,13 +605,14 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
           </button>
 
           {/* Quick SOS Emergency 991 */}
-          <a
-            href="tel:991"
-            className="w-8 h-8 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/40 flex items-center justify-center text-xs font-black transition active-press"
+          <button
+            type="button"
+            onClick={handleTriggerEmergencySos}
+            className="w-8 h-8 rounded-xl bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/40 flex items-center justify-center text-xs font-black transition active-press cursor-pointer"
             title="Police SOS (991)"
           >
             <ShieldAlert className="w-4 h-4" />
-          </a>
+          </button>
         </div>
       </header>
 
@@ -1474,6 +1527,53 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
           sounds.playBeep(880, 'sine', 0.2);
         }}
       />
+
+      {/* 24/7 Rapid Emergency SOS Modal */}
+      {isSosModalOpen && (
+        <div className="fixed inset-0 z-[1400] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-rose-500/80 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center mx-auto animate-pulse">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-black text-white">Emergency Response Active</h3>
+              <p className="text-xs text-rose-400 font-bold">የአደጋ ጊዜ ፈጣን ጥሪ</p>
+              <p className="text-[11px] text-slate-300">
+                An incident alert has been dispatched to Chebelew 24/7 Security Operations with your live vehicle GPS location.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <a
+                href="tel:991"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-lg active-press"
+              >
+                <Phone className="w-4 h-4" /> Call Federal Police (991)
+              </a>
+              <a
+                href="tel:9922"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active-press"
+              >
+                <Phone className="w-4 h-4 text-amber-400" /> Chebelew 24/7 Security Hotline (9922)
+              </a>
+              <a
+                href="tel:907"
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active-press"
+              >
+                <Phone className="w-4 h-4 text-emerald-400" /> Medical Ambulance (907)
+              </a>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSosModalOpen(false)}
+              className="w-full py-2.5 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition"
+            >
+              Dismiss / ዝጋ
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

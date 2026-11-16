@@ -104,6 +104,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
   const [requireSafetyPin, setRequireSafetyPin] = useState(true);
   const [emergencyContact, setEmergencyContact] = useState('+251911998877');
   const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+  const [isSosModalOpen, setIsSosModalOpen] = useState(false);
 
   // Collapsible Accordions for Clean Yango-style Map-Dominant UI
   const [showAllOffers, setShowAllOffers] = useState(false);
@@ -170,15 +171,41 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    let activeUserId = user.id;
     try {
       const cached = localStorage.getItem('chebelew_active_user');
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed.role === 'rider') {
           setUser(parsed);
+          activeUserId = parsed.id;
         }
       }
     } catch (e) {}
+
+    // Restore active in-flight trip if user refreshes or reopens app
+    const restoreActiveTrip = async (uid: string) => {
+      try {
+        const res = await fetch(`/api/rides/active/${uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ride && ['REQUESTED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS'].includes(data.ride.status)) {
+            setActiveRide(data.ride);
+            setSheetState('ACTIVE_RIDE');
+            if (data.ride.pickup) setPickup(data.ride.pickup);
+            if (data.ride.destination) setDestination(data.ride.destination);
+            if (data.ride.currentDriverLocation) {
+              setLiveDriverPos({
+                lat: data.ride.currentDriverLocation[0],
+                lng: data.ride.currentDriverLocation[1],
+              });
+            }
+          }
+        }
+      } catch (e) {}
+    };
+
+    restoreActiveTrip(activeUserId);
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -394,6 +421,28 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
     }
   };
 
+  // Trigger Emergency SOS Incident
+  const handleTriggerEmergencySos = async () => {
+    sounds.playBeep(900, 'sawtooth', 0.5);
+    try {
+      await fetch('/api/safety/sos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rideId: activeRide?.id,
+          reporterUserId: user.id,
+          reporterName: user.name,
+          reporterPhone: user.phone,
+          reporterRole: 'rider',
+          currentLat: liveDriverPos?.lat || pickup?.lat || 9.0105,
+          currentLng: liveDriverPos?.lng || pickup?.lng || 38.7615,
+          safetyNotes: `Passenger triggered emergency SOS during active trip #${activeRide?.id || 'none'}`,
+        }),
+      });
+    } catch (e) {}
+    setIsSosModalOpen(true);
+  };
+
   // Submit Driver Rating
   const handleSubmitRating = async () => {
     if (!activeRide) {
@@ -470,11 +519,12 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
             {/* Edge-to-Edge Full-Screen Interactive Map */}
             <div className="absolute inset-0 z-0">
               <AddisMap
-                pickup={pickup}
-                destination={destination}
+                pickup={activeRide?.pickup || pickup}
+                destination={activeRide?.destination || destination}
                 drivers={availableDrivers}
                 activeDriverLocation={liveDriverPos ? [liveDriverPos.lat, liveDriverPos.lng] : undefined}
                 activeDriverHeading={liveDriverPos?.heading || 0}
+                activeDriverPlate={activeRide?.driver?.vehiclePlate}
                 routeCoordinates={activeRide?.routeCoordinates || []}
                 isSearching={activeRide?.status === 'REQUESTED'}
                 className="h-full w-full"
@@ -516,12 +566,13 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                   )}
 
                   {/* Quick Police SOS 991 */}
-                  <a
-                    href="tel:991"
-                    className="px-2.5 py-1 bg-rose-600/25 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg text-xs font-black border border-rose-500/40 flex items-center gap-1 transition shadow active-press"
+                  <button
+                    type="button"
+                    onClick={handleTriggerEmergencySos}
+                    className="px-2.5 py-1 bg-rose-600/25 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg text-xs font-black border border-rose-500/40 flex items-center gap-1 transition shadow active-press cursor-pointer"
                   >
                     <ShieldAlert className="w-3.5 h-3.5" /> 991
-                  </a>
+                  </button>
                 </div>
               </div>
 
@@ -1235,12 +1286,13 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                             <Share2 className="w-3.5 h-3.5 text-amber-400" /> Share Trip
                           </button>
 
-                          <a
-                            href="tel:991"
-                            className="py-2.5 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-rose-500/40 active-press"
+                          <button
+                            type="button"
+                            onClick={handleTriggerEmergencySos}
+                            className="py-2.5 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-rose-500/40 active-press transition cursor-pointer"
                           >
-                            <ShieldAlert className="w-3.5 h-3.5" /> Police 991
-                          </a>
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-400" /> SOS 991
+                          </button>
                         </div>
 
                         {/* Cancel Trip Button */}
@@ -2165,6 +2217,65 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                 Yes, Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 24/7 Rapid Emergency SOS Modal */}
+      {isSosModalOpen && (
+        <div className="fixed inset-0 z-[1300] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-rose-500/80 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center mx-auto animate-pulse">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-black text-white">Emergency Response Active</h3>
+              <p className="text-xs text-rose-400 font-bold">የአደጋ ጊዜ ፈጣን ጥሪ</p>
+              <p className="text-[11px] text-slate-300">
+                An incident alert has been dispatched to Chebelew 24/7 Security Operations with your live GPS location.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <a
+                href="tel:991"
+                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-lg active-press"
+              >
+                <Phone className="w-4 h-4" /> Call Federal Police (991)
+              </a>
+              <a
+                href="tel:9922"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active-press"
+              >
+                <Phone className="w-4 h-4 text-amber-400" /> Chebelew 24/7 Security Hotline (9922)
+              </a>
+              <a
+                href="tel:907"
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active-press"
+              >
+                <Phone className="w-4 h-4 text-emerald-400" /> Medical Ambulance (907)
+              </a>
+              {activeRide && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/track/${activeRide.id}`);
+                    alert('SafeTrip Live Tracking link copied!');
+                  }}
+                  className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 active-press"
+                >
+                  <Share2 className="w-4 h-4 text-brand-400" /> Share Live Trip Link
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSosModalOpen(false)}
+              className="w-full py-2.5 text-slate-400 hover:text-white text-xs font-semibold rounded-xl transition"
+            >
+              Dismiss / ዝጋ
+            </button>
           </div>
         </div>
       )}

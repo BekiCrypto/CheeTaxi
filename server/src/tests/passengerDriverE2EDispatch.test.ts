@@ -131,43 +131,66 @@ describe('Passenger & Driver App End-to-End Connectivity & Dispatch Lifecycle Su
     });
   });
 
-  describe('3. Active Trip Lifecycle & Completion', () => {
-    it('should update status to ARRIVED when driver reaches pickup point', async () => {
-      db.prepare(`UPDATE rides SET status = 'ARRIVED', updated_at = ? WHERE id = ?`).run(
-        new Date().toISOString(),
-        createdRideId
-      );
-
-      const res = await request(app).get(`/api/rides/${createdRideId}`);
+  describe('3. Active Trip Lifecycle & REST Redundancy', () => {
+    it('should retrieve active in-flight trip for session restore', async () => {
+      const res = await request(app).get(`/api/rides/active/${passengerUserId}`);
       expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.ride).toBeDefined();
+      expect(res.body.ride.id).toBe(createdRideId);
+      expect(res.body.ride.status).toBe('ASSIGNED');
+    });
+
+    it('should transition status to ARRIVED via REST /arrive', async () => {
+      const res = await request(app).post(`/api/rides/${createdRideId}/arrive`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
       expect(res.body.ride.status).toBe('ARRIVED');
     });
 
-    it('should update status to IN_PROGRESS when driver starts trip', async () => {
-      db.prepare(`UPDATE rides SET status = 'IN_PROGRESS', updated_at = ? WHERE id = ?`).run(
-        new Date().toISOString(),
-        createdRideId
-      );
-
-      const res = await request(app).get(`/api/rides/${createdRideId}`);
+    it('should transition status to IN_PROGRESS via REST /start', async () => {
+      const res = await request(app).post(`/api/rides/${createdRideId}/start`);
       expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
       expect(res.body.ride.status).toBe('IN_PROGRESS');
     });
 
-    it('should complete trip, update driver stats, and release in-flight lock', async () => {
-      const ride = DispatchService.getRideById(createdRideId);
-      expect(ride).toBeDefined();
+    it('should complete trip via REST /complete, reconcile cash, and release in-flight lock', async () => {
+      const res = await request(app).post(`/api/rides/${createdRideId}/complete`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.ride.status).toBe('COMPLETED');
 
-      const now = new Date().toISOString();
-      db.prepare(`UPDATE rides SET status = 'COMPLETED', updated_at = ? WHERE id = ?`).run(now, createdRideId);
-      db.prepare(`UPDATE drivers SET is_busy = 0, active_ride_id = NULL, total_rides = total_rides + 1 WHERE id = ?`).run(driverId);
-
-      const updatedRide = DispatchService.getRideById(createdRideId);
-      expect(updatedRide?.status).toBe('COMPLETED');
-
+      // Verify driver in-flight lock released in database
       const releasedDriver = db.prepare('SELECT is_busy, active_ride_id FROM drivers WHERE id = ?').get(driverId) as any;
       expect(releasedDriver.is_busy).toBe(0);
       expect(releasedDriver.active_ride_id).toBeNull();
+    });
+
+    it('should verify active trip returns null after completion', async () => {
+      const res = await request(app).get(`/api/rides/active/${passengerUserId}`);
+      expect(res.status).toBe(200);
+      expect(res.body.ride).toBeNull();
+    });
+
+    it('should log emergency SOS incident and return rapid emergency contacts', async () => {
+      const res = await request(app).post('/api/safety/sos').send({
+        rideId: createdRideId,
+        reporterUserId: passengerUserId,
+        reporterName: 'E2E Test Passenger',
+        reporterPhone: '+251911998877',
+        reporterRole: 'rider',
+        currentLat: 8.9950,
+        currentLng: 38.7880,
+        safetyNotes: 'Test Emergency SOS from Passenger',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.incident).toBeDefined();
+      expect(res.body.incident.reporterUserId).toBe(passengerUserId);
+      expect(res.body.emergencyContacts.police).toBe('991');
+      expect(res.body.emergencyContacts.chebelewHotline).toBe('9922');
     });
   });
 });

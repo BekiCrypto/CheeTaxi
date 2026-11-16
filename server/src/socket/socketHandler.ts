@@ -81,65 +81,26 @@ export function setupSocketHandlers(io: SocketIOServer) {
 
     // Driver arrived at pickup
     socket.on('ride:arrived', (data: { rideId: string }) => {
-      const now = new Date().toISOString();
-      db.prepare(`
-        UPDATE rides
-        SET status = 'ARRIVED', updated_at = ?
-        WHERE id = ?
-      `).run(now, data.rideId);
-
-      const updatedRide = DispatchService.getRideById(data.rideId);
-      io.to(`ride:${data.rideId}`).emit('ride:status_changed', updatedRide);
-      io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
+      const updatedRide = DispatchService.updateRideStatus(data.rideId, 'ARRIVED');
+      if (updatedRide) {
+        io.to(`ride:${data.rideId}`).emit('ride:status_changed', updatedRide);
+        io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
+      }
     });
 
     // Driver started trip
     socket.on('ride:start', (data: { rideId: string }) => {
-      const now = new Date().toISOString();
-      db.prepare(`
-        UPDATE rides
-        SET status = 'IN_PROGRESS', updated_at = ?
-        WHERE id = ?
-      `).run(now, data.rideId);
-
-      const updatedRide = DispatchService.getRideById(data.rideId);
-      io.to(`ride:${data.rideId}`).emit('ride:status_changed', updatedRide);
-      io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
+      const updatedRide = DispatchService.updateRideStatus(data.rideId, 'IN_PROGRESS');
+      if (updatedRide) {
+        io.to(`ride:${data.rideId}`).emit('ride:status_changed', updatedRide);
+        io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
+      }
     });
 
     // Driver completed trip
     socket.on('ride:complete', (data: { rideId: string }) => {
-      const now = new Date().toISOString();
-      const ride = DispatchService.getRideById(data.rideId);
-
-      if (ride && ride.driverId) {
-        db.prepare(`
-          UPDATE rides
-          SET status = 'COMPLETED', updated_at = ?
-          WHERE id = ?
-        `).run(now, data.rideId);
-
-        // Release driver
-        db.prepare(`
-          UPDATE drivers
-          SET is_busy = 0, active_ride_id = NULL, total_rides = total_rides + 1
-          WHERE id = ?
-        `).run(ride.driverId);
-
-        // If Cash payment, add net payout to driver balance immediately
-        if (ride.paymentMethod === 'CASH') {
-          db.prepare(`
-            UPDATE rides SET payment_status = 'PAID' WHERE id = ?
-          `).run(data.rideId);
-
-          db.prepare(`
-            UPDATE drivers
-            SET wallet_balance_etb = wallet_balance_etb + ?
-            WHERE id = ?
-          `).run(ride.fare.driverNetPayout, ride.driverId);
-        }
-
-        const updatedRide = DispatchService.getRideById(data.rideId);
+      const updatedRide = DispatchService.updateRideStatus(data.rideId, 'COMPLETED');
+      if (updatedRide) {
         io.to(`ride:${data.rideId}`).emit('ride:status_changed', updatedRide);
         io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
       }
@@ -147,25 +108,16 @@ export function setupSocketHandlers(io: SocketIOServer) {
 
     // Cancel ride
     socket.on('ride:cancel', (data: { rideId: string; reason?: string; cancelledBy: 'rider' | 'driver' | 'admin' }) => {
-      const now = new Date().toISOString();
-      const ride = DispatchService.getRideById(data.rideId);
+      const updatedRide = DispatchService.updateRideStatus(data.rideId, 'CANCELLED', {
+        cancelReason: data.reason,
+        cancelledBy: data.cancelledBy,
+      });
 
-      if (ride) {
-        db.prepare(`
-          UPDATE rides
-          SET status = 'CANCELLED', cancel_reason = ?, cancelled_by = ?, updated_at = ?
-          WHERE id = ?
-        `).run(data.reason || 'User requested cancellation', data.cancelledBy, now, data.rideId);
-
-        if (ride.driverId) {
-          db.prepare(`
-            UPDATE drivers
-            SET is_busy = 0, active_ride_id = NULL
-            WHERE id = ?
-          `).run(ride.driverId);
+      if (updatedRide) {
+        if (updatedRide.driverId) {
+          io.to(`driver:${updatedRide.driverId}`).emit('driver:ride_cancelled', { rideId: data.rideId });
         }
-
-        const updatedRide = DispatchService.getRideById(data.rideId);
+        io.emit('driver:ride_withdrawn', { rideId: data.rideId });
         io.to(`ride:${data.rideId}`).emit('ride:status_changed', updatedRide);
         io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
       }

@@ -151,6 +151,53 @@ export function createRideRouter(io: SocketIOServer) {
   });
 
   /**
+   * Get active in-flight ride for user (rider or driver) for seamless session restore
+   */
+  router.get('/active/:userId', (req, res) => {
+    const ride = DispatchService.getActiveRideForUser(req.params.userId);
+    return res.json({ success: true, ride });
+  });
+
+  /**
+   * Driver reports arrived at pickup (REST fallback & dual-path redundancy)
+   */
+  router.post('/:id/arrive', (req, res) => {
+    const updated = DispatchService.updateRideStatus(req.params.id, 'ARRIVED');
+    if (!updated) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+    io.to(`ride:${req.params.id}`).emit('ride:status_changed', updated);
+    io.to('admin:dispatch').emit('admin:trip_updated', updated);
+    return res.json({ success: true, ride: updated });
+  });
+
+  /**
+   * Driver starts the trip (REST fallback & dual-path redundancy)
+   */
+  router.post('/:id/start', (req, res) => {
+    const updated = DispatchService.updateRideStatus(req.params.id, 'IN_PROGRESS');
+    if (!updated) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+    io.to(`ride:${req.params.id}`).emit('ride:status_changed', updated);
+    io.to('admin:dispatch').emit('admin:trip_updated', updated);
+    return res.json({ success: true, ride: updated });
+  });
+
+  /**
+   * Driver completes the trip (REST fallback & dual-path redundancy)
+   */
+  router.post('/:id/complete', (req, res) => {
+    const updated = DispatchService.updateRideStatus(req.params.id, 'COMPLETED');
+    if (!updated) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+    io.to(`ride:${req.params.id}`).emit('ride:status_changed', updated);
+    io.to('admin:dispatch').emit('admin:trip_updated', updated);
+    return res.json({ success: true, ride: updated });
+  });
+
+  /**
    * Get specific ride by ID
    */
   router.get('/:id', (req, res) => {
@@ -166,27 +213,18 @@ export function createRideRouter(io: SocketIOServer) {
    */
   router.post('/:id/cancel', (req, res) => {
     const { reason, cancelledBy = 'rider' } = req.body;
-    const ride = DispatchService.getRideById(req.params.id);
-    if (!ride) {
+    const updated = DispatchService.updateRideStatus(req.params.id, 'CANCELLED', {
+      cancelReason: reason || 'Ride cancelled',
+      cancelledBy,
+    });
+    if (!updated) {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
-    const now = new Date().toISOString();
-    db.prepare(`
-      UPDATE rides
-      SET status = 'CANCELLED', cancel_reason = ?, cancelled_by = ?, updated_at = ?
-      WHERE id = ?
-    `).run(reason || 'Ride cancelled', cancelledBy, now, req.params.id);
-
-    if (ride.driverId) {
-      db.prepare('UPDATE drivers SET is_busy = 0, active_ride_id = NULL WHERE id = ?').run(
-        ride.driverId
-      );
-      io.to(`driver:${ride.driverId}`).emit('driver:ride_cancelled', { rideId: req.params.id });
+    if (updated.driverId) {
+      io.to(`driver:${updated.driverId}`).emit('driver:ride_cancelled', { rideId: req.params.id });
     }
     io.emit('driver:ride_withdrawn', { rideId: req.params.id });
-
-    const updated = DispatchService.getRideById(req.params.id);
     io.to(`ride:${req.params.id}`).emit('ride:status_changed', updated);
     io.to('admin:dispatch').emit('admin:trip_updated', updated);
 

@@ -670,6 +670,11 @@ export const RiderView: React.FC<RiderViewProps> = ({
 
     socket.emit('join:ride', activeRide.id);
 
+    if (activeRide?.id) {
+      socket.emit('join:ride', activeRide.id);
+      socket.emit('join:rider', currentRiderId);
+    }
+
     const onStatusChanged = (updatedRide: Ride) => {
       setActiveRide(updatedRide);
       if (onRideActive) onRideActive(updatedRide);
@@ -690,13 +695,31 @@ export const RiderView: React.FC<RiderViewProps> = ({
     };
 
     socket.on('ride:status_changed', onStatusChanged);
+    socket.on('ride:updated', onStatusChanged);
     socket.on('ride:location_tick', onLocationTick);
+
+    // Guaranteed polling fallback
+    const pollInterval = setInterval(async () => {
+      if (activeRide?.id && activeRide.status !== 'COMPLETED' && activeRide.status !== 'CANCELLED') {
+        try {
+          const res = await fetch(`/api/rides/${activeRide.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.ride && data.ride.status !== activeRide.status) {
+              onStatusChanged(data.ride);
+            }
+          }
+        } catch (e) {}
+      }
+    }, 3000);
 
     return () => {
       socket.off('ride:status_changed', onStatusChanged);
+      socket.off('ride:updated', onStatusChanged);
       socket.off('ride:location_tick', onLocationTick);
+      clearInterval(pollInterval);
     };
-  }, [socket, activeRide?.id]);
+  }, [socket, activeRide?.id, currentRiderId]);
 
   // Request a ride
   const handleRequestRide = async () => {

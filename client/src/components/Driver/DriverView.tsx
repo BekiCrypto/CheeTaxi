@@ -402,25 +402,28 @@ export const DriverView: React.FC<DriverViewProps> = ({
 
   // Transition: Arrived at pickup
   const handleArrived = () => {
-    if (!activeRide || !socket) return;
-    socket.emit('ride:arrived', { rideId: activeRide.id });
+    if (!activeRide) return;
+    if (socket) socket.emit('ride:arrived', { rideId: activeRide.id });
+    fetch(`/api/rides/${activeRide.id}/arrive`, { method: 'POST' }).catch(() => {});
     sounds.playDriverArrived();
   };
 
   // Transition: Start trip
   const handleStartTrip = () => {
-    if (!activeRide || !socket) return;
-    socket.emit('ride:start', { rideId: activeRide.id });
+    if (!activeRide) return;
+    if (socket) socket.emit('ride:start', { rideId: activeRide.id });
+    fetch(`/api/rides/${activeRide.id}/start`, { method: 'POST' }).catch(() => {});
     sounds.playTripStarted();
   };
 
   // Transition: Complete trip
   const handleCompleteTrip = () => {
-    if (!activeRide || !socket) return;
+    if (!activeRide) return;
     setIsSimulatingMove(false);
     clearInterval(simIntervalRef.current);
 
-    socket.emit('ride:complete', { rideId: activeRide.id });
+    if (socket) socket.emit('ride:complete', { rideId: activeRide.id });
+    fetch(`/api/rides/${activeRide.id}/complete`, { method: 'POST' }).catch(() => {});
     sounds.playPaymentSuccess();
   };
 
