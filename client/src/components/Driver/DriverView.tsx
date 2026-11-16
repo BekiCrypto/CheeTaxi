@@ -256,15 +256,37 @@ export const DriverView: React.FC<DriverViewProps> = ({
       sounds.playPaymentSuccess();
     };
 
+    const onRideWithdrawn = (data: { rideId: string }) => {
+      setMultiOffers((prev) => prev.filter((o) => o.id !== data.rideId));
+      if (incomingRide && incomingRide.id === data.rideId) {
+        setIncomingRide(null);
+      }
+    };
+
+    const onRideAssigned = (assignedRide: any) => {
+      if (assignedRide && assignedRide.driverId === driver?.id) {
+        setActiveRide(assignedRide);
+        setIncomingRide(null);
+        setMultiOffers([]);
+        sounds.playRideAccepted();
+      }
+    };
+
     socket.on('driver:incoming_ride', onIncomingRide);
+    socket.on('driver:ride_broadcast', onIncomingRide);
     socket.on('driver:multi_offers', onMultiOffers);
+    socket.on('driver:ride_withdrawn', onRideWithdrawn);
+    socket.on('driver:ride_assigned', onRideAssigned);
     socket.on('driver:ride_cancelled', onRideCancelled);
     socket.on('ride:status_changed', onStatusChanged);
     socket.on('driver:kyc_updated', onKycUpdated);
 
     return () => {
       socket.off('driver:incoming_ride', onIncomingRide);
+      socket.off('driver:ride_broadcast', onIncomingRide);
       socket.off('driver:multi_offers', onMultiOffers);
+      socket.off('driver:ride_withdrawn', onRideWithdrawn);
+      socket.off('driver:ride_assigned', onRideAssigned);
       socket.off('driver:ride_cancelled', onRideCancelled);
       socket.off('ride:status_changed', onStatusChanged);
       socket.off('driver:kyc_updated', onKycUpdated);
@@ -331,6 +353,12 @@ export const DriverView: React.FC<DriverViewProps> = ({
       rideId: targetRide.id,
       driverId: driver.id,
     });
+
+    fetch(`/api/rides/${targetRide.id}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driverId: driver.id }),
+    }).catch(() => {});
 
     setActiveRide(targetRide);
     setIncomingRide(null);

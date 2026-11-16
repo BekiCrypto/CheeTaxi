@@ -79,6 +79,11 @@ export function createRideRouter(io: SocketIOServer) {
       }
     }
 
+    // Determine whether to auto-assign immediately:
+    // If autoAssign was explicitly passed, respect it.
+    // Otherwise, manual dispatch auto-assigns, whereas mobile passenger hailing starts in REQUESTED state.
+    const shouldAutoAssign = req.body.autoAssign !== undefined ? Boolean(req.body.autoAssign) : Boolean(isManualDispatch);
+
     const ride = DispatchService.createRide({
       riderId,
       riderName: riderName || 'Passenger',
@@ -91,15 +96,79 @@ export function createRideRouter(io: SocketIOServer) {
       operatorNotes: customNotes,
       providerId: providerId as any,
       partnerOrderId,
+      driverId: req.body.driverId,
+      autoAssign: shouldAutoAssign,
     });
 
     // Notify connected clients
     if (ride.driverId) {
       io.to(`driver:${ride.driverId}`).emit('driver:incoming_ride', ride);
+      io.to(`driver:${ride.driverId}`).emit('driver:ride_assigned', ride);
+    } else {
+      // Broadcast incoming ride request to nearby eligible drivers
+      const eligible = DispatchService.findEligibleDrivers(pickup.lat, pickup.lng, vehicleCategory, 10);
+      for (const d of eligible) {
+        io.to(`driver:${d.id}`).emit('driver:incoming_ride', ride);
+      }
+      io.emit('driver:ride_broadcast', ride);
+
+      // Automated matching fallback timer:
+      // If no human driver manually accepts within 6 seconds, match the top available driver
+      setTimeout(() => {
+        const current = DispatchService.getRideById(ride.id);
+        if (current && current.status === 'REQUESTED') {
+          const freshEligible = DispatchService.findEligibleDrivers(ride.pickup.lat, ride.pickup.lng, ride.vehicleCategory, 10);
+          if (freshEligible.length > 0) {
+            try {
+              const matched = DispatchService.assignDriver(ride.id, freshEligible[0].id);
+              if (matched) {
+                io.to(`ride:${ride.id}`).emit('ride:status_changed', matched);
+                io.to(`driver:${freshEligible[0].id}`).emit('driver:ride_assigned', matched);
+                io.emit('driver:ride_withdrawn', { rideId: ride.id });
+                io.to('admin:dispatch').emit('admin:trip_updated', matched);
+              }
+            } catch (e) {
+              console.warn('[Dispatch] Auto-match fallback:', e);
+            }
+          }
+        }
+      }, 6000);
     }
     io.to('admin:dispatch').emit('admin:new_trip', ride);
 
     return res.status(201).json({ success: true, ride });
+  });
+
+  /**
+   * Driver accepts a ride request (REST fallback / alternative to socket)
+   */
+  router.post('/:id/accept', (req, res) => {
+    const { driverId } = req.body;
+    if (!driverId) {
+      return res.status(400).json({ error: 'driverId is required' });
+    }
+
+    try {
+      const assigned = DispatchService.assignDriver(req.params.id, driverId);
+      if (!assigned) {
+        return res.status(404).json({ error: 'Ride not found or already assigned' });
+      }
+
+      io.to(`ride:${req.params.id}`).emit('ride:status_changed', assigned);
+      io.to(`driver:${driverId}`).emit('driver:ride_assigned', assigned);
+      io.emit('driver:ride_withdrawn', { rideId: req.params.id });
+      io.to('admin:dispatch').emit('admin:trip_updated', assigned);
+
+      return res.json({ success: true, ride: assigned });
+    } catch (err: any) {
+      if (err.message === 'DRIVER_ALREADY_BUSY') {
+        return res.status(409).json({
+          error: 'Driver is currently on another active trip (In-Flight Lock Active)',
+          code: 'DRIVER_ACTIVE_TRIP_LOCKED',
+        });
+      }
+      return res.status(400).json({ error: err.message || 'Failed to accept ride' });
+    }
   });
 
   /**
@@ -136,6 +205,7 @@ export function createRideRouter(io: SocketIOServer) {
       );
       io.to(`driver:${ride.driverId}`).emit('driver:ride_cancelled', { rideId: req.params.id });
     }
+    io.emit('driver:ride_withdrawn', { rideId: req.params.id });
 
     const updated = DispatchService.getRideById(req.params.id);
     io.to(`ride:${req.params.id}`).emit('ride:status_changed', updated);

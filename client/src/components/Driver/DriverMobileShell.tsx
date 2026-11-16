@@ -217,16 +217,36 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       setIncomingOffers((prev) => prev.filter(o => o.id !== data.rideId));
     };
 
+    const handleRideWithdrawn = (data: { rideId: string }) => {
+      setIncomingOffers((prev) => prev.filter(o => o.id !== data.rideId));
+    };
+
+    const handleRideAssigned = (assignedRide: any) => {
+      if (assignedRide && assignedRide.driverId === driverId) {
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        setIncomingOffers([]);
+        setActiveRide(assignedRide);
+        setRideStep('TO_PICKUP');
+        sounds.playRideAccepted();
+      }
+    };
+
     socket.on('ride:new', handleNewRide);
     socket.on('driver:incoming_ride', handleNewRide);
+    socket.on('driver:ride_broadcast', handleNewRide);
     socket.on('driver:multi_offers', handleMultiOffers);
+    socket.on('driver:ride_withdrawn', handleRideWithdrawn);
+    socket.on('driver:ride_assigned', handleRideAssigned);
     socket.on('ride:cancelled', handleRideCancelled);
     socket.on('driver:ride_cancelled', handleRideCancelled);
 
     return () => {
       socket.off('ride:new', handleNewRide);
       socket.off('driver:incoming_ride', handleNewRide);
+      socket.off('driver:ride_broadcast', handleNewRide);
       socket.off('driver:multi_offers', handleMultiOffers);
+      socket.off('driver:ride_withdrawn', handleRideWithdrawn);
+      socket.off('driver:ride_assigned', handleRideAssigned);
       socket.off('ride:cancelled', handleRideCancelled);
       socket.off('driver:ride_cancelled', handleRideCancelled);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
@@ -288,6 +308,13 @@ export const DriverMobileShell: React.FC<DriverMobileShellProps> = ({
       rideId: target.id,
       driverId,
     });
+
+    // Network redundancy: also trigger REST accept
+    fetch(`/api/rides/${target.id}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driverId }),
+    }).catch(() => {});
 
     // In-Flight lock: activeRide becomes set, blocking any subsequent requests
     setActiveRide(target);

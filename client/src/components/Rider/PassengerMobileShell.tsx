@@ -6,7 +6,7 @@ import {
   Search, Sliders, Share2, X, Send, Navigation, ArrowUpDown,
   Sparkles, CreditCard, ChevronDown, ChevronUp, Check, ShieldCheck,
   ChevronLeft, Info, HelpCircle, LocateFixed, Crosshair, Building,
-  ShoppingBag, Hotel, Compass, Activity, FileText, CheckCircle
+  ShoppingBag, Hotel, Compass, Activity, FileText, CheckCircle, Radio
 } from 'lucide-react';
 import { AddisMap } from '../Map/AddisMap';
 import { Language, translations } from '../../i18n/translations';
@@ -240,18 +240,29 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
     }
   }, [pickup, destination, selectedCategory, comparisonMode]);
 
-  // Socket Telemetry Listeners
+  // Socket Telemetry Listeners & Real-Time Redundancy
   useEffect(() => {
     if (!socket) return;
 
+    if (activeRide?.id) {
+      socket.emit('join:ride', activeRide.id);
+      socket.emit('join:rider', user.id);
+    }
+
     const handleRideUpdate = (updatedRide: Ride) => {
+      if (!updatedRide) return;
       if (activeRide && updatedRide.id === activeRide.id) {
         setActiveRide(updatedRide);
-        if (updatedRide.status === 'COMPLETED') {
+        if (updatedRide.status === 'ASSIGNED' && activeRide.status === 'REQUESTED') {
+          sounds.playRideAccepted();
+        } else if (updatedRide.status === 'ARRIVED') {
+          sounds.playBeep(650, 'sine', 0.25);
+        } else if (updatedRide.status === 'COMPLETED') {
           setSheetState('COMPLETED_SUMMARY');
           sounds.playPaymentSuccess();
-        } else if (updatedRide.status === 'ASSIGNED') {
-          sounds.playRideAccepted();
+        } else if (updatedRide.status === 'CANCELLED') {
+          setActiveRide(null);
+          setSheetState('EXPLORE');
         }
 
         if (updatedRide.currentDriverLocation) {
@@ -263,22 +274,48 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
       }
     };
 
+    const handleLocationTick = (data: { rideId: string; driverLocation: [number, number]; heading?: number }) => {
+      if (activeRide && data.rideId === activeRide.id) {
+        setLiveDriverPos({ lat: data.driverLocation[0], lng: data.driverLocation[1], heading: data.heading });
+      }
+    };
+
     const handleLocationUpdate = (data: { driverId: string; lat: number; lng: number; heading?: number }) => {
       if (activeRide?.driverId && data.driverId === activeRide.driverId) {
         setLiveDriverPos({ lat: data.lat, lng: data.lng, heading: data.heading });
       }
     };
 
+    socket.on('ride:status_changed', handleRideUpdate);
     socket.on('ride:updated', handleRideUpdate);
     socket.on('ride:status_change', handleRideUpdate);
+    socket.on('ride:location_tick', handleLocationTick);
     socket.on('driver:location_update', handleLocationUpdate);
 
+    // Guaranteed polling fallback every 3s during active matching/trip
+    const pollInterval = setInterval(async () => {
+      if (activeRide && activeRide.status !== 'COMPLETED' && activeRide.status !== 'CANCELLED') {
+        try {
+          const res = await fetch(`/api/rides/${activeRide.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.ride && data.ride.status !== activeRide.status) {
+              handleRideUpdate(data.ride);
+            }
+          }
+        } catch (e) {}
+      }
+    }, 3000);
+
     return () => {
+      socket.off('ride:status_changed', handleRideUpdate);
       socket.off('ride:updated', handleRideUpdate);
       socket.off('ride:status_change', handleRideUpdate);
+      socket.off('ride:location_tick', handleLocationTick);
       socket.off('driver:location_update', handleLocationUpdate);
+      clearInterval(pollInterval);
     };
-  }, [socket, activeRide]);
+  }, [socket, activeRide?.id, activeRide?.status, activeRide?.driverId, user.id]);
 
   // Fetch ride history
   const fetchRideHistory = async () => {
@@ -321,6 +358,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
           providerOfferId: selectedOffer?.id,
           fareEtb: selectedOffer?.estimatedFare || 240,
           operatorNotes: pickupNotes || undefined,
+          autoAssign: false,
         }),
       });
 
@@ -329,6 +367,10 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
         setActiveRide(data.ride);
         setSheetState('ACTIVE_RIDE');
         sounds.playIncomingRideAlert();
+        if (socket) {
+          socket.emit('join:ride', data.ride.id);
+          socket.emit('join:rider', user.id);
+        }
       }
     } catch (e) {
       console.error('Failed to book ride:', e);
@@ -434,6 +476,7 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                 activeDriverLocation={liveDriverPos ? [liveDriverPos.lat, liveDriverPos.lng] : undefined}
                 activeDriverHeading={liveDriverPos?.heading || 0}
                 routeCoordinates={activeRide?.routeCoordinates || []}
+                isSearching={activeRide?.status === 'REQUESTED'}
                 className="h-full w-full"
               />
             </div>
@@ -1032,7 +1075,15 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                         <span className="text-xs font-black uppercase text-emerald-400">
-                          {activeRide.status === 'ASSIGNED' ? 'Driver Heading to You' : activeRide.status}
+                          {activeRide.status === 'REQUESTED'
+                            ? (isAm ? 'አቅራቢያ ታክሲዎችን በመፈለግ ላይ...' : 'Connecting with nearby taxis...')
+                            : activeRide.status === 'ASSIGNED'
+                            ? (isAm ? 'ሾፌሩ ወደ እርስዎ እየመጣ ነው' : 'Driver Heading to You')
+                            : activeRide.status === 'ARRIVED'
+                            ? (isAm ? 'ሾፌሩ ደርሷል (ይሳፈሩ)' : 'Driver Arrived at Pickup')
+                            : activeRide.status === 'IN_PROGRESS'
+                            ? (isAm ? 'ጉዞ በሂደት ላይ' : 'In Transit to Destination')
+                            : activeRide.status}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1050,82 +1101,158 @@ export const PassengerMobileShell: React.FC<PassengerMobileShellProps> = ({
                       </div>
                     </div>
 
-                    {/* Driver Card with Verified Photo & Plate */}
-                    <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/80 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 font-black text-xl flex items-center justify-center shadow-lg">
-                            {activeRide.driver?.fullName ? activeRide.driver.fullName.charAt(0) : 'D'}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <h3 className="text-sm font-bold text-white">
-                                {activeRide.driver?.fullName || 'Ahmed Mohammed'}
-                              </h3>
-                              <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-400 text-[10px] font-bold rounded">
-                                ★ {activeRide.driver?.rating || '4.92'}
-                              </span>
+                    {/* MATCHMAKING RADAR HUD (WHEN IN REQUESTED STATUS) */}
+                    {activeRide.status === 'REQUESTED' ? (
+                      <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 text-white p-4 rounded-2xl shadow-2xl relative overflow-hidden space-y-4">
+                        {/* Ambient background glow */}
+                        <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+
+                        {/* Radar Sonar Wave & Pulse */}
+                        <div className="flex items-center gap-3.5">
+                          <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+                            <div className="absolute inset-0 rounded-full bg-amber-500/20 animate-ping" />
+                            <div className="absolute inset-1 rounded-full bg-amber-500/30 animate-pulse" />
+                            <div className="relative w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                              <Radio className="w-5 h-5 animate-spin" style={{ animationDuration: '3s' }} />
                             </div>
-                            <p className="text-xs text-slate-400">
-                              {activeRide.driver ? `${activeRide.driver.vehicleMake} ${activeRide.driver.vehicleModel}` : 'Toyota Corolla (White)'}
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <h3 className="text-sm font-black text-white tracking-tight">
+                              {isAm ? 'ከአቅራቢያ ታክሲዎች ጋር በማገናኘት ላይ...' : 'Connecting with nearby taxis...'}
+                            </h3>
+                            <p className="text-[11px] text-slate-400 leading-snug">
+                              {isAm
+                                ? `ለተረጋገጡ የጨበለው ሾፌሮች በ${activeRide.pickup?.address?.split(',')[0] || 'መነሻዎ'} አቅራቢያ ጥያቄ በመላክ ላይ`
+                                : `Broadcasting ride request to certified Chebelew drivers near ${activeRide.pickup?.address?.split(',')[0] || 'your pickup'}`}
                             </p>
                           </div>
                         </div>
 
-                        {/* License Plate Badge */}
-                        <div className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-center font-mono font-bold text-xs text-amber-400 shadow">
-                          {activeRide.driver?.vehiclePlate || 'AA 3 45982'}
+                        {/* Real-Time Dispatch Corridor Telemetry */}
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60 flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">{isAm ? 'ግምታዊ ማገናኛ' : 'Estimated match'}</span>
+                              <span className="font-bold text-slate-200">~1-2 mins</span>
+                            </div>
+                          </div>
+                          <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60 flex items-center gap-2">
+                            <Car className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <div>
+                              <span className="text-[10px] text-slate-400 block">{isAm ? 'በአካባቢው ያሉ' : 'Nearby online'}</span>
+                              <span className="font-bold text-slate-200">{availableDrivers.length || 5} cabs alerted</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
 
-                      {/* 4-Digit Safety PIN Pill */}
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                          <span className="text-slate-300 font-bold">Safety PIN:</span>
-                          <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 font-black rounded-lg font-mono tracking-widest text-sm">
-                            {safetyPin}
-                          </span>
+                        {/* Shimmering Route Preview */}
+                        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 pb-1 border-b border-slate-800/80">
+                            <span>{activeRide.vehicleCategory.toUpperCase()} • {activeRide.paymentMethod}</span>
+                            <span className="font-bold text-amber-400">{activeRide.fare?.totalFare || 240} ETB</span>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
+                            <p className="text-slate-300 text-[11px] line-clamp-1">{activeRide.pickup.address}</p>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
+                            <p className="text-slate-300 text-[11px] line-clamp-1">{activeRide.destination.address}</p>
+                          </div>
                         </div>
-                        <span className="text-[10px] text-slate-400">Give to driver</span>
+
+                        {/* Cancel Request Button */}
+                        <button
+                          type="button"
+                          onClick={handleCancelActiveRide}
+                          className="w-full py-2.5 bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 text-xs font-bold rounded-xl border border-slate-700 hover:border-rose-500/40 transition active-press"
+                        >
+                          {isAm ? 'ጥያቄውን ሰርዝ' : 'Cancel Request'}
+                        </button>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        {/* Driver Card with Verified Photo & Plate */}
+                        <div className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/80 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 font-black text-xl flex items-center justify-center shadow-lg">
+                                {activeRide.driver?.fullName ? activeRide.driver.fullName.charAt(0) : 'D'}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <h3 className="text-sm font-bold text-white">
+                                    {activeRide.driver?.fullName || 'Ahmed Mohammed'}
+                                  </h3>
+                                  <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-400 text-[10px] font-bold rounded">
+                                    ★ {activeRide.driver?.rating || '4.92'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-400">
+                                  {activeRide.driver ? `${activeRide.driver.vehicleMake} ${activeRide.driver.vehicleModel}` : 'Toyota Corolla (White)'}
+                                </p>
+                              </div>
+                            </div>
 
-                    {/* Quick Action Buttons (Call, Live Share, SOS) */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <a
-                        href={`tel:${activeRide.driver?.phone || '+251911223344'}`}
-                        className="py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 active-press"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-emerald-400" /> Call Driver
-                      </a>
+                            {/* License Plate Badge */}
+                            <div className="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-center font-mono font-bold text-xs text-amber-400 shadow">
+                              {activeRide.driver?.vehiclePlate || 'AA 3 45982'}
+                            </div>
+                          </div>
 
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(`${window.location.origin}/track/${activeRide.id}`);
-                          alert('Live SafeTrip Tracking link copied! Share with family or emergency contacts.');
-                        }}
-                        className="py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 active-press"
-                      >
-                        <Share2 className="w-3.5 h-3.5 text-amber-400" /> Share Trip
-                      </button>
+                          {/* 4-Digit Safety PIN Pill */}
+                          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                              <span className="text-slate-300 font-bold">Safety PIN:</span>
+                              <span className="px-2 py-0.5 bg-emerald-500 text-slate-950 font-black rounded-lg font-mono tracking-widest text-sm">
+                                {safetyPin}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400">Give to driver</span>
+                          </div>
+                        </div>
 
-                      <a
-                        href="tel:991"
-                        className="py-2.5 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-rose-500/40 active-press"
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5" /> Police 991
-                      </a>
-                    </div>
+                        {/* Quick Action Buttons (Call, Live Share, SOS) */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <a
+                            href={`tel:${activeRide.driver?.phone || '+251911223344'}`}
+                            className="py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 active-press"
+                          >
+                            <Phone className="w-3.5 h-3.5 text-emerald-400" /> Call Driver
+                          </a>
 
-                    {/* Cancel Trip Button */}
-                    <button
-                      type="button"
-                      onClick={() => setIsCancelConfirmOpen(true)}
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-rose-400 text-xs font-bold rounded-xl border border-rose-500/20 active-press transition"
-                    >
-                      Cancel Ride / ጉዞ ሰርዝ
-                    </button>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/track/${activeRide.id}`);
+                              alert('Live SafeTrip Tracking link copied! Share with family or emergency contacts.');
+                            }}
+                            className="py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 active-press"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-amber-400" /> Share Trip
+                          </button>
+
+                          <a
+                            href="tel:991"
+                            className="py-2.5 bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border border-rose-500/40 active-press"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5" /> Police 991
+                          </a>
+                        </div>
+
+                        {/* Cancel Trip Button */}
+                        <button
+                          type="button"
+                          onClick={() => setIsCancelConfirmOpen(true)}
+                          className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-rose-400 text-xs font-bold rounded-xl border border-rose-500/20 active-press transition"
+                        >
+                          Cancel Ride / ጉዞ ሰርዝ
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
 

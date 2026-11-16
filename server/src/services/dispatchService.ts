@@ -18,6 +18,7 @@ export interface CreateRideInput {
   providerId?: AggregatorProviderId;
   partnerOrderId?: string;
   providerOfferId?: string;
+  autoAssign?: boolean;
 }
 
 export class DispatchService {
@@ -120,18 +121,7 @@ export class DispatchService {
     let assignedDriverId = input.driverId;
     let initialStatus = 'REQUESTED';
 
-    // If no direct manual driver was supplied, check nearby drivers
-    if (!assignedDriverId) {
-      const candidates = this.findEligibleDrivers(
-        input.pickup.lat,
-        input.pickup.lng,
-        input.vehicleCategory
-      );
-      if (candidates.length > 0) {
-        assignedDriverId = candidates[0].id;
-        initialStatus = 'ASSIGNED';
-      }
-    } else {
+    if (assignedDriverId) {
       // Guardrail: Validate that manual/direct driver is actually available and not on an active trip
       const target = db.prepare('SELECT is_online, is_busy, active_ride_id FROM drivers WHERE id = ?').get(assignedDriverId) as any;
       if (target && (target.is_busy === 1 || Boolean(target.active_ride_id) || target.is_online === 0)) {
@@ -139,6 +129,17 @@ export class DispatchService {
         assignedDriverId = undefined;
         initialStatus = 'REQUESTED';
       } else {
+        initialStatus = 'ASSIGNED';
+      }
+    } else if (input.autoAssign !== false) {
+      // Auto-assign candidate when autoAssign is true or defaulted (preserving backward compatibility)
+      const candidates = this.findEligibleDrivers(
+        input.pickup.lat,
+        input.pickup.lng,
+        input.vehicleCategory
+      );
+      if (candidates.length > 0) {
+        assignedDriverId = candidates[0].id;
         initialStatus = 'ASSIGNED';
       }
     }
@@ -199,6 +200,49 @@ export class DispatchService {
     );
 
     return this.getRideById(rideId)!;
+  }
+
+  /**
+   * Assigns a driver to a requested ride, locking the driver in-flight
+   */
+  static assignDriver(rideId: string, driverId: string): Ride | null {
+    const ride = db.prepare('SELECT * FROM rides WHERE id = ?').get(rideId) as any;
+    if (!ride) return null;
+    if (ride.status !== 'REQUESTED' && ride.status !== 'ASSIGNED') {
+      return null;
+    }
+
+    const driver = db.prepare('SELECT * FROM drivers WHERE id = ?').get(driverId) as any;
+    if (!driver) return null;
+    if (driver.is_busy === 1 || Boolean(driver.active_ride_id)) {
+      throw new Error('DRIVER_ALREADY_BUSY');
+    }
+
+    const now = new Date().toISOString();
+    db.prepare("UPDATE rides SET driver_id = ?, status = 'ASSIGNED', updated_at = ? WHERE id = ?").run(
+      driverId,
+      now,
+      rideId
+    );
+
+    db.prepare('UPDATE drivers SET is_busy = 1, active_ride_id = ? WHERE id = ?').run(
+      rideId,
+      driverId
+    );
+
+    db.prepare(`
+      INSERT INTO dispatch_logs (id, ride_id, action, operator_name, details, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      uuidv4(),
+      rideId,
+      'DRIVER_ACCEPT',
+      'System Matcher',
+      `Assigned to driver ${driverId} (${driver.full_name})`,
+      now
+    );
+
+    return this.getRideById(rideId);
   }
 
   /**

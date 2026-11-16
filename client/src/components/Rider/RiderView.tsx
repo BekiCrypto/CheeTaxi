@@ -716,6 +716,7 @@ export const RiderView: React.FC<RiderViewProps> = ({
           providerId: selectedOffer?.providerId || 'chebelew',
           providerOfferId: selectedOffer?.id,
           fareEtb: selectedOffer?.estimatedFare,
+          autoAssign: false,
         }),
       });
 
@@ -724,6 +725,10 @@ export const RiderView: React.FC<RiderViewProps> = ({
         setActiveRide(data.ride);
         if (onRideActive) onRideActive(data.ride);
         sounds.playIncomingRideAlert();
+        if (socket) {
+          socket.emit('join:ride', data.ride.id);
+          socket.emit('join:rider', currentRiderId);
+        }
       }
     } catch (err) {
       console.error('Failed to book ride:', err);

@@ -14,6 +14,10 @@ export function setupSocketHandlers(io: SocketIOServer) {
       socket.join(`driver:${driverId}`);
     });
 
+    socket.on('join:rider', (riderId: string) => {
+      socket.join(`rider:${riderId}`);
+    });
+
     socket.on('driver:register', (data: { driverId: string }) => {
       if (data?.driverId) {
         socket.join(`driver:${data.driverId}`);
@@ -62,23 +66,17 @@ export function setupSocketHandlers(io: SocketIOServer) {
     // Driver accepts ride
     socket.on('ride:accept', (data: { rideId: string; driverId: string }) => {
       const { rideId, driverId } = data;
-      const now = new Date().toISOString();
-
-      db.prepare(`
-        UPDATE rides
-        SET driver_id = ?, status = 'ASSIGNED', updated_at = ?
-        WHERE id = ?
-      `).run(driverId, now, rideId);
-
-      db.prepare(`
-        UPDATE drivers
-        SET is_busy = 1, active_ride_id = ?
-        WHERE id = ?
-      `).run(rideId, driverId);
-
-      const updatedRide = DispatchService.getRideById(rideId);
-      io.to(`ride:${rideId}`).emit('ride:status_changed', updatedRide);
-      io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
+      try {
+        const updatedRide = DispatchService.assignDriver(rideId, driverId);
+        if (updatedRide) {
+          io.to(`ride:${rideId}`).emit('ride:status_changed', updatedRide);
+          io.to(`driver:${driverId}`).emit('driver:ride_assigned', updatedRide);
+          io.emit('driver:ride_withdrawn', { rideId });
+          io.to('admin:dispatch').emit('admin:trip_updated', updatedRide);
+        }
+      } catch (err: any) {
+        console.warn(`[Socket] Driver ${driverId} failed to accept ride ${rideId}:`, err.message);
+      }
     });
 
     // Driver arrived at pickup
