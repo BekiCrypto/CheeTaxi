@@ -663,8 +663,8 @@ export const DriverView: React.FC<DriverViewProps> = ({
                   </div>
                   <div className="text-[11px] text-emerald-700 flex justify-between pt-1 border-t border-emerald-200/60 font-mono">
                     <span>Gross: {activeRide.fare.totalFare.toFixed(2)} ETB</span>
-                    <span>VAT 15%: -{activeRide.fare.vatAmount.toFixed(2)} ETB</span>
-                    <span>Comm 15%: -{activeRide.fare.platformCommission.toFixed(2)} ETB</span>
+                    <span>VAT (570/2025): -{activeRide.fare.vatAmount.toFixed(2)} ETB</span>
+                    <span className="font-bold text-emerald-800">Chebelew Fee: 0.00 ETB (0% Comm)</span>
                   </div>
                   <div className="text-[10px] text-slate-500 pt-0.5">
                     Payment Method:{' '}
@@ -1103,12 +1103,12 @@ export const DriverView: React.FC<DriverViewProps> = ({
         )}
 
         <AddisMap
-          pickup={activeRide?.pickup}
-          destination={activeRide?.destination}
+          pickup={activeRide?.pickup || incomingRide?.pickup}
+          destination={activeRide?.destination || incomingRide?.destination}
           activeDriverLocation={[driver.currentLat, driver.currentLng]}
           activeDriverHeading={driver.heading}
           activeDriverPlate={driver.vehiclePlate}
-          routeCoordinates={activeRide?.routeCoordinates}
+          routeCoordinates={activeRide?.routeCoordinates || incomingRide?.routeCoordinates || []}
         />
       </div>
 
