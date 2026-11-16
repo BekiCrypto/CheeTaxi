@@ -106,33 +106,12 @@ export function createRideRouter(io: SocketIOServer) {
       io.to(`driver:${ride.driverId}`).emit('driver:ride_assigned', ride);
     } else {
       // Broadcast incoming ride request to nearby eligible drivers
+      // The driver retains full agency: they inspect the AI trip recommendations and choose to accept
       const eligible = DispatchService.findEligibleDrivers(pickup.lat, pickup.lng, vehicleCategory, 10);
       for (const d of eligible) {
         io.to(`driver:${d.id}`).emit('driver:incoming_ride', ride);
       }
       io.emit('driver:ride_broadcast', ride);
-
-      // Automated matching fallback timer:
-      // If no human driver manually accepts within 6 seconds, match the top available driver
-      setTimeout(() => {
-        const current = DispatchService.getRideById(ride.id);
-        if (current && current.status === 'REQUESTED') {
-          const freshEligible = DispatchService.findEligibleDrivers(ride.pickup.lat, ride.pickup.lng, ride.vehicleCategory, 10);
-          if (freshEligible.length > 0) {
-            try {
-              const matched = DispatchService.assignDriver(ride.id, freshEligible[0].id);
-              if (matched) {
-                io.to(`ride:${ride.id}`).emit('ride:status_changed', matched);
-                io.to(`driver:${freshEligible[0].id}`).emit('driver:ride_assigned', matched);
-                io.emit('driver:ride_withdrawn', { rideId: ride.id });
-                io.to('admin:dispatch').emit('admin:trip_updated', matched);
-              }
-            } catch (e) {
-              console.warn('[Dispatch] Auto-match fallback:', e);
-            }
-          }
-        }
-      }, 6000);
     }
     io.to('admin:dispatch').emit('admin:new_trip', ride);
 
