@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { db } from '../db/database.js';
 import { DispatchService } from '../services/dispatchService.js';
 import { TelebirrService } from '../services/telebirrService.js';
+import { LocationService } from '../services/locationService.js';
 
 export function setupSocketHandlers(io: SocketIOServer) {
   io.on('connection', (socket: Socket) => {
@@ -28,27 +29,18 @@ export function setupSocketHandlers(io: SocketIOServer) {
       socket.join('admin:dispatch');
     });
 
-    // Driver location update
+    // High-Throughput Driver Location Update (Batched & Buffered in Memory)
     socket.on('driver:location_update', (data: { driverId: string; lat: number; lng: number; heading?: number }) => {
       const { driverId, lat, lng, heading = 0 } = data;
 
-      db.prepare(`
-        UPDATE drivers
-        SET current_lat = ?, current_lng = ?, heading = ?
-        WHERE id = ?
-      `).run(lat, lng, heading, driverId);
+      const loc = LocationService.getLocation(driverId);
+      const activeRideId = loc?.activeRideId;
 
-      // Find if driver has an active ride
-      const driver = db.prepare('SELECT active_ride_id FROM drivers WHERE id = ?').get(driverId) as any;
-      if (driver && driver.active_ride_id) {
-        db.prepare(`
-          UPDATE rides
-          SET current_driver_lat = ?, current_driver_lng = ?, updated_at = ?
-          WHERE id = ?
-        `).run(lat, lng, new Date().toISOString(), driver.active_ride_id);
+      LocationService.updateLocation(driverId, lat, lng, heading, activeRideId);
 
-        io.to(`ride:${driver.active_ride_id}`).emit('ride:location_tick', {
-          rideId: driver.active_ride_id,
+      if (activeRideId) {
+        io.to(`ride:${activeRideId}`).emit('ride:location_tick', {
+          rideId: activeRideId,
           driverLocation: [lat, lng],
           heading,
         });

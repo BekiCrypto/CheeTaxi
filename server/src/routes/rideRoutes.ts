@@ -84,6 +84,8 @@ export function createRideRouter(io: SocketIOServer) {
     // Otherwise, manual dispatch auto-assigns, whereas mobile passenger hailing starts in REQUESTED state.
     const shouldAutoAssign = req.body.autoAssign !== undefined ? Boolean(req.body.autoAssign) : Boolean(isManualDispatch);
 
+    const idempotencyKey = (req.body.idempotencyKey || req.headers['x-idempotency-key'] || req.headers['idempotency-key']) as string | undefined;
+
     const ride = DispatchService.createRide({
       riderId,
       riderName: riderName || 'Passenger',
@@ -98,6 +100,7 @@ export function createRideRouter(io: SocketIOServer) {
       partnerOrderId,
       driverId: req.body.driverId,
       autoAssign: shouldAutoAssign,
+      idempotencyKey,
     });
 
     // Notify connected clients
@@ -273,18 +276,13 @@ export function createRideRouter(io: SocketIOServer) {
   });
 
   /**
-   * Get rides history for user
+   * Get rides history for user with single-query join and pagination (Eliminates N+1 query pattern)
    */
   const getUserRidesHandler = (req: any, res: any) => {
-    const rows = db.prepare(`
-      SELECT * FROM rides
-      WHERE rider_id = ? OR driver_id = (SELECT id FROM drivers WHERE user_id = ?)
-      ORDER BY created_at DESC
-      LIMIT 20
-    `).all(req.params.userId, req.params.userId) as any[];
-
-    const rides = rows.map((r) => DispatchService.getRideById(r.id)).filter(Boolean);
-    return res.json({ rides });
+    const page = parseInt(req.query.page as string, 10) || 1;
+    const limit = parseInt(req.query.limit as string, 10) || 20;
+    const rides = DispatchService.getUserRides(req.params.userId, page, limit);
+    return res.json({ rides, page, limit });
   };
 
   router.get('/user/:userId', getUserRidesHandler);

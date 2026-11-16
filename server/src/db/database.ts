@@ -66,6 +66,7 @@ export function initDatabase() {
       fleet_id TEXT,
       country_code TEXT NOT NULL DEFAULT 'ET',
       city_code TEXT NOT NULL DEFAULT 'ADDIS_ABABA',
+      location_updated_at TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
@@ -250,6 +251,7 @@ export function initDatabase() {
       operator_notes TEXT,
       corporate_id TEXT,
       country_code TEXT NOT NULL DEFAULT 'ET',
+      idempotency_key TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (rider_id) REFERENCES users(id),
@@ -591,17 +593,40 @@ export function initDatabase() {
   migrateColumn('drivers', 'destination_filter', 'TEXT');
   migrateColumn('drivers', 'is_corridor_active', 'INTEGER NOT NULL DEFAULT 0');
   migrateColumn('drivers', 'corridor_radius_km', 'REAL NOT NULL DEFAULT 1.5');
+  migrateColumn('drivers', 'location_updated_at', 'TEXT');
 
   migrateColumn('rides', 'corporate_id', 'TEXT');
   migrateColumn('rides', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
   migrateColumn('rides', 'provider_id', "TEXT DEFAULT 'chebelew'");
   migrateColumn('rides', 'partner_order_id', 'TEXT');
   migrateColumn('rides', 'partner_callback_url', 'TEXT');
+  migrateColumn('rides', 'idempotency_key', 'TEXT');
 
   migrateColumn('users', 'country_code', "TEXT NOT NULL DEFAULT 'ET'");
   migrateColumn('users', 'is_verified', 'INTEGER NOT NULL DEFAULT 1');
   migrateColumn('users', 'corporate_id', 'TEXT');
   migrateColumn('users', 'fleet_id', 'TEXT');
+
+  // Production Scalability & High-Throughput Dispatch Indexes (created after columns exist)
+  try {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
+      CREATE INDEX IF NOT EXISTS idx_rides_rider_status ON rides(rider_id, status);
+      CREATE INDEX IF NOT EXISTS idx_rides_driver_status ON rides(driver_id, status);
+      CREATE INDEX IF NOT EXISTS idx_rides_created_at ON rides(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_rides_idempotency ON rides(idempotency_key);
+      CREATE INDEX IF NOT EXISTS idx_rides_partner_order ON rides(partner_order_id);
+      CREATE INDEX IF NOT EXISTS idx_drivers_dispatch_candidate ON drivers(is_online, is_busy, kyc_status);
+      CREATE INDEX IF NOT EXISTS idx_drivers_user_id ON drivers(user_id);
+      CREATE INDEX IF NOT EXISTS idx_drivers_sub ON drivers(subscription_status, subscription_expires_at);
+      CREATE INDEX IF NOT EXISTS idx_drivers_location_updated ON drivers(location_updated_at);
+      CREATE INDEX IF NOT EXISTS idx_dispatch_logs_ride ON dispatch_logs(ride_id, timestamp);
+      CREATE INDEX IF NOT EXISTS idx_scheduled_rides_user ON scheduled_rides(rider_id, status);
+      CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, created_at DESC);
+    `);
+  } catch (err) {
+    console.error('Index creation error:', err);
+  }
 
   // Production migration: promote all partner adapters to live authorized state
   try {

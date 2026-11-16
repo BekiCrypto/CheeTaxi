@@ -31,8 +31,9 @@ export function createAdminRouter(io: SocketIOServer) {
       WHERE status IN ('REQUESTED', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS')
     `).get() as { count: number };
 
+    // Only load today's completed fares instead of full table scan of all historical rides
     const completedTrips = db.prepare(`
-      SELECT * FROM rides WHERE status = 'COMPLETED'
+      SELECT fare_json FROM rides WHERE status = 'COMPLETED' AND DATE(created_at) = DATE('now')
     `).all() as any[];
 
     let todayGmv = 0;

@@ -20,12 +20,19 @@ import { createSafetyRouter } from './routes/safetyRoutes.js';
 import { corporateRouter } from './routes/corporateRoutes.js';
 import { developerRouter } from './routes/developerRoutes.js';
 import { paymentRouter } from './routes/paymentRoutes.js';
+import { mediaRouter } from './routes/mediaRoutes.js';
+import { MetricsService } from './services/metricsService.js';
+import { LocationService } from './services/locationService.js';
+import { QueueService } from './services/queueService.js';
 
 const app = express();
 const server = http.createServer(app);
 
 // Disable Express fingerprinting header for security
 app.disable('x-powered-by');
+
+// Prometheus Latency & Metrics Tracking Middleware
+app.use(MetricsService.middleware());
 
 // Production Security Headers
 app.use((req, res, next) => {
@@ -94,6 +101,50 @@ const io = new SocketIOServer(server, {
 
 setupSocketHandlers(io);
 
+// Prometheus Metrics Exposition Endpoint
+app.get('/api/metrics', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  return res.send(MetricsService.renderPrometheusMetrics());
+});
+
+// Fast Process Liveness Probe (K8s / Container Orchestration)
+app.get('/api/health/live', (req, res) => {
+  return res.json({
+    status: 'live',
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Deep Readiness Probe (Verifies SQLite read/write, WAL status, heap threshold)
+app.get('/api/health/ready', (req, res) => {
+  try {
+    const testQuery = db.prepare('SELECT 1 as alive').get() as any;
+    const mem = process.memoryUsage();
+    const heapLimitMb = 1024; // 1 GB safe threshold
+    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
+
+    if (!testQuery || testQuery.alive !== 1) {
+      return res.status(503).json({ status: 'not_ready', reason: 'Database query failed' });
+    }
+
+    if (heapUsedMb > heapLimitMb) {
+      return res.status(503).json({ status: 'not_ready', reason: 'Memory pressure exceeds safe threshold' });
+    }
+
+    return res.json({
+      status: 'ready',
+      database: 'connected_wal',
+      heapUsedMb,
+      inMemoryLocationsCount: LocationService.getStoreSize(),
+      queueStats: QueueService.getStats(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(503).json({ status: 'not_ready', error: err.message });
+  }
+});
+
 // Health check and diagnostic endpoint
 app.get('/api/health', (req, res) => {
   let dbHealthy = false;
@@ -159,6 +210,7 @@ app.use('/api/corporate', corporateRouter);
 app.use('/api/developer', developerRouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api', paymentRouter);
+app.use('/api/media', mediaRouter);
 
 // Serve frontend static build if available (production mode / unified server)
 const possiblePaths = [
@@ -228,8 +280,11 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
     server.close(() => {
       console.log('HTTP server closed.');
       try {
+        LocationService.flushImmediate();
+        LocationService.reset();
+        QueueService.stop();
         db.close();
-        console.log('Database connection closed cleanly.');
+        console.log('Database connection and background workers closed cleanly.');
       } catch (e) {
         console.error('Error closing database:', e);
       }

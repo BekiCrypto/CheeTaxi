@@ -3,6 +3,7 @@ import { db } from '../db/database.js';
 import { Driver, LocationPoint, Ride, VehicleCategory, PaymentMethod, AggregatorProviderId } from '../../../shared/types.js';
 import { calculateHaversineDistance, estimateRoadMetrics, generateRouteCoordinates } from './geoService.js';
 import { calculateFare } from './fareService.js';
+import { LocationService } from './locationService.js';
 
 export interface CreateRideInput {
   riderId: string;
@@ -19,6 +20,7 @@ export interface CreateRideInput {
   partnerOrderId?: string;
   providerOfferId?: string;
   autoAssign?: boolean;
+  idempotencyKey?: string;
 }
 
 export class DispatchService {
@@ -76,7 +78,10 @@ export class DispatchService {
         }
       }
 
-      const dist = calculateHaversineDistance(pickupLat, pickupLng, row.current_lat, row.current_lng);
+      const liveLoc = LocationService.getLocation(row.id);
+      const driverLat = liveLoc ? liveLoc.lat : row.current_lat;
+      const driverLng = liveLoc ? liveLoc.lng : row.current_lng;
+      const dist = calculateHaversineDistance(pickupLat, pickupLng, driverLat, driverLng);
       if (dist <= maxRadiusKm) {
         const eta = Math.max(2, Math.round(dist * 2.2 + 2));
         matches.push({
@@ -96,9 +101,9 @@ export class DispatchService {
           kycNotes: row.kyc_notes,
           isOnline: Boolean(row.is_online),
           isBusy: Boolean(row.is_busy),
-          currentLat: row.current_lat,
-          currentLng: row.current_lng,
-          heading: row.heading,
+          currentLat: driverLat,
+          currentLng: driverLng,
+          heading: liveLoc?.heading || row.heading,
           rating: row.rating,
           totalRides: row.total_rides,
           walletBalanceEtb: row.wallet_balance_etb,
@@ -123,6 +128,14 @@ export class DispatchService {
    * Creates a ride request and runs matching
    */
   static createRide(input: CreateRideInput): Ride {
+    // 1. Idempotency Check: if a ride with this idempotency key was already created, return it
+    if (input.idempotencyKey) {
+      const existing = db.prepare('SELECT id FROM rides WHERE idempotency_key = ?').get(input.idempotencyKey) as any;
+      if (existing) {
+        return this.getRideById(existing.id)!;
+      }
+    }
+
     const rideId = `ride_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();
 
@@ -180,11 +193,13 @@ export class DispatchService {
       INSERT INTO rides (
         id, rider_id, rider_name, rider_phone, driver_id, pickup_json, destination_json,
         vehicle_category, distance_km, duration_min, fare_json, payment_method, payment_status,
-        status, route_coords_json, is_manual_dispatch, operator_notes, provider_id, partner_order_id, created_at, updated_at
+        status, route_coords_json, is_manual_dispatch, operator_notes, provider_id, partner_order_id,
+        idempotency_key, created_at, updated_at
       ) VALUES (
         @id, @riderId, @riderName, @riderPhone, @driverId, @pickupJson, @destinationJson,
         @vehicleCategory, @distanceKm, @durationMin, @fareJson, @paymentMethod, 'PENDING',
-        @status, @routeCoordsJson, @isManualDispatch, @operatorNotes, @providerId, @partnerOrderId, @createdAt, @updatedAt
+        @status, @routeCoordsJson, @isManualDispatch, @operatorNotes, @providerId, @partnerOrderId,
+        @idempotencyKey, @createdAt, @updatedAt
       )
     `);
 
@@ -207,6 +222,7 @@ export class DispatchService {
       operatorNotes: input.operatorNotes || null,
       providerId: input.providerId || 'chebelew',
       partnerOrderId: input.partnerOrderId || null,
+      idempotencyKey: input.idempotencyKey || null,
       createdAt: now,
       updatedAt: now,
     });
@@ -216,6 +232,7 @@ export class DispatchService {
         rideId,
         assignedDriverId
       );
+      LocationService.updateLocation(assignedDriverId, input.pickup.lat, input.pickup.lng, 0, rideId);
     }
 
     // Log dispatch event
@@ -235,7 +252,7 @@ export class DispatchService {
   }
 
   /**
-   * Assigns a driver to a requested ride, locking the driver in-flight
+   * Assigns a driver to a requested ride, locking the driver in-flight with atomic Compare-and-Swap (CAS)
    */
   static assignDriver(rideId: string, driverId: string): Ride | null {
     const ride = db.prepare('SELECT * FROM rides WHERE id = ?').get(rideId) as any;
@@ -246,21 +263,27 @@ export class DispatchService {
 
     const driver = db.prepare('SELECT * FROM drivers WHERE id = ?').get(driverId) as any;
     if (!driver) return null;
-    if (driver.is_busy === 1 || Boolean(driver.active_ride_id)) {
+
+    const now = new Date().toISOString();
+
+    // Atomic CAS Update: guarantees that only one concurrent worker can lock the driver
+    const updateRes = db.prepare(`
+      UPDATE drivers
+      SET is_busy = 1, active_ride_id = ?
+      WHERE id = ? AND is_busy = 0 AND (active_ride_id IS NULL OR active_ride_id = '')
+    `).run(rideId, driverId);
+
+    if (updateRes.changes === 0) {
       throw new Error('DRIVER_ALREADY_BUSY');
     }
 
-    const now = new Date().toISOString();
     db.prepare("UPDATE rides SET driver_id = ?, status = 'ASSIGNED', updated_at = ? WHERE id = ?").run(
       driverId,
       now,
       rideId
     );
 
-    db.prepare('UPDATE drivers SET is_busy = 1, active_ride_id = ? WHERE id = ?').run(
-      rideId,
-      driverId
-    );
+    LocationService.updateLocation(driverId, driver.current_lat || 9.01, driver.current_lng || 38.76, driver.heading || 0, rideId);
 
     db.prepare(`
       INSERT INTO dispatch_logs (id, ride_id, action, operator_name, details, timestamp)
@@ -432,6 +455,75 @@ export class DispatchService {
   }
 
   /**
+   * High-Performance Single-Query Ride Retrieval with LEFT JOIN (Eliminates N+1 query overhead)
+   */
+  static getUserRides(userId: string, page = 1, limit = 20): Ride[] {
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    const offset = Math.max(0, (page - 1) * safeLimit);
+
+    const query = `
+      SELECT 
+        r.*,
+        d.id as d_id, d.user_id as d_user_id, d.full_name as d_full_name, d.phone as d_phone,
+        d.avatar_url as d_avatar_url, d.vehicle_make as d_vehicle_make, d.vehicle_model as d_vehicle_model,
+        d.vehicle_year as d_vehicle_year, d.vehicle_plate as d_vehicle_plate, d.vehicle_color as d_vehicle_color,
+        d.vehicle_category as d_vehicle_category, d.license_number as d_license_number, d.kyc_status as d_kyc_status,
+        d.kyc_notes as d_kyc_notes, d.is_online as d_is_online, d.is_busy as d_is_busy, d.current_lat as d_current_lat,
+        d.current_lng as d_current_lng, d.heading as d_heading, d.rating as d_rating, d.total_rides as d_total_rides,
+        d.wallet_balance_etb as d_wallet_balance_etb, d.subscription_status as d_subscription_status,
+        d.active_subscription_id as d_active_subscription_id, d.subscription_expires_at as d_subscription_expires_at,
+        d.active_ride_id as d_active_ride_id, d.active_delivery_id as d_active_delivery_id, d.fleet_id as d_fleet_id,
+        d.country_code as d_country_code, d.city_code as d_city_code
+      FROM rides r
+      LEFT JOIN drivers d ON r.driver_id = d.id
+      WHERE r.rider_id = ? OR r.driver_id = (SELECT id FROM drivers WHERE user_id = ?)
+      ORDER BY r.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const rows = db.prepare(query).all(userId, userId, safeLimit, offset) as any[];
+
+    return rows.map((row) => {
+      let driverObj: Driver | undefined;
+      if (row.d_id) {
+        driverObj = {
+          id: row.d_id,
+          userId: row.d_user_id,
+          fullName: row.d_full_name,
+          phone: row.d_phone,
+          avatarUrl: row.d_avatar_url,
+          vehicleMake: row.d_vehicle_make,
+          vehicleModel: row.d_vehicle_model,
+          vehicleYear: row.d_vehicle_year,
+          vehiclePlate: row.d_vehicle_plate,
+          vehicleColor: row.d_vehicle_color,
+          vehicleCategory: row.d_vehicle_category as VehicleCategory,
+          licenseNumber: row.d_license_number,
+          kycStatus: row.d_kyc_status,
+          kycNotes: row.d_kyc_notes,
+          isOnline: Boolean(row.d_is_online),
+          isBusy: Boolean(row.d_is_busy),
+          currentLat: row.d_current_lat,
+          currentLng: row.d_current_lng,
+          heading: row.d_heading,
+          rating: row.d_rating,
+          totalRides: row.d_total_rides,
+          walletBalanceEtb: row.d_wallet_balance_etb,
+          subscriptionStatus: row.d_subscription_status || 'active',
+          activeSubscriptionId: row.d_active_subscription_id || undefined,
+          subscriptionExpiresAt: row.d_subscription_expires_at || undefined,
+          activeRideId: row.d_active_ride_id || undefined,
+          activeDeliveryId: row.d_active_delivery_id || undefined,
+          fleetId: row.d_fleet_id || undefined,
+          countryCode: row.d_country_code || 'ET',
+          cityCode: row.d_city_code || 'ADDIS_ABABA',
+        };
+      }
+      return this.mapRideRow(row, driverObj);
+    });
+  }
+
+  /**
    * Retrieves full Ride object with driver details
    */
   static getRideById(rideId: string): Ride | null {
@@ -477,6 +569,10 @@ export class DispatchService {
       }
     }
 
+    return this.mapRideRow(row, driverObj);
+  }
+
+  private static mapRideRow(row: any, driverObj?: Driver): Ride {
     return {
       id: row.id,
       riderId: row.rider_id,
@@ -484,12 +580,12 @@ export class DispatchService {
       riderPhone: row.rider_phone,
       driverId: row.driver_id || undefined,
       driver: driverObj,
-      pickup: JSON.parse(row.pickup_json),
-      destination: JSON.parse(row.destination_json),
+      pickup: typeof row.pickup_json === 'string' ? JSON.parse(row.pickup_json) : row.pickup_json,
+      destination: typeof row.destination_json === 'string' ? JSON.parse(row.destination_json) : row.destination_json,
       vehicleCategory: row.vehicle_category,
       distanceKm: row.distance_km,
       durationMinutes: row.duration_min,
-      fare: JSON.parse(row.fare_json),
+      fare: typeof row.fare_json === 'string' ? JSON.parse(row.fare_json) : row.fare_json,
       paymentMethod: row.payment_method,
       paymentStatus: row.payment_status,
       status: row.status,
@@ -500,7 +596,7 @@ export class DispatchService {
       rating: row.rating,
       review: row.review,
       tipAmount: row.tip_amount,
-      routeCoordinates: row.route_coords_json ? JSON.parse(row.route_coords_json) : undefined,
+      routeCoordinates: row.route_coords_json ? (typeof row.route_coords_json === 'string' ? JSON.parse(row.route_coords_json) : row.route_coords_json) : undefined,
       currentDriverLocation:
         row.current_driver_lat && row.current_driver_lng
           ? [row.current_driver_lat, row.current_driver_lng]
